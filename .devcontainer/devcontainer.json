@@ -1,0 +1,23 @@
+{
+  "name": "ymca",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "postCreateCommand": "corepack enable && pnpm install",
+  "forwardPorts": [4000, 5173],
+  "portsAttributes": {
+    "4000": {
+      "label": "API",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "Web",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.windows": "PowerShell"
+      }
+    }
+  }
+}
