@@ -1,0 +1,14 @@
+{
+  "name": "@ymca/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "dev": "echo shared-types dev pending",
+    "build": "echo shared-types build pending",
+    "test": "echo shared-types tests pending",
+    "lint": "echo shared-types lint pending",
+    "typecheck": "echo shared-types typecheck pending"
+  }
+}

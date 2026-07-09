@@ -1,0 +1,338 @@
+# Blueprint V2: ymca (Notion-Like Workspace)
+
+This document is the source-of-truth product and engineering specification for building ymca, a Notion-like collaborative workspace application.
+
+## 1) Project Identity
+
+- Project name: ymca
+- Product type: collaborative knowledge workspace (documents, nested pages, sharing)
+- Primary users (MVP): small teams (5-100 users)
+- Platforms (MVP): web first, desktop wrapper after web stabilizes
+
+## 2) Goals, Non-Goals, and Success Criteria
+
+### Goals (MVP)
+
+- Rich block editor with reliable autosave
+- Nested page tree with fast navigation
+- Workspace/team model with role-based access control
+- Sharing model: private, workspace-visible, public read-only links
+- Stable core observability, auditability, and backup strategy
+
+### Non-Goals (MVP)
+
+- Real-time multiplayer cursor presence
+- Database/table view like Notion databases
+- Built-in comments and mentions
+- Offline-first synchronization
+- AI-assisted writing features
+
+### MVP Success Criteria
+
+- Page open latency p95 <= 700 ms (excluding very large pages)
+- Save latency p95 <= 300 ms for normal page sizes
+- No data loss during normal browser refreshes/navigation
+- Permission checks enforced for every page read/write operation
+- Basic audit trail available for create, update, delete, share actions
+- System must run reliably for concurrent multi-user usage (target MVP team size), without data corruption, permission leakage, or session cross-over under normal load
+
+## 3) Tech Stack
+
+- Frontend: React, TypeScript, Vite, Tailwind CSS
+- Editor: TipTap (ProseMirror-based)
+- Backend: Node.js, TypeScript, Fastify
+- Database: PostgreSQL
+- ORM: Prisma
+- Desktop wrapper (Phase 4): Tauri 2.x
+- Package manager/workspace: pnpm workspaces
+
+## 4) Architecture
+
+### Monorepo Layout
+
+ymca/
+  apps/
+    web/
+    api/
+    desktop/
+  packages/
+    shared-types/
+    shared-config/
+  infra/
+    docker/
+    migrations/
+
+### System Components
+
+- Web client handles editing, navigation, and share workflows
+- API server handles auth, RBAC, page tree, content persistence, audit logging
+- PostgreSQL stores workspace metadata, page hierarchy, permissions, revisions
+- Object storage (phase-defined) stores cover/media assets
+
+### Content Persistence Strategy (MVP)
+
+- Store full page content in JSONB (TipTap document format)
+- Autosave on debounce (2 seconds)
+- Use optimistic concurrency with page version field
+- Store revision snapshots for rollback/history
+
+## 5) Product Scope (MVP)
+
+### Core Features
+
+- Workspace creation and member invitations
+- Nested pages (infinite depth)
+- Block editor with headings, paragraphs, bullet list, checklist, code block, divider
+- Sidebar tree navigation with drag reorder
+- Page icon and cover image
+- Page publish toggle (public read-only link)
+- Role-based sharing (Owner, Editor, Viewer)
+- Trash/restore flow (soft delete)
+- Global search across accessible pages
+
+### Future Features (Post-MVP)
+
+- Comments and mentions
+- Templates and duplicate page as template
+- Live collaborative editing with presence
+- Notion-style databases and custom properties
+
+## 6) Data Model (Conceptual)
+
+### Core Entities
+
+- User
+- Workspace
+- WorkspaceMember
+- Page
+- PagePermission
+- PageRevision
+- AuditLog
+- Session
+- InviteToken
+
+### Key Rules
+
+- Every page belongs to exactly one workspace
+- Page hierarchy cannot cross workspace boundaries
+- Root pages have parentPageId = null
+- Soft delete uses deletedAt timestamp (not hard delete in MVP)
+- Public links are tokenized and revocable
+
+### Permission Model
+
+- Workspace roles: WorkspaceOwner, WorkspaceAdmin, WorkspaceMember, WorkspaceGuest
+- Page roles: Owner, Editor, Viewer
+- Inheritance default: child inherits parent page access
+- Overrides allowed: explicit permission on child page
+- Deny precedence: explicit deny on child supersedes inherited allow
+
+### Ordering Model
+
+- Use position field for sibling ordering
+- Initial approach: fractional ranking string or numeric with rebalancing
+
+## 7) API Contract (MVP)
+
+### Auth and Workspace
+
+- POST /auth/register
+- POST /auth/login
+- POST /auth/logout
+- GET /me
+- POST /workspaces
+- GET /workspaces
+- POST /workspaces/:id/invites
+- POST /invites/:token/accept
+
+### Page and Content
+
+- GET /workspaces/:workspaceId/pages/tree
+- POST /workspaces/:workspaceId/pages
+- GET /pages/:id
+- PATCH /pages/:id/meta
+- PUT /pages/:id/content
+- POST /pages/:id/move
+- POST /pages/:id/restore
+- DELETE /pages/:id (soft delete)
+
+### Sharing and Publish
+
+- POST /pages/:id/share
+- DELETE /pages/:id/share/:permissionId
+- POST /pages/:id/publish
+- POST /pages/:id/unpublish
+- GET /public/:shareToken
+
+### Search and Revisions
+
+- GET /search?q=...&workspaceId=...
+- GET /pages/:id/revisions
+- POST /pages/:id/revisions/:revisionId/restore
+
+### API Conventions
+
+- Use cursor-based pagination for list endpoints
+- Use request validation at boundary (schema-first)
+- Consistent error envelope with code, message, traceId
+- Include ETag or version number for optimistic concurrency
+
+## 8) Concurrency and Data Integrity
+
+- Page record includes version integer
+- Client sends expectedVersion on content save
+- If mismatch, API returns 409 Conflict with latest metadata
+- Client flow on conflict:
+  - fetch latest content
+  - present user with merge/overwrite option (simple strategy in MVP)
+
+## 9) Search Strategy
+
+- MVP: PostgreSQL full-text search (tsvector + GIN index)
+- Index fields: page title + plain-text extracted body
+- Respect permission filters in every search query
+- Post-MVP option: external search engine for scale
+
+## 10) Security Baseline
+
+- Password hashing with Argon2 or bcrypt (configured cost)
+- Session strategy: HTTP-only secure cookie sessions (recommended)
+- CSRF protection for cookie-authenticated mutating endpoints
+- Input validation and output encoding for XSS prevention
+- TipTap content sanitization policy for pasted HTML
+- Rate limiting for auth and share endpoints
+- Secrets in environment variables, never in source control
+- Audit important security events (login failure bursts, invite abuse)
+
+## 11) Logging, Metrics, and Audit
+
+### Application Logging
+
+- Structured logs (JSON) with level, message, traceId, userId, workspaceId
+- Never log passwords, session secrets, or raw tokens
+- Include request/response timing and endpoint tags
+
+### Metrics
+
+- API latency by endpoint
+- Save success/failure rates
+- Conflict rate for page saves
+- DB query duration percentiles
+
+### Audit Log Events
+
+- PAGE_CREATE, PAGE_UPDATE, PAGE_DELETE, PAGE_RESTORE
+- PAGE_SHARE_ADD, PAGE_SHARE_REMOVE
+- INVITE_SENT, INVITE_ACCEPTED
+- ROLE_CHANGED
+
+## 12) Performance and Capacity Targets
+
+- Initial scale target: 100 workspaces, 10k pages total
+- Typical page size target: <= 300 KB JSON content
+- Hard payload limit for save endpoint: configurable (example 1 MB)
+- Sidebar tree load p95 <= 500 ms
+- Search p95 <= 800 ms for common queries in MVP scale
+
+## 13) Testing and Quality Gates
+
+### Test Layers
+
+- Unit tests: utility, permission resolver, ranking/order logic
+- Integration tests: API routes + DB interactions
+- End-to-end tests: auth, create/edit/share/publish, restore-from-trash
+
+### Quality Gates
+
+- Lint and typecheck must pass on all packages
+- Migration test must run against clean database
+- Critical path e2e tests pass before release tag
+- Concurrent multi-user test scenarios must pass for auth, workspace access, page edit/save conflicts, and permission boundaries
+
+## 14) Environments and Release Strategy
+
+- Environments: local, dev, staging, production
+- CI pipeline:
+  - install -> lint -> test -> build -> migration check
+- CD policy:
+  - promote from staging to production after smoke tests
+- Database migration policy:
+  - forward-only migrations
+  - rollback playbook documented per release
+
+## 15) Backup, Recovery, and Retention
+
+- Daily full backup + periodic incremental backups
+- Retention policy defined by environment
+- Quarterly restore drills in non-production environment
+- Revision retention policy (example): keep last 50 revisions per page in MVP
+
+## 16) Execution Plan and Exit Criteria
+
+### Phase 1: Foundation (Editor + Auth + Workspace)
+
+- Monorepo scaffold
+- Auth/session flow
+- Workspace and member model
+- Basic page CRUD and TipTap save/load
+- Exit criteria:
+  - user can create workspace and first page
+  - autosave works with version checks
+
+### Phase 2: Navigation + Permissions + Trash
+
+- Recursive page tree and ordering
+- Share dialog + inherited permissions
+- Soft delete and restore
+- Exit criteria:
+  - role enforcement proven by tests
+  - deleted pages recoverable from trash
+
+### Phase 3: Publish + Search + Revisions
+
+- Public read-only links with token controls
+- Full-text search with permission filters
+- Revision history and restore
+- Exit criteria:
+  - published pages accessible without login
+  - revision restore validated end-to-end
+
+### Phase 4: Desktop Packaging
+
+- Tauri integration and secure capability configuration
+- Signed desktop builds
+- Auto-update channel strategy
+- Exit criteria:
+  - stable dev desktop build
+  - production packaging checklist complete
+
+## 17) Open Decisions to Lock Before Coding
+
+- Final auth style: cookie-session only or hybrid with access token
+- Public link policy: token rotation and expiry defaults
+- Revision granularity: full snapshot only or delta in future
+- Object storage provider for assets (local/S3-compatible)
+- Max page size and attachment limits for MVP
+
+## 18) Risks and Mitigations
+
+- Risk: large JSON document writes become slow
+  - Mitigation: payload limits, compression, and future block-level storage path
+- Risk: permission logic bugs leak data
+  - Mitigation: centralized permission engine + integration tests
+- Risk: tree queries become expensive
+  - Mitigation: proper indexes and bounded query patterns
+
+## 19) Naming and Conventions
+
+- Workspace slug format: lowercase-kebab-case
+- Page title default: Untitled
+- Consistent UTC timestamps
+- IDs: UUID v4 for MVP
+
+## 20) Immediate Next Planning Step (No Coding)
+
+- Confirm the open decisions in section 17
+- Freeze MVP scope from section 5
+- Approve API surface in section 7
+- Then begin implementation using this Blueprint V2 as the baseline

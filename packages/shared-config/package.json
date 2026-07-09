@@ -1,0 +1,12 @@
+{
+  "name": "@ymca/shared-config",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo shared-config dev pending",
+    "build": "echo shared-config build pending",
+    "test": "echo shared-config tests pending",
+    "lint": "echo shared-config lint pending",
+    "typecheck": "echo shared-config typecheck pending"
+  }
+}

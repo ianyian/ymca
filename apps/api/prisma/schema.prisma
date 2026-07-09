@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  WorkspaceOwner
+  WorkspaceAdmin
+  WorkspaceMember
+  WorkspaceGuest
+}
+
+enum PageRole {
+  Owner
+  Editor
+  Viewer
+}
+
+model User {
+  id              String            @id @default(uuid()) @db.Uuid
+  email           String            @unique
+  passwordHash    String
+  displayName     String?
+  language        String            @default("en")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  sessions        Session[]
+  workspacesOwned Workspace[]            @relation("WorkspaceOwner")
+  memberships     WorkspaceMember[]
+  pagesCreated    Page[]                 @relation("PageCreator")
+  pagePermissions PagePermission[]       @relation("PermissionGrantedTo")
+  invitesCreated  InviteToken[]          @relation("InviteCreator")
+  passwordResets  PasswordResetToken[]
+}
+
+model Session {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  tokenHash     String    @unique
+  csrfToken     String
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  lastSeenAt    DateTime  @default(now())
+  invalidatedAt DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id        String            @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String            @unique
+  ownerId   String            @db.Uuid
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members   WorkspaceMember[]
+  pages     Page[]
+  invites   InviteToken[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole
+  invitedById String?       @db.Uuid
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Page {
+  id            String           @id @default(uuid()) @db.Uuid
+  workspaceId   String           @db.Uuid
+  parentPageId  String?          @db.Uuid
+  creatorId     String           @db.Uuid
+  title         String           @default("Untitled")
+  icon          String?
+  coverImageUrl String?
+  tags          String[]         @default([])
+  content       Json             @default("{}") @db.JsonB
+  position      Decimal?
+  version       Int              @default(1)
+  isPublished   Boolean          @default(false)
+  publishedAt   DateTime?
+  publishToken  String?          @unique
+  publishTheme  String           @default("muji")
+  deletedAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator       User             @relation("PageCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  parentPage    Page?            @relation("PageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
+  childPages    Page[]           @relation("PageHierarchy")
+  revisions     PageRevision[]
+  permissions   PagePermission[]
+  attachments   PageAttachment[]
+
+  @@index([workspaceId])
+  @@index([parentPageId])
+  @@index([workspaceId, deletedAt])
+  @@index([publishToken])
+}
+
+model PageRevision {
+  id        String   @id @default(uuid()) @db.Uuid
+  pageId    String   @db.Uuid
+  version   Int
+  snapshot  Json     @db.JsonB
+  createdBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, createdAt])
+}
+
+model PagePermission {
+  id             String         @id @default(uuid()) @db.Uuid
+  pageId         String         @db.Uuid
+  userId         String?        @db.Uuid
+  workspaceRole  WorkspaceRole?
+  pageRole       PageRole
+  isExplicitDeny Boolean        @default(false)
+  grantedById    String?        @db.Uuid
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  page           Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user           User?          @relation("PermissionGrantedTo", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([userId])
+}
+
+model InviteToken {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  email       String?
+  role        WorkspaceRole
+  token       String        @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String        @db.Uuid
+  createdAt   DateTime      @default(now())
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User          @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([token])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @db.Uuid
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model PageAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  pageId       String   @db.Uuid
+  filename     String
+  originalName String
+  mimetype     String
+  size         Int
+  filePath     String   @default("")
+  createdAt    DateTime @default(now())
+  page         Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+}

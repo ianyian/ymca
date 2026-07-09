@@ -1,0 +1,118 @@
+{
+  "lastUpdated": "2026-07-08",
+  "source": "manual code audit against blueprint.txt phase checklist",
+  "overallEstimatedCompletionPercent": 90,
+  "phases": [
+    {
+      "phase": "Phase 1: Foundation (Editor + Auth + Workspace)",
+      "estimatedCompletionPercent": 100,
+      "status": "complete",
+      "notes": [
+        "Monorepo scaffold complete",
+        "Auth/session flow complete (register, login, logout, /me, CSRF protection)",
+        "Workspace and membership model complete (create, list)",
+        "Page CRUD endpoints complete (create, get, patch meta, put content with versioning)",
+        "Web UI with TipTap editor and 2s-debounce autosave complete",
+        "Prisma schema and initial migration SQL created",
+        "Unit tests: 10 passing (token, versioning, workspace slug)",
+        "Integration tests: 45 passing (auth 14, workspaces 9, pages 22)",
+        "Exit criteria met: user can create workspace and first page, autosave works with version checks"
+      ]
+    },
+    {
+      "phase": "Phase 2: Navigation + Permissions + Trash",
+      "estimatedCompletionPercent": 100,
+      "status": "complete",
+      "notes": [
+        "Prisma schema: PagePermission + InviteToken models + PageRole enum",
+        "Domain layer: permissions.ts, tree.ts, ordering.ts",
+        "API: page tree, trash/restore, move, share/unshare, invite/accept",
+        "Frontend: sidebar page tree with collapse/expand, new/delete, trash panel with restore",
+        "Unit tests: 47 passing, Integration tests: 86 passing",
+        "Exit criteria met: role enforcement in tests, deleted pages recoverable from trash"
+      ]
+    },
+    {
+      "phase": "Phase 3: Publish + Search + Revisions",
+      "estimatedCompletionPercent": 100,
+      "status": "complete",
+      "notes": [
+        "Prisma schema: isPublished, publishedAt, publishToken on Page + GIN index migration",
+        "API: POST /pages/:id/publish, POST /pages/:id/unpublish",
+        "API: GET /public/:shareToken (no auth required)",
+        "API: GET /search?q=&workspaceId= (PostgreSQL full-text with ilike fallback)",
+        "API: GET /pages/:id/revisions, POST /pages/:id/revisions/:revisionId/restore",
+        "Frontend: full Notion-like layout — sidebar tree, search modal, publish toggle, public link copy, revision history panel",
+        "Integration tests: 112 passing total (26 new Phase 3 tests)",
+        "Total test suite: 47 unit + 112 integration = 159 tests all passing",
+        "Exit criteria met: published pages accessible without login, revision restore validated end-to-end"
+      ]
+    },
+    {
+      "phase": "Phase 4: Desktop Packaging",
+      "estimatedCompletionPercent": 5,
+      "status": "not_started",
+      "notes": [
+        "Desktop app folder exists",
+        "Tauri integration and packaging workflow not implemented"
+      ]
+    }
+  ]
+}
+  "phases": [
+    {
+      "phase": "Phase 1: Foundation (Editor + Auth + Workspace)",
+      "estimatedCompletionPercent": 100,
+      "status": "complete",
+      "notes": [
+        "Monorepo scaffold complete",
+        "Auth/session flow complete (register, login, logout, /me, CSRF protection)",
+        "Workspace and membership model complete (create, list)",
+        "Page CRUD endpoints complete (create, get, patch meta, put content with versioning)",
+        "Web UI with TipTap editor and 2s-debounce autosave complete",
+        "Prisma schema and initial migration SQL created",
+        "Unit tests: 10 passing (token, versioning, workspace slug)",
+        "Integration tests: 45 passing (auth 14, workspaces 9, pages 22)",
+        "Exit criteria met: user can create workspace and first page, autosave works with version checks"
+      ]
+    },
+    {
+      "phase": "Phase 2: Navigation + Permissions + Trash",
+      "estimatedCompletionPercent": 95,
+      "status": "in_progress",
+      "notes": [
+        "Prisma schema updated: PagePermission + InviteToken models + PageRole enum",
+        "Phase 2 migration SQL created (20260708000000_phase2_permissions_invites)",
+        "Domain layer: permissions.ts (resolveEffectivePageRole, canEdit, canView)",
+        "Domain layer: tree.ts (buildPageTree from flat list with position sorting)",
+        "Domain layer: ordering.ts (generatePositionBetween, appendPosition, rebalancePositions)",
+        "API routes: GET /workspaces/:id/pages/tree",
+        "API routes: DELETE /pages/:id, POST /pages/:id/restore, GET /workspaces/:id/trash",
+        "API routes: POST /pages/:id/move (reparent + position)",
+        "API routes: POST /pages/:id/share, DELETE /pages/:id/share/:permissionId",
+        "API routes: POST /workspaces/:id/invites, POST /invites/:token/accept",
+        "Unit tests: 47 passing (10 original + 37 new domain tests)",
+        "Integration tests: 86 passing (45 original + 41 new route tests)",
+        "Pending: Web UI sidebar tree + trash panel (apps/web)"
+      ]
+    },
+    {
+      "phase": "Phase 3: Publish + Search + Revisions",
+      "estimatedCompletionPercent": 15,
+      "status": "not_started",
+      "notes": [
+        "Page revision table and write path exist",
+        "Publish endpoints and search API are not implemented"
+      ]
+    },
+    {
+      "phase": "Phase 4: Desktop Packaging",
+      "estimatedCompletionPercent": 5,
+      "status": "not_started",
+      "notes": [
+        "Desktop app folder exists",
+        "Tauri integration and packaging workflow not implemented"
+      ]
+    }
+  ]
+}
