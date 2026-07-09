@@ -27,16 +27,16 @@ type ErrorEnvelope = {
 export function createServer() {
   const app = Fastify({
     logger: {
-      level: process.env.NODE_ENV === "production" ? "info" : "debug"
+      level: process.env.NODE_ENV === "production" ? "info" : "debug",
     },
     genReqId: () => randomUUID(),
-    bodyLimit: 50 * 1024 * 1024,  // 50 MB — supports pages with pasted images
+    bodyLimit: 50 * 1024 * 1024, // 50 MB — supports pages with pasted images
   });
 
   app.register(cors, {
-    origin: true,   // reflect any origin — safe for local/LAN use
+    origin: true, // reflect any origin — safe for local/LAN use
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
   app.register(cookie);
@@ -73,7 +73,7 @@ export function createServer() {
       return reply.status(403).send({
         code: "CSRF_MISMATCH",
         message: "Invalid CSRF token",
-        traceId: request.id
+        traceId: request.id,
       });
     }
   });
@@ -101,44 +101,56 @@ export function createServer() {
             type: "object",
             properties: {
               status: { type: "string" },
-              traceId: { type: "string" }
+              traceId: { type: "string" },
             },
-            required: ["status", "traceId"]
-          }
-        }
-      }
+            required: ["status", "traceId"],
+          },
+        },
+      },
     },
     async (request) => {
       return {
         status: "ok",
-        traceId: request.id
+        traceId: request.id,
       };
-    }
+    },
   );
 
   app.setNotFoundHandler(async (request, reply) => {
     const body: ErrorEnvelope = {
       code: "NOT_FOUND",
       message: "Route not found",
-      traceId: request.id
+      traceId: request.id,
     };
     return reply.status(404).send(body);
   });
 
   app.setErrorHandler((error, request, reply) => {
-    const statusCode = typeof error.statusCode === "number" ? error.statusCode : 500;
+    const normalizedError = error as {
+      statusCode?: unknown;
+      message?: unknown;
+    };
+    const statusCode =
+      typeof normalizedError.statusCode === "number"
+        ? normalizedError.statusCode
+        : 500;
     const body: ErrorEnvelope = {
       code: statusCode >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR",
-      message: statusCode >= 500 ? "Internal server error" : error.message,
-      traceId: request.id
+      message:
+        statusCode >= 500
+          ? "Internal server error"
+          : typeof normalizedError.message === "string"
+            ? normalizedError.message
+            : "Request error",
+      traceId: request.id,
     };
 
     request.log.error(
       {
         err: error,
-        traceId: request.id
+        traceId: request.id,
       },
-      "request failed"
+      "request failed",
     );
 
     return reply.status(statusCode).send(body);
