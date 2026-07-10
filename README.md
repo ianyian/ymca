@@ -45,6 +45,14 @@ The Neon password, host, and full database URL should live in GitHub Secrets, Co
 
 For a local demo with Neon, start the API first so the proxy can connect, then start the web app.
 
+## GitHub Pages frontend
+
+This repo is set up so the frontend can be published to GitHub Pages at `/ymca/`.
+
+Before the Pages workflow can work, set a GitHub repository variable named `VITE_API_URL` to your Render API URL, for example `https://your-api.onrender.com`.
+
+Then GitHub Actions will build `apps/web` and publish the static site from `apps/web/dist`.
+
 ## Reusable API tests (Phase 1 and later phases)
 
 - Run from repo root:
