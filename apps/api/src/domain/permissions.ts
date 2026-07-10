@@ -1,4 +1,4 @@
-import type { WorkspaceRole, PageRole, PagePermission } from '@prisma/client';
+import type { PagePermissionRecord, PageRole, WorkspaceRole } from "./roles.js";
 
 const WORKSPACE_ROLE_RANK: Record<WorkspaceRole, number> = {
   WorkspaceOwner: 4,
@@ -31,17 +31,17 @@ export type PermissionContext = {
  */
 export function resolveEffectivePageRole(
   ctx: PermissionContext,
-  permissions: Pick<PagePermission, 'userId' | 'workspaceRole' | 'pageRole' | 'isExplicitDeny'>[],
+  permissions: PagePermissionRecord[],
 ): PageRole | null {
   if (
-    ctx.workspaceRole === 'WorkspaceOwner' ||
-    ctx.workspaceRole === 'WorkspaceAdmin'
+    ctx.workspaceRole === "WorkspaceOwner" ||
+    ctx.workspaceRole === "WorkspaceAdmin"
   ) {
-    return 'Owner';
+    return "Owner";
   }
 
   if (ctx.isPageCreator) {
-    return 'Owner';
+    return "Owner";
   }
 
   // Check for explicit deny targeting this user
@@ -54,7 +54,8 @@ export function resolveEffectivePageRole(
   let best: PageRole | null = null;
   for (const p of permissions) {
     if (p.userId === ctx.userId && !p.isExplicitDeny) {
-      if (best === null || PAGE_ROLE_RANK[p.pageRole] > PAGE_ROLE_RANK[best]) {
+      const currentRank = best === null ? -1 : PAGE_ROLE_RANK[best];
+      if (PAGE_ROLE_RANK[p.pageRole] > currentRank) {
         best = p.pageRole;
       }
     }
@@ -65,8 +66,10 @@ export function resolveEffectivePageRole(
   const userRank = WORKSPACE_ROLE_RANK[ctx.workspaceRole];
   for (const p of permissions) {
     if (p.workspaceRole !== null && p.userId === null && !p.isExplicitDeny) {
-      if (userRank >= WORKSPACE_ROLE_RANK[p.workspaceRole!]) {
-        if (best === null || PAGE_ROLE_RANK[p.pageRole] > PAGE_ROLE_RANK[best]) {
+      const permissionRank = WORKSPACE_ROLE_RANK[p.workspaceRole];
+      if (userRank >= permissionRank) {
+        const currentRank = best === null ? -1 : PAGE_ROLE_RANK[best];
+        if (PAGE_ROLE_RANK[p.pageRole] > currentRank) {
           best = p.pageRole;
         }
       }
@@ -75,12 +78,12 @@ export function resolveEffectivePageRole(
   if (best !== null) return best;
 
   // Defaults
-  if (ctx.workspaceRole === 'WorkspaceMember') return 'Viewer';
+  if (ctx.workspaceRole === "WorkspaceMember") return "Viewer";
   return null;
 }
 
 export function canEdit(role: PageRole | null): boolean {
-  return role === 'Owner' || role === 'Editor';
+  return role === "Owner" || role === "Editor";
 }
 
 export function canView(role: PageRole | null): boolean {

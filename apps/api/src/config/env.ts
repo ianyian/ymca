@@ -4,9 +4,15 @@ import { z } from "zod";
 loadDotEnv();
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   API_HOST: z.string().default("0.0.0.0"),
-  API_PORT: z.coerce.number().int().positive().default(4000),
+  API_PORT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(Number(process.env.PORT ?? 4000)),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),

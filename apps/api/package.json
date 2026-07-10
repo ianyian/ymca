@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm prisma:generate && tsc -p tsconfig.json",
+    "postinstall": "pnpm prisma:generate",
     "start": "node dist/index.js",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "node --experimental-strip-types --test tests/unit/**/*.test.ts",

@@ -1,16 +1,19 @@
-import type { FastifyInstance } from 'fastify';
-import crypto from 'node:crypto';
-import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../auth/require-auth.js';
-import type { WorkspaceRole } from '@prisma/client';
+import type { FastifyInstance } from "fastify";
+import crypto from "node:crypto";
+import { prisma } from "../lib/prisma.js";
+import { requireAuth } from "../auth/require-auth.js";
+import type { WorkspaceRole } from "../domain/roles.js";
 
 const createInviteBodySchema = {
-  type: 'object',
+  type: "object",
   properties: {
-    email: { type: 'string', format: 'email' },
-    role: { type: 'string', enum: ['WorkspaceAdmin', 'WorkspaceMember', 'WorkspaceGuest'] },
+    email: { type: "string", format: "email" },
+    role: {
+      type: "string",
+      enum: ["WorkspaceAdmin", "WorkspaceMember", "WorkspaceGuest"],
+    },
   },
-  required: ['role'],
+  required: ["role"],
   additionalProperties: false,
 } as const;
 
@@ -19,13 +22,13 @@ const INVITE_EXPIRY_HOURS = 72;
 export async function registerInviteRoutes(app: FastifyInstance) {
   // Create an invite token for a workspace
   app.post(
-    '/workspaces/:workspaceId/invites',
+    "/workspaces/:workspaceId/invites",
     {
       schema: {
         params: {
-          type: 'object',
-          properties: { workspaceId: { type: 'string', format: 'uuid' } },
-          required: ['workspaceId'],
+          type: "object",
+          properties: { workspaceId: { type: "string", format: "uuid" } },
+          required: ["workspaceId"],
         },
         body: createInviteBodySchema,
       },
@@ -40,16 +43,22 @@ export async function registerInviteRoutes(app: FastifyInstance) {
       const membership = await prisma.workspaceMember.findUnique({
         where: { workspaceId_userId: { workspaceId, userId: user.id } },
       });
-      if (!membership || (membership.role !== 'WorkspaceOwner' && membership.role !== 'WorkspaceAdmin')) {
+      if (
+        !membership ||
+        (membership.role !== "WorkspaceOwner" &&
+          membership.role !== "WorkspaceAdmin")
+      ) {
         return reply.status(403).send({
-          code: 'FORBIDDEN',
-          message: 'Only workspace admins can create invites',
+          code: "FORBIDDEN",
+          message: "Only workspace admins can create invites",
           traceId: request.id,
         });
       }
 
-      const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(
+        Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000,
+      );
 
       const invite = await prisma.inviteToken.create({
         data: {
@@ -68,13 +77,13 @@ export async function registerInviteRoutes(app: FastifyInstance) {
 
   // Accept an invite token — adds the current user as a workspace member
   app.post(
-    '/invites/:token/accept',
+    "/invites/:token/accept",
     {
       schema: {
         params: {
-          type: 'object',
-          properties: { token: { type: 'string' } },
-          required: ['token'],
+          type: "object",
+          properties: { token: { type: "string" } },
+          required: ["token"],
         },
       },
     },
@@ -88,28 +97,33 @@ export async function registerInviteRoutes(app: FastifyInstance) {
 
       if (!invite) {
         return reply.status(404).send({
-          code: 'INVITE_NOT_FOUND',
-          message: 'Invite not found',
+          code: "INVITE_NOT_FOUND",
+          message: "Invite not found",
           traceId: request.id,
         });
       }
 
       if (invite.usedAt !== null || invite.expiresAt < new Date()) {
         return reply.status(410).send({
-          code: 'INVITE_EXPIRED',
-          message: 'Invite has expired or been used',
+          code: "INVITE_EXPIRED",
+          message: "Invite has expired or been used",
           traceId: request.id,
         });
       }
 
       // Check if already a member
       const existing = await prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: invite.workspaceId, userId: user.id } },
+        where: {
+          workspaceId_userId: {
+            workspaceId: invite.workspaceId,
+            userId: user.id,
+          },
+        },
       });
       if (existing) {
         return reply.status(409).send({
-          code: 'ALREADY_MEMBER',
-          message: 'You are already a member of this workspace',
+          code: "ALREADY_MEMBER",
+          message: "You are already a member of this workspace",
           traceId: request.id,
         });
       }

@@ -1,28 +1,28 @@
-import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../auth/require-auth.js';
-import type { PageRole } from '@prisma/client';
+import type { FastifyInstance } from "fastify";
+import { prisma } from "../lib/prisma.js";
+import { requireAuth } from "../auth/require-auth.js";
+import type { PageRole } from "../domain/roles.js";
 
 const shareBodySchema = {
-  type: 'object',
+  type: "object",
   properties: {
-    userId: { type: 'string', format: 'uuid' },
-    pageRole: { type: 'string', enum: ['Owner', 'Editor', 'Viewer'] },
+    userId: { type: "string", format: "uuid" },
+    pageRole: { type: "string", enum: ["Owner", "Editor", "Viewer"] },
   },
-  required: ['pageRole'],
+  required: ["pageRole"],
   additionalProperties: false,
 } as const;
 
 export async function registerShareRoutes(app: FastifyInstance) {
   // Grant page permission to a user
   app.post(
-    '/pages/:id/share',
+    "/pages/:id/share",
     {
       schema: {
         params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id'],
+          type: "object",
+          properties: { id: { type: "string", format: "uuid" } },
+          required: ["id"],
         },
         body: shareBodySchema,
       },
@@ -37,19 +37,24 @@ export async function registerShareRoutes(app: FastifyInstance) {
       const page = await prisma.page.findUnique({ where: { id } });
       if (!page || page.deletedAt !== null) {
         return reply.status(404).send({
-          code: 'PAGE_NOT_FOUND',
-          message: 'Page not found',
+          code: "PAGE_NOT_FOUND",
+          message: "Page not found",
           traceId: request.id,
         });
       }
 
       const membership = await prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: page.workspaceId, userId: user.id } },
+        where: {
+          workspaceId_userId: {
+            workspaceId: page.workspaceId,
+            userId: user.id,
+          },
+        },
       });
       if (!membership) {
         return reply.status(403).send({
-          code: 'FORBIDDEN',
-          message: 'No access to page',
+          code: "FORBIDDEN",
+          message: "No access to page",
           traceId: request.id,
         });
       }
@@ -57,12 +62,17 @@ export async function registerShareRoutes(app: FastifyInstance) {
       // If userId provided, verify they are a workspace member
       if (body.userId) {
         const targetMembership = await prisma.workspaceMember.findUnique({
-          where: { workspaceId_userId: { workspaceId: page.workspaceId, userId: body.userId } },
+          where: {
+            workspaceId_userId: {
+              workspaceId: page.workspaceId,
+              userId: body.userId,
+            },
+          },
         });
         if (!targetMembership) {
           return reply.status(400).send({
-            code: 'USER_NOT_IN_WORKSPACE',
-            message: 'Target user is not a member of this workspace',
+            code: "USER_NOT_IN_WORKSPACE",
+            message: "Target user is not a member of this workspace",
             traceId: request.id,
           });
         }
@@ -83,16 +93,16 @@ export async function registerShareRoutes(app: FastifyInstance) {
 
   // Revoke page permission
   app.delete(
-    '/pages/:id/share/:permissionId',
+    "/pages/:id/share/:permissionId",
     {
       schema: {
         params: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            permissionId: { type: 'string', format: 'uuid' },
+            id: { type: "string", format: "uuid" },
+            permissionId: { type: "string", format: "uuid" },
           },
-          required: ['id', 'permissionId'],
+          required: ["id", "permissionId"],
         },
       },
     },
@@ -100,24 +110,32 @@ export async function registerShareRoutes(app: FastifyInstance) {
       const user = requireAuth(request, reply);
       if (!user) return;
 
-      const { id, permissionId } = request.params as { id: string; permissionId: string };
+      const { id, permissionId } = request.params as {
+        id: string;
+        permissionId: string;
+      };
 
       const page = await prisma.page.findUnique({ where: { id } });
       if (!page || page.deletedAt !== null) {
         return reply.status(404).send({
-          code: 'PAGE_NOT_FOUND',
-          message: 'Page not found',
+          code: "PAGE_NOT_FOUND",
+          message: "Page not found",
           traceId: request.id,
         });
       }
 
       const membership = await prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: page.workspaceId, userId: user.id } },
+        where: {
+          workspaceId_userId: {
+            workspaceId: page.workspaceId,
+            userId: user.id,
+          },
+        },
       });
       if (!membership) {
         return reply.status(403).send({
-          code: 'FORBIDDEN',
-          message: 'No access to page',
+          code: "FORBIDDEN",
+          message: "No access to page",
           traceId: request.id,
         });
       }
@@ -127,8 +145,8 @@ export async function registerShareRoutes(app: FastifyInstance) {
       });
       if (!permission || permission.pageId !== id) {
         return reply.status(404).send({
-          code: 'PERMISSION_NOT_FOUND',
-          message: 'Permission not found',
+          code: "PERMISSION_NOT_FOUND",
+          message: "Permission not found",
           traceId: request.id,
         });
       }

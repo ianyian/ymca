@@ -7,10 +7,12 @@ import { getNextVersion, hasVersionConflict } from "../domain/versioning.js";
 const createPageBodySchema = {
   type: "object",
   properties: {
-    parentPageId: { anyOf: [{ type: "string", format: "uuid" }, { type: "null" }] },
-    title: { type: "string", minLength: 1, maxLength: 200 }
+    parentPageId: {
+      anyOf: [{ type: "string", format: "uuid" }, { type: "null" }],
+    },
+    title: { type: "string", minLength: 1, maxLength: 200 },
   },
-  additionalProperties: false
+  additionalProperties: false,
 } as const;
 
 const pageMetaBodySchema = {
@@ -19,19 +21,23 @@ const pageMetaBodySchema = {
     title: { type: "string", minLength: 1, maxLength: 200 },
     icon: { type: "string", maxLength: 32 },
     coverImageUrl: { type: "string", maxLength: 512 },
-    tags: { type: "array", items: { type: "string", maxLength: 64 }, maxItems: 30 }
+    tags: {
+      type: "array",
+      items: { type: "string", maxLength: 64 },
+      maxItems: 30,
+    },
   },
-  additionalProperties: false
+  additionalProperties: false,
 } as const;
 
 const pageContentBodySchema = {
   type: "object",
   properties: {
     expectedVersion: { type: "integer", minimum: 1 },
-    content: {}
+    content: {},
   },
   required: ["expectedVersion", "content"],
-  additionalProperties: false
+  additionalProperties: false,
 } as const;
 
 async function assertWorkspaceAccess(userId: string, workspaceId: string) {
@@ -39,9 +45,9 @@ async function assertWorkspaceAccess(userId: string, workspaceId: string) {
     where: {
       workspaceId_userId: {
         workspaceId,
-        userId
-      }
-    }
+        userId,
+      },
+    },
   });
 
   return membership !== null;
@@ -55,12 +61,12 @@ export async function registerPageRoutes(app: FastifyInstance) {
         params: {
           type: "object",
           properties: {
-            workspaceId: { type: "string", format: "uuid" }
+            workspaceId: { type: "string", format: "uuid" },
           },
-          required: ["workspaceId"]
+          required: ["workspaceId"],
         },
-        body: createPageBodySchema
-      }
+        body: createPageBodySchema,
+      },
     },
     async (request, reply) => {
       const user = requireAuth(request, reply);
@@ -71,24 +77,27 @@ export async function registerPageRoutes(app: FastifyInstance) {
       const params = request.params as { workspaceId: string };
       const body = request.body as { parentPageId?: string; title?: string };
 
-      const hasAccess = await assertWorkspaceAccess(user.id, params.workspaceId);
+      const hasAccess = await assertWorkspaceAccess(
+        user.id,
+        params.workspaceId,
+      );
       if (!hasAccess) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to workspace",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
       if (body.parentPageId) {
         const parent = await prisma.page.findUnique({
-          where: { id: body.parentPageId }
+          where: { id: body.parentPageId },
         });
         if (!parent || parent.workspaceId !== params.workspaceId) {
           return reply.status(400).send({
             code: "INVALID_PARENT_PAGE",
             message: "Parent page is not in the target workspace",
-            traceId: request.id
+            traceId: request.id,
           });
         }
       }
@@ -101,13 +110,13 @@ export async function registerPageRoutes(app: FastifyInstance) {
           title: body.title?.trim() || "Untitled",
           content: {
             type: "doc",
-            content: []
-          }
-        }
+            content: [],
+          },
+        },
       });
 
       return reply.status(201).send({ page });
-    }
+    },
   );
 
   app.get(
@@ -117,11 +126,11 @@ export async function registerPageRoutes(app: FastifyInstance) {
         params: {
           type: "object",
           properties: {
-            id: { type: "string", format: "uuid" }
+            id: { type: "string", format: "uuid" },
           },
-          required: ["id"]
-        }
-      }
+          required: ["id"],
+        },
+      },
     },
     async (request, reply) => {
       const user = requireAuth(request, reply);
@@ -131,14 +140,14 @@ export async function registerPageRoutes(app: FastifyInstance) {
 
       const params = request.params as { id: string };
       const page = await prisma.page.findUnique({
-        where: { id: params.id }
+        where: { id: params.id },
       });
 
       if (!page || page.deletedAt) {
         return reply.status(404).send({
           code: "PAGE_NOT_FOUND",
           message: "Page not found",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
@@ -147,12 +156,12 @@ export async function registerPageRoutes(app: FastifyInstance) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to page",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
       return reply.send({ page });
-    }
+    },
   );
 
   app.patch(
@@ -162,12 +171,12 @@ export async function registerPageRoutes(app: FastifyInstance) {
         params: {
           type: "object",
           properties: {
-            id: { type: "string", format: "uuid" }
+            id: { type: "string", format: "uuid" },
           },
-          required: ["id"]
+          required: ["id"],
         },
-        body: pageMetaBodySchema
-      }
+        body: pageMetaBodySchema,
+      },
     },
     async (request, reply) => {
       const user = requireAuth(request, reply);
@@ -184,22 +193,25 @@ export async function registerPageRoutes(app: FastifyInstance) {
       };
 
       const existingPage = await prisma.page.findUnique({
-        where: { id: params.id }
+        where: { id: params.id },
       });
       if (!existingPage || existingPage.deletedAt) {
         return reply.status(404).send({
           code: "PAGE_NOT_FOUND",
           message: "Page not found",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
-      const hasAccess = await assertWorkspaceAccess(user.id, existingPage.workspaceId);
+      const hasAccess = await assertWorkspaceAccess(
+        user.id,
+        existingPage.workspaceId,
+      );
       if (!hasAccess) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to page",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
@@ -209,15 +221,17 @@ export async function registerPageRoutes(app: FastifyInstance) {
           title: body.title?.trim() || existingPage.title,
           icon: typeof body.icon === "string" ? body.icon : existingPage.icon,
           coverImageUrl:
-            typeof body.coverImageUrl === "string" ? body.coverImageUrl : existingPage.coverImageUrl,
+            typeof body.coverImageUrl === "string"
+              ? body.coverImageUrl
+              : existingPage.coverImageUrl,
           ...(Array.isArray(body.tags) && {
-            tags: body.tags.map((t) => t.trim()).filter(Boolean)
-          })
-        }
+            tags: body.tags.map((t) => t.trim()).filter(Boolean),
+          }),
+        },
       });
 
       return reply.send({ page });
-    }
+    },
   );
 
   app.put(
@@ -227,12 +241,12 @@ export async function registerPageRoutes(app: FastifyInstance) {
         params: {
           type: "object",
           properties: {
-            id: { type: "string", format: "uuid" }
+            id: { type: "string", format: "uuid" },
           },
-          required: ["id"]
+          required: ["id"],
         },
-        body: pageContentBodySchema
-      }
+        body: pageContentBodySchema,
+      },
     },
     async (request, reply) => {
       const user = requireAuth(request, reply);
@@ -241,16 +255,19 @@ export async function registerPageRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { id: string };
-      const body = request.body as { expectedVersion: number; content: unknown };
+      const body = request.body as {
+        expectedVersion: number;
+        content: unknown;
+      };
 
       const page = await prisma.page.findUnique({
-        where: { id: params.id }
+        where: { id: params.id },
       });
       if (!page || page.deletedAt) {
         return reply.status(404).send({
           code: "PAGE_NOT_FOUND",
           message: "Page not found",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
@@ -259,7 +276,7 @@ export async function registerPageRoutes(app: FastifyInstance) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to page",
-          traceId: request.id
+          traceId: request.id,
         });
       }
 
@@ -270,35 +287,37 @@ export async function registerPageRoutes(app: FastifyInstance) {
           traceId: request.id,
           latest: {
             version: page.version,
-            updatedAt: page.updatedAt
-          }
+            updatedAt: page.updatedAt,
+          },
         });
       }
 
       const nextVersion = getNextVersion(page.version);
       const contentJson = body.content as Prisma.InputJsonValue;
-      const updatedPage = await prisma.$transaction(async (tx) => {
-        const saved = await tx.page.update({
-          where: { id: page.id },
-          data: {
-            content: contentJson,
-            version: nextVersion
-          }
-        });
+      const updatedPage = await prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const saved = await tx.page.update({
+            where: { id: page.id },
+            data: {
+              content: contentJson,
+              version: nextVersion,
+            },
+          });
 
-        await tx.pageRevision.create({
-          data: {
-            pageId: page.id,
-            version: nextVersion,
-            snapshot: contentJson,
-            createdBy: user.id
-          }
-        });
+          await tx.pageRevision.create({
+            data: {
+              pageId: page.id,
+              version: nextVersion,
+              snapshot: contentJson,
+              createdBy: user.id,
+            },
+          });
 
-        return saved;
-      });
+          return saved;
+        },
+      );
 
       return reply.send({ page: updatedPage });
-    }
+    },
   );
 }
