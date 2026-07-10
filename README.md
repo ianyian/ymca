@@ -51,7 +51,13 @@ This repo is set up so the frontend can be published to GitHub Pages at `/ymca/`
 
 Before the Pages workflow can work, set a GitHub repository variable named `VITE_API_URL` to your Render API URL, for example `https://your-api.onrender.com`.
 
-If that variable is missing, the frontend will publish but logins will fail because the browser will post to the wrong host.
+The deploy workflow publishes the built app to a `gh-pages` branch. In GitHub Pages settings, choose:
+
+- Source: `Deploy from a branch`
+- Branch: `gh-pages`
+- Folder: `/(root)`
+
+If the `gh-pages` branch does not appear yet, run the `Deploy Web` workflow once from the Actions tab.
 
 Then GitHub Actions will build `apps/web` and publish the static site from `apps/web/dist`.
 
