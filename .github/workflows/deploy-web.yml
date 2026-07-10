@@ -22,6 +22,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Set API URL
+        run: echo "VITE_API_URL=${{ vars.VITE_API_URL || 'https://ymca-g4by.onrender.com' }}" >> $GITHUB_ENV
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -37,18 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify API URL
-        run: |
-          if [ -z "${{ vars.VITE_API_URL }}" ]; then
-            echo "Repository variable VITE_API_URL is missing. Set it to your Render API URL before deploying."
-            exit 1
-          fi
-
       - name: Build web app
         working-directory: apps/web
         run: pnpm build
-        env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
