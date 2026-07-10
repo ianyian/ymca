@@ -4,6 +4,7 @@ import type { AppEnv } from "../config/env.js";
 import { generateSecureToken, hashSessionToken } from "./token.js";
 
 export const SESSION_COOKIE_NAME = "ymca_session";
+const SESSION_COOKIE_SAME_SITE = process.env.NODE_ENV === "production" ? "none" : "lax";
 
 type AuthPayload = {
   user: {
@@ -49,7 +50,7 @@ export function setSessionCookie(reply: FastifyReply, token: string, expiresAt: 
     path: "/",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: SESSION_COOKIE_SAME_SITE,
     expires: expiresAt
   });
 }
@@ -59,7 +60,7 @@ export function clearSessionCookie(reply: FastifyReply) {
     path: "/",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax"
+    sameSite: SESSION_COOKIE_SAME_SITE
   });
 }
 
