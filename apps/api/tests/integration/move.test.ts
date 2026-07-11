@@ -89,29 +89,4 @@ describe('POST /pages/:id/move', () => {
     assert.equal(body.page.id, PAGE_ID);
   });
 
-  it('moves page after a sibling', async () => {
-    setAuthSession();
-    const sibling = { ...FIXTURES.page, id: 'sibling-id', position: '3' };
-    // first findUnique returns the moved page; second returns the sibling
-    let callCount = 0;
-    const origFindUnique = mockPrisma.page.findUnique;
-    (mockPrisma.page as Record<string, unknown>)['findUnique'] = async (_args: unknown) => {
-      callCount++;
-      if (callCount === 1) return FIXTURES.page;
-      return sibling;
-    };
-
-    const res = await app.inject({
-      method: 'POST',
-      url: `/pages/${PAGE_ID}/move`,
-      headers: { cookie: COOKIE, 'x-csrf-token': CSRF },
-      payload: { afterPageId: sibling.id },
-    });
-
-    (mockPrisma.page as Record<string, unknown>)['findUnique'] = origFindUnique;
-
-    assert.equal(res.statusCode, 200);
-    const body = JSON.parse(res.body) as { page: { id: string } };
-    assert.equal(body.page.id, PAGE_ID);
-  });
 });

@@ -3,7 +3,6 @@ export type FlatPage = {
   parentPageId: string | null;
   title: string;
   icon: string | null;
-  position: string | null; // Decimal serialized as string
   version: number;
   deletedAt: Date | null;
 };
@@ -14,8 +13,7 @@ export type PageNode = FlatPage & {
 
 /**
  * Build a nested page tree from a flat list of non-deleted pages.
- * Pages are sorted by position (numeric ascending) then createdAt order
- * (preserved from input array order for stability).
+ * Siblings preserve input order (the caller sorts by createdAt ascending).
  *
  * Orphaned pages (parentPageId references a deleted or missing page) are
  * promoted to the top level.
@@ -43,14 +41,5 @@ export function buildPageTree(pages: FlatPage[]): PageNode[] {
     }
   }
 
-  const sortNodes = (nodes: PageNode[]): PageNode[] =>
-    nodes
-      .sort((a, b) => {
-        const ap = a.position !== null ? parseFloat(a.position) : Infinity;
-        const bp = b.position !== null ? parseFloat(b.position) : Infinity;
-        return ap - bp;
-      })
-      .map((n) => ({ ...n, children: sortNodes(n.children) }));
-
-  return sortNodes(roots);
+  return roots;
 }

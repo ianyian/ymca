@@ -100,10 +100,15 @@ export async function resolveAuthFromRequest(
     return null;
   }
 
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { lastSeenAt: new Date() },
-  });
+  // Throttle lastSeenAt writes: only touch the row if it's been stale for a
+  // while, so read-heavy request traffic doesn't cause a write on every request.
+  const LAST_SEEN_THROTTLE_MS = 60 * 1000;
+  if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_THROTTLE_MS) {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { lastSeenAt: new Date() },
+    });
+  }
 
   return {
     user: session.user,

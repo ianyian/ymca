@@ -325,6 +325,31 @@ describe('PUT /pages/:id/content', () => {
     assert.equal(body.page.version, 2);
   });
 
+  it('returns 403 when a guest with no page grant edits a page they do not own', async () => {
+    setAuthSession();
+    // Caller is a WorkspaceGuest (default page role: none) …
+    mockState.workspaceAccessResult = { id: 'member-id', role: 'WorkspaceGuest' };
+    // … and is NOT the page creator, with no explicit page permission.
+    mockState.pageFindUniqueResult = {
+      ...FIXTURES.page,
+      creatorId: '99999999-9999-9999-9999-999999999999',
+      permissions: [],
+    } as never;
+
+    const app = createServer();
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/pages/${PAGE_ID}/content`,
+      payload: { expectedVersion: 1, content: { type: 'doc', content: [] } },
+      headers: {
+        cookie: 'ymca_session=fixture-raw-token',
+        'x-csrf-token': FIXTURES.session.csrfToken,
+      },
+    });
+
+    assert.equal(response.statusCode, 403);
+  });
+
   it('returns 409 with VERSION_CONFLICT when expectedVersion does not match', async () => {
     setAuthSession();
     // Current DB version is 5, client sends expectedVersion: 3 → conflict

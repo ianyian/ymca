@@ -39,7 +39,6 @@ export async function registerTreeRoutes(app: FastifyInstance) {
           parentPageId: true,
           title: true,
           icon: true,
-          position: true,
           version: true,
           deletedAt: true,
           tags: true,
@@ -50,7 +49,6 @@ export async function registerTreeRoutes(app: FastifyInstance) {
 
       const serialized = pages.map((p) => ({
         ...p,
-        position: p.position !== null ? p.position.toString() : null,
         updatedAt: p.updatedAt.toISOString(),
       }));
 

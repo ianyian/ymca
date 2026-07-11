@@ -21,6 +21,15 @@ function jsonToHtml(node: Record<string, unknown>): string {
     case 'bulletList': return `<ul>${inner()}</ul>`;
     case 'orderedList': return `<ol>${inner()}</ol>`;
     case 'listItem': return `<li>${inner()}</li>`;
+    case 'taskList': return `<ul class="task-list">${inner()}</ul>`;
+    case 'taskItem': {
+      const checked = (node.attrs as Record<string, unknown>)?.checked === true;
+      return `<li class="task-item${checked ? ' checked' : ''}"><span class="task-check">${checked ? '☑' : '☐'}</span><div>${inner()}</div></li>`;
+    }
+    case 'callout': {
+      const emoji = escapeHtml((node.attrs as Record<string, unknown>)?.emoji as string ?? '💡');
+      return `<div class="callout"><span class="callout-emoji">${emoji}</span><div class="callout-body">${inner()}</div></div>`;
+    }
     case 'blockquote': return `<blockquote>${inner()}</blockquote>`;
     case 'codeBlock': return `<pre><code>${inner()}</code></pre>`;
     case 'horizontalRule': return `<hr>`;
@@ -35,8 +44,9 @@ function jsonToHtml(node: Record<string, unknown>): string {
           case 'code': text = `<code>${text}</code>`; break;
           case 'strike': text = `<s>${text}</s>`; break;
           case 'underline': text = `<u>${text}</u>`; break;
+          case 'highlight': text = `<mark>${text}</mark>`; break;
           case 'link': {
-            const href = escapeHtml(((mark as Record<string, unknown>).attrs as Record<string, unknown>)?.href as string ?? '#');
+            const href = sanitizeUrl(((mark as Record<string, unknown>).attrs as Record<string, unknown>)?.href as string ?? '#');
             text = `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
             break;
           }
@@ -55,6 +65,19 @@ function jsonToHtml(node: Record<string, unknown>): string {
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Only allow safe URL schemes in published HTML. Blocks javascript:, data:,
+ * vbscript:, etc. which would otherwise execute in a viewer's browser.
+ * Returns an escaped, safe href (falls back to '#').
+ */
+function sanitizeUrl(raw: string): string {
+  const url = (raw ?? '').trim();
+  // Allow relative URLs and anchors.
+  if (url.startsWith('/') || url.startsWith('#')) return escapeHtml(url);
+  if (/^(https?:|mailto:|tel:)/i.test(url)) return escapeHtml(url);
+  return '#';
 }
 
 function renderPublicPage(title: string, icon: string | null, tags: string[], bodyHtml: string, publishedAt: Date | null, publishTheme: string, webOrigin: string): string {
@@ -230,6 +253,16 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
     .page-content ul, .page-content ol { padding-left: 24px; margin: 4px 0; }
     .page-content li { margin: 2px 0; }
     .page-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .page-content mark { background: rgba(255,212,0,0.35); border-radius: 2px; padding: 0 1px; }
+    .page-content ul.task-list { list-style: none; padding-left: 2px; }
+    .page-content ul.task-list .task-item { display: flex; align-items: flex-start; gap: 8px; }
+    .page-content ul.task-list .task-item .task-check { font-size: 15px; line-height: 1.5; }
+    .page-content ul.task-list .task-item.checked > div { color: var(--muted); text-decoration: line-through; }
+    .page-content .callout { display: flex; gap: 10px; padding: 12px 14px; margin: 8px 0; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--border); }
+    .page-content .callout-emoji { font-size: 18px; line-height: 1.5; }
+    .page-content .callout-body { flex: 1; min-width: 0; }
+    .page-content .callout-body > *:first-child { margin-top: 0; }
+    .page-content .callout-body > *:last-child { margin-bottom: 0; }
 
     /* Footer */
     .page-footer {
@@ -290,10 +323,8 @@ export async function registerPublicPageRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { shareToken } = request.params as { shareToken: string };
 
-      // Derive web UI origin from the request host (swap port 4000 → 5173)
-      const reqHost = request.headers['host'] ?? 'localhost:4000';
-      const hostname = reqHost.split(':')[0];
-      const webOrigin = `http://${hostname}:5173`;
+      // Web UI origin for "Back to YMCA" links (set APP_URL in production).
+      const webOrigin = process.env.APP_URL ?? 'http://localhost:5173';
 
       const page = await prisma.page.findUnique({
         where: { publishToken: shareToken },

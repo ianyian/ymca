@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../auth/require-auth.js';
-import { appendPosition } from '../domain/ordering.js';
+import { resolvePageAccess } from '../lib/page-access.js';
+import { canEdit } from '../domain/permissions.js';
 
 const moveBodySchema = {
   type: 'object',
   properties: {
     parentPageId: { type: ['string', 'null'] },
-    afterPageId: { type: ['string', 'null'] },
   },
   additionalProperties: false,
 } as const;
@@ -32,28 +32,22 @@ export async function registerMoveRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = request.body as {
         parentPageId?: string | null;
-        afterPageId?: string | null;
       };
 
-      const page = await prisma.page.findUnique({ where: { id } });
-      if (!page || page.deletedAt !== null) {
-        return reply.status(404).send({
-          code: 'PAGE_NOT_FOUND',
-          message: 'Page not found',
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const membership = await prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: page.workspaceId, userId: user.id } },
-      });
-      if (!membership) {
+      if (!canEdit(access.pageRole)) {
         return reply.status(403).send({
           code: 'FORBIDDEN',
-          message: 'No access to page',
+          message: 'You do not have edit access to this page',
           traceId: request.id,
         });
       }
+      const page = access.page;
 
       // Validate new parent is in same workspace
       const newParentId = Object.hasOwn(body, 'parentPageId')
@@ -79,19 +73,9 @@ export async function registerMoveRoutes(app: FastifyInstance) {
         }
       }
 
-      // Compute new position: place after `afterPageId` sibling
-      let newPosition: string;
-      if (body.afterPageId) {
-        const sibling = await prisma.page.findUnique({ where: { id: body.afterPageId } });
-        const afterPos = sibling?.position !== null ? sibling?.position?.toString() ?? null : null;
-        newPosition = appendPosition(afterPos);
-      } else {
-        newPosition = '0.5'; // prepend to list
-      }
-
       const moved = await prisma.page.update({
         where: { id },
-        data: { parentPageId: newParentId, position: newPosition },
+        data: { parentPageId: newParentId },
       });
 
       return reply.send({ page: moved });

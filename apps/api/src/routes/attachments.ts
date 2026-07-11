@@ -6,9 +6,23 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../auth/require-auth.js';
+import { resolvePageAccess } from '../lib/page-access.js';
+import { canEdit, canView } from '../domain/permissions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = join(__dirname, '..', '..', 'uploads');
+
+// Allowlist of accepted upload MIME types + a hard per-file size cap.
+const ALLOWED_MIME = new Set([
+  'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf', 'text/plain', 'text/markdown',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+]);
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15 MB
 
 function ensurePageDir(pageId: string): string {
   const dir = join(UPLOADS_DIR, pageId);
@@ -47,20 +61,23 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         filename: string; mimetype: string; content: string;
       };
 
-      const page = await prisma.page.findUnique({ where: { id: pageId } });
-      if (!page || page.deletedAt !== null) {
-        return reply.status(404).send({ code: 'PAGE_NOT_FOUND', message: 'Page not found', traceId: request.id });
+      const access = await resolvePageAccess(user.id, pageId);
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message, traceId: request.id });
+      }
+      if (!canEdit(access.pageRole)) {
+        return reply.status(403).send({ code: 'FORBIDDEN', message: 'You do not have edit access to this page', traceId: request.id });
       }
 
-      const membership = await prisma.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: page.workspaceId, userId: user.id } },
-      });
-      if (!membership) {
-        return reply.status(403).send({ code: 'FORBIDDEN', message: 'No access', traceId: request.id });
+      if (!ALLOWED_MIME.has(mimetype)) {
+        return reply.status(400).send({ code: 'UNSUPPORTED_TYPE', message: 'File type not allowed', traceId: request.id });
       }
 
       // Decode base64 and write to disk
       const buffer = Buffer.from(content, 'base64');
+      if (buffer.length > MAX_ATTACHMENT_BYTES) {
+        return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'File exceeds the 15 MB limit', traceId: request.id });
+      }
       const attachId = randomUUID();
       const ext = filename.includes('.') ? '.' + filename.split('.').pop() : '';
       const storedName = `${attachId}${ext}`;
@@ -85,7 +102,10 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send({ attachment });
+      // `url` is the capability URL callers embed as an inline image/file src.
+      return reply
+        .status(201)
+        .send({ attachment, url: `/attachments/${attachment.id}/inline` });
     },
   );
 
@@ -107,9 +127,12 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
 
       const { id: pageId } = request.params as { id: string };
 
-      const page = await prisma.page.findUnique({ where: { id: pageId } });
-      if (!page || page.deletedAt !== null) {
-        return reply.status(404).send({ code: 'PAGE_NOT_FOUND', message: 'Page not found', traceId: request.id });
+      const access = await resolvePageAccess(user.id, pageId);
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message, traceId: request.id });
+      }
+      if (!canView(access.pageRole)) {
+        return reply.status(403).send({ code: 'FORBIDDEN', message: 'No access to page', traceId: request.id });
       }
 
       const attachments = await prisma.pageAttachment.findMany({
@@ -119,6 +142,50 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
       });
 
       return reply.status(200).send({ attachments });
+    },
+  );
+
+  // GET /attachments/:attachId/inline — serve a file inline by capability URL.
+  // Used as the `src` for inline images in the editor and on published pages,
+  // where a request cannot carry a session/CSRF header. Access is gated by the
+  // unguessable attachment UUID (capability pattern). Images are served inline;
+  // any other type is forced to download to avoid inline-content sniffing.
+  app.get(
+    '/attachments/:attachId/inline',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { attachId: { type: 'string', format: 'uuid' } },
+          required: ['attachId'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { attachId } = request.params as { attachId: string };
+
+      const attachment = await prisma.pageAttachment.findUnique({ where: { id: attachId } });
+      if (!attachment) {
+        return reply.status(404).send({ code: 'NOT_FOUND', message: 'Attachment not found', traceId: request.id });
+      }
+      if (!existsSync(attachment.filePath)) {
+        return reply.status(404).send({ code: 'FILE_MISSING', message: 'File not found on disk', traceId: request.id });
+      }
+
+      const isImage = attachment.mimetype.startsWith('image/');
+      reply
+        .header('content-type', attachment.mimetype)
+        .header('x-content-type-options', 'nosniff')
+        .header('cache-control', 'public, max-age=31536000, immutable')
+        .header(
+          'content-disposition',
+          isImage
+            ? 'inline'
+            : `attachment; filename="${encodeURIComponent(attachment.originalName)}"`,
+        )
+        .header('content-length', attachment.size);
+
+      return reply.send(createReadStream(attachment.filePath));
     },
   );
 
@@ -138,7 +205,18 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
+
       const { id: pageId, attachId } = request.params as { id: string; attachId: string };
+
+      const access = await resolvePageAccess(user.id, pageId);
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message, traceId: request.id });
+      }
+      if (!canView(access.pageRole)) {
+        return reply.status(403).send({ code: 'FORBIDDEN', message: 'No access to page', traceId: request.id });
+      }
 
       const attachment = await prisma.pageAttachment.findUnique({ where: { id: attachId } });
       if (!attachment || attachment.pageId !== pageId) {
@@ -151,6 +229,7 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
 
       reply
         .header('content-type', attachment.mimetype)
+        .header('x-content-type-options', 'nosniff')
         .header('content-disposition', `attachment; filename="${encodeURIComponent(attachment.originalName)}"`)
         .header('content-length', attachment.size);
 
@@ -179,6 +258,14 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
       if (!user) return;
 
       const { id: pageId, attachId } = request.params as { id: string; attachId: string };
+
+      const access = await resolvePageAccess(user.id, pageId);
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message, traceId: request.id });
+      }
+      if (!canEdit(access.pageRole)) {
+        return reply.status(403).send({ code: 'FORBIDDEN', message: 'You do not have edit access to this page', traceId: request.id });
+      }
 
       const attachment = await prisma.pageAttachment.findUnique({ where: { id: attachId } });
       if (!attachment || attachment.pageId !== pageId) {

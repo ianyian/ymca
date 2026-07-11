@@ -316,6 +316,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const env = getEnv();
       const { email } = request.body as { email: string };
       const normalizedEmail = email.trim().toLowerCase();
 
@@ -343,10 +344,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         data: { id: crypto.randomUUID(), userId: dbUser.id, token, expiresAt },
       });
 
-      // Derive app URL from the request host
-      const reqHost = request.headers["host"] ?? "localhost:4000";
-      const hostname = reqHost.split(":")[0];
-      const appUrl = `http://${hostname}:5173`;
+      // Use the configured web app URL (set APP_URL in production).
+      const appUrl = env.APP_URL;
       const resetUrl = `${appUrl}/?token=${token}`;
 
       const result = await sendPasswordResetEmail({

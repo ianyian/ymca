@@ -22,6 +22,9 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default("noreply@ymca.local"),
   APP_URL: z.string().default("http://localhost:5173"),
+  // Comma-separated allowlist of browser origins permitted for CORS. When unset,
+  // the server reflects the request origin (convenient for local/LAN dev).
+  CORS_ORIGINS: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

@@ -3,8 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Direct (non-pooled) connection for migrations. When DATABASE_URL points at
+  // the Neon pooler (PgBouncer), migrations must use a direct connection.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 enum WorkspaceRole {
@@ -26,8 +29,8 @@ model User {
   passwordHash    String
   displayName     String?
   language        String            @default("en")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(6)
   sessions        Session[]
   workspacesOwned Workspace[]            @relation("WorkspaceOwner")
   memberships     WorkspaceMember[]
@@ -44,10 +47,10 @@ model Session {
   csrfToken     String
   userAgent     String?
   ipAddress     String?
-  expiresAt     DateTime
-  createdAt     DateTime  @default(now())
-  lastSeenAt    DateTime  @default(now())
-  invalidatedAt DateTime?
+  expiresAt     DateTime  @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  lastSeenAt    DateTime  @default(now()) @db.Timestamptz(6)
+  invalidatedAt DateTime? @db.Timestamptz(6)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -59,8 +62,8 @@ model Workspace {
   name      String
   slug      String            @unique
   ownerId   String            @db.Uuid
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  createdAt DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(6)
   owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members   WorkspaceMember[]
   pages     Page[]
@@ -73,8 +76,8 @@ model WorkspaceMember {
   userId      String        @db.Uuid
   role        WorkspaceRole
   invitedById String?       @db.Uuid
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -93,15 +96,14 @@ model Page {
   coverImageUrl String?
   tags          String[]         @default([])
   content       Json             @default("{}") @db.JsonB
-  position      Decimal?
   version       Int              @default(1)
   isPublished   Boolean          @default(false)
-  publishedAt   DateTime?
+  publishedAt   DateTime?        @db.Timestamptz(6)
   publishToken  String?          @unique
   publishTheme  String           @default("muji")
-  deletedAt     DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?        @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
   workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator       User             @relation("PageCreator", fields: [creatorId], references: [id], onDelete: Restrict)
   parentPage    Page?            @relation("PageHierarchy", fields: [parentPageId], references: [id], onDelete: SetNull)
@@ -110,10 +112,9 @@ model Page {
   permissions   PagePermission[]
   attachments   PageAttachment[]
 
-  @@index([workspaceId])
   @@index([parentPageId])
   @@index([workspaceId, deletedAt])
-  @@index([publishToken])
+  @@index([tags], type: Gin)
 }
 
 model PageRevision {
@@ -122,7 +123,7 @@ model PageRevision {
   version   Int
   snapshot  Json     @db.JsonB
   createdBy String?  @db.Uuid
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
   page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId, createdAt])
@@ -136,8 +137,8 @@ model PagePermission {
   pageRole       PageRole
   isExplicitDeny Boolean        @default(false)
   grantedById    String?        @db.Uuid
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(6)
   page           Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
   user           User?          @relation("PermissionGrantedTo", fields: [userId], references: [id], onDelete: Cascade)
 
@@ -151,28 +152,26 @@ model InviteToken {
   email       String?
   role        WorkspaceRole
   token       String        @unique
-  expiresAt   DateTime
-  usedAt      DateTime?
+  expiresAt   DateTime      @db.Timestamptz(6)
+  usedAt      DateTime?     @db.Timestamptz(6)
   createdById String        @db.Uuid
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy   User          @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([workspaceId])
-  @@index([token])
 }
 
 model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String    @db.Uuid
   token     String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  expiresAt DateTime  @db.Timestamptz(6)
+  usedAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
 }
 
 model PageAttachment {
@@ -183,7 +182,7 @@ model PageAttachment {
   mimetype     String
   size         Int
   filePath     String   @default("")
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
   page         Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId])

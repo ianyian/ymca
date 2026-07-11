@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { randomUUID } from "node:crypto";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { startNeonProxy } from "./lib/neon-proxy.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { resolveAuthFromRequest } from "./auth/session.js";
@@ -33,11 +34,28 @@ export function createServer() {
     bodyLimit: 50 * 1024 * 1024, // 50 MB — supports pages with pasted images
   });
 
+  // CORS: if CORS_ORIGINS is set, restrict to that allowlist; otherwise reflect
+  // the request origin (convenient for local/LAN dev). Set CORS_ORIGINS in
+  // production to lock cross-origin access down to your web app's origin(s).
+  const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.register(cors, {
-    origin: true, // reflect any origin — safe for local/LAN use
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
+
+  // Rate limiting: tight on auth endpoints (brute-force protection), looser
+  // elsewhere. Disabled under test so the suite isn't throttled.
+  if (process.env.NODE_ENV !== "test") {
+    app.register(rateLimit, {
+      global: true,
+      max: (request) => (request.url.startsWith("/auth/") ? 10 : 200),
+      timeWindow: "1 minute",
+    });
+  }
 
   app.register(cookie);
 

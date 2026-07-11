@@ -6,6 +6,11 @@ import {
   useEditor,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import Highlight from "@tiptap/extension-highlight";
+import type { EditorView } from "@tiptap/pm/view";
+import { Callout, SlashCommand } from "./editor-extensions";
 import { LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
 
 // ────────────────────────────────────────────────────────────
@@ -29,7 +34,6 @@ type PageNode = {
   version: number;
   tags: string[];
   parentPageId: string | null;
-  position: string | null;
   deletedAt: string | null;
   updatedAt: string;
   children: PageNode[];
@@ -479,6 +483,44 @@ const Ico = {
     </svg>
   ),
 };
+
+// ────────────────────────────────────────────────────────────
+// Image upload — store files via the attachment API and embed a URL,
+// instead of inlining base64 (which bloats page content + every revision).
+// ────────────────────────────────────────────────────────────
+
+const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+async function uploadImageFile(
+  file: File,
+  pageId: string,
+  csrf: string,
+): Promise<string> {
+  if (file.size > MAX_INLINE_IMAGE_BYTES) {
+    throw new Error(T[_currentLang].errImageTooLarge);
+  }
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) =>
+      resolve(((ev.target?.result as string) ?? "").split(",")[1] ?? "");
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const res = await api<{ url: string }>(
+    `/pages/${pageId}/attachments`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        filename: file.name || "pasted-image.png",
+        mimetype: file.type || "image/png",
+        content: base64,
+      }),
+    },
+    csrf,
+  );
+  // The API returns a root-relative capability URL; make it absolute.
+  return `${API}${res.url}`;
+}
 
 // ────────────────────────────────────────────────────────────
 // Custom Image TipTap Extension
@@ -2684,8 +2726,36 @@ export function App() {
 
   // ── Editor ──
 
+  // Upload a pasted/dropped image to the attachment store, then insert an <img>
+  // pointing at its URL. Avoids embedding base64 bytes in the document JSON.
+  const insertImageFromFile = useCallback(
+    async (view: EditorView, file: File) => {
+      const page = activePageRef.current;
+      const currentCsrf = csrfRef.current;
+      if (!page || !currentCsrf) return;
+      try {
+        const url = await uploadImageFile(file, page.id, currentCsrf);
+        const node = view.state.schema.nodes["image"];
+        if (node) {
+          view.dispatch(view.state.tr.replaceSelectionWith(node.create({ src: url })));
+        }
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : "Image upload failed");
+      }
+    },
+    [],
+  );
+
   const editor = useEditor({
-    extensions: [StarterKit, ImageExt],
+    extensions: [
+      StarterKit,
+      ImageExt,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight.configure({ multicolor: false }),
+      Callout,
+      SlashCommand,
+    ],
     content: "<p></p>",
     editorProps: {
       attributes: { class: "outline-none" },
@@ -2695,18 +2765,19 @@ export function App() {
         if (imgItem) {
           const file = imgItem.getAsFile();
           if (!file) return false;
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const src = e.target?.result as string;
-            const node = view.state.schema.nodes["image"];
-            if (node) {
-              const tr = view.state.tr.replaceSelectionWith(
-                node.create({ src }),
-              );
-              view.dispatch(tr);
-            }
-          };
-          reader.readAsDataURL(file);
+          void insertImageFromFile(view, file);
+          return true;
+        }
+        return false;
+      },
+      handleDrop(view, event) {
+        const dt = (event as DragEvent).dataTransfer;
+        const file = Array.from(dt?.files ?? []).find((f) =>
+          f.type.startsWith("image/"),
+        );
+        if (file) {
+          event.preventDefault();
+          void insertImageFromFile(view, file);
           return true;
         }
         return false;

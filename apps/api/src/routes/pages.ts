@@ -2,7 +2,13 @@ import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../auth/require-auth.js";
-import { getNextVersion, hasVersionConflict } from "../domain/versioning.js";
+import { resolvePageAccess } from "../lib/page-access.js";
+import { canEdit, canView } from "../domain/permissions.js";
+import {
+  getNextVersion,
+  hasVersionConflict,
+  pruneRevisions,
+} from "../domain/versioning.js";
 
 const createPageBodySchema = {
   type: "object",
@@ -139,20 +145,13 @@ export async function registerPageRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { id: string };
-      const page = await prisma.page.findUnique({
-        where: { id: params.id },
-      });
-
-      if (!page || page.deletedAt) {
-        return reply.status(404).send({
-          code: "PAGE_NOT_FOUND",
-          message: "Page not found",
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, params.id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const hasAccess = await assertWorkspaceAccess(user.id, page.workspaceId);
-      if (!hasAccess) {
+      if (!canView(access.pageRole)) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to page",
@@ -160,7 +159,7 @@ export async function registerPageRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.send({ page });
+      return reply.send({ page: access.page });
     },
   );
 
@@ -192,28 +191,20 @@ export async function registerPageRoutes(app: FastifyInstance) {
         tags?: string[];
       };
 
-      const existingPage = await prisma.page.findUnique({
-        where: { id: params.id },
-      });
-      if (!existingPage || existingPage.deletedAt) {
-        return reply.status(404).send({
-          code: "PAGE_NOT_FOUND",
-          message: "Page not found",
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, params.id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const hasAccess = await assertWorkspaceAccess(
-        user.id,
-        existingPage.workspaceId,
-      );
-      if (!hasAccess) {
+      if (!canEdit(access.pageRole)) {
         return reply.status(403).send({
           code: "FORBIDDEN",
-          message: "No access to page",
+          message: "You do not have edit access to this page",
           traceId: request.id,
         });
       }
+      const existingPage = access.page;
 
       const page = await prisma.page.update({
         where: { id: params.id },
@@ -260,25 +251,20 @@ export async function registerPageRoutes(app: FastifyInstance) {
         content: unknown;
       };
 
-      const page = await prisma.page.findUnique({
-        where: { id: params.id },
-      });
-      if (!page || page.deletedAt) {
-        return reply.status(404).send({
-          code: "PAGE_NOT_FOUND",
-          message: "Page not found",
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, params.id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const hasAccess = await assertWorkspaceAccess(user.id, page.workspaceId);
-      if (!hasAccess) {
+      if (!canEdit(access.pageRole)) {
         return reply.status(403).send({
           code: "FORBIDDEN",
-          message: "No access to page",
+          message: "You do not have edit access to this page",
           traceId: request.id,
         });
       }
+      const page = access.page;
 
       if (hasVersionConflict(page.version, body.expectedVersion)) {
         return reply.status(409).send({
@@ -312,6 +298,8 @@ export async function registerPageRoutes(app: FastifyInstance) {
               createdBy: user.id,
             },
           });
+
+          await pruneRevisions(tx, page.id);
 
           return saved;
         },

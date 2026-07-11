@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../auth/require-auth.js";
-import { getNextVersion } from "../domain/versioning.js";
+import { resolvePageAccess } from "../lib/page-access.js";
+import { canEdit, canView } from "../domain/permissions.js";
+import { getNextVersion, pruneRevisions } from "../domain/versioning.js";
 import type { Prisma } from "@prisma/client";
 
 const MAX_REVISIONS = 50;
@@ -25,24 +27,13 @@ export async function registerRevisionRoutes(app: FastifyInstance) {
 
       const { id } = request.params as { id: string };
 
-      const page = await prisma.page.findUnique({ where: { id } });
-      if (!page || page.deletedAt !== null) {
-        return reply.status(404).send({
-          code: "PAGE_NOT_FOUND",
-          message: "Page not found",
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const membership = await prisma.workspaceMember.findUnique({
-        where: {
-          workspaceId_userId: {
-            workspaceId: page.workspaceId,
-            userId: user.id,
-          },
-        },
-      });
-      if (!membership) {
+      if (!canView(access.pageRole)) {
         return reply.status(403).send({
           code: "FORBIDDEN",
           message: "No access to page",
@@ -91,30 +82,20 @@ export async function registerRevisionRoutes(app: FastifyInstance) {
         revisionId: string;
       };
 
-      const page = await prisma.page.findUnique({ where: { id } });
-      if (!page || page.deletedAt !== null) {
-        return reply.status(404).send({
-          code: "PAGE_NOT_FOUND",
-          message: "Page not found",
-          traceId: request.id,
-        });
+      const access = await resolvePageAccess(user.id, id);
+      if (!access.ok) {
+        return reply
+          .status(access.status)
+          .send({ code: access.code, message: access.message, traceId: request.id });
       }
-
-      const membership = await prisma.workspaceMember.findUnique({
-        where: {
-          workspaceId_userId: {
-            workspaceId: page.workspaceId,
-            userId: user.id,
-          },
-        },
-      });
-      if (!membership) {
+      if (!canEdit(access.pageRole)) {
         return reply.status(403).send({
           code: "FORBIDDEN",
-          message: "No access to page",
+          message: "You do not have edit access to this page",
           traceId: request.id,
         });
       }
+      const page = access.page;
 
       const revision = await prisma.pageRevision.findUnique({
         where: { id: revisionId },
@@ -144,6 +125,7 @@ export async function registerRevisionRoutes(app: FastifyInstance) {
               createdBy: user.id,
             },
           });
+          await pruneRevisions(tx, id);
           return updated;
         },
       );

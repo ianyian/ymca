@@ -344,6 +344,7 @@ export const mockPrisma = {
     }),
     findMany: async (_args: unknown) => mockState.pageRevisionFindManyResult,
     findUnique: async (_args: unknown) => mockState.pageRevisionFindUniqueResult,
+    deleteMany: async (_args: unknown) => ({ count: 0 }),
   },
 
   pagePermission: {

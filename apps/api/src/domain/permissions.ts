@@ -89,3 +89,8 @@ export function canEdit(role: PageRole | null): boolean {
 export function canView(role: PageRole | null): boolean {
   return role !== null;
 }
+
+/** Only page Owners may grant/revoke sharing or publish state. */
+export function canManage(role: PageRole | null): boolean {
+  return role === "Owner";
+}
