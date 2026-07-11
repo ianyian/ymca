@@ -1706,12 +1706,16 @@ function DocumentHub({
 }) {
   const PER_PAGE = 10;
   const [filterTag, setFilterTag] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [pageNum, setPageNum] = useState(0);
   const allPages = flattenTree(tree);
   const allTags = Array.from(new Set(allPages.flatMap((p) => p.tags))).sort();
-  const filtered = filterTag
-    ? allPages.filter((p) => p.tags.includes(filterTag))
-    : allPages;
+  const q = query.trim().toLowerCase();
+  const filtered = allPages.filter(
+    (p) =>
+      (!filterTag || p.tags.includes(filterTag)) &&
+      (!q || (p.title || "Untitled").toLowerCase().includes(q)),
+  );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(pageNum, totalPages - 1);
@@ -1720,8 +1724,8 @@ function DocumentHub({
     safePage * PER_PAGE + PER_PAGE,
   );
 
-  // Reset to the first page whenever the tag filter changes.
-  useEffect(() => setPageNum(0), [filterTag]);
+  // Reset to the first page whenever the tag filter or search changes.
+  useEffect(() => setPageNum(0), [filterTag, query]);
 
   return (
     <div className='flex-1 overflow-y-auto px-8 py-10 max-w-[900px] mx-auto w-full'>
@@ -1786,6 +1790,64 @@ function DocumentHub({
         </div>
       )}
 
+      {/* Toolbar: search (left) + pagination (right, fixed here so it doesn't
+          shift the layout as row counts change) */}
+      <div className='flex items-center justify-between gap-3 mb-3'>
+        <div className='relative w-full max-w-[300px]'>
+          <span
+            className='absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none'
+            style={{ color: "var(--text-muted)" }}
+          >
+            <Ico.Search />
+          </span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder='Search documents by name…'
+            className='w-full text-sm pl-8 pr-3 py-1.5 rounded-[8px] border outline-none'
+            style={{
+              borderColor: "var(--border-color)",
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+            }}
+          />
+        </div>
+        {totalPages > 1 && (
+          <div className='flex items-center gap-1.5 shrink-0'>
+            <button
+              onClick={() => setPageNum((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
+              style={{
+                borderColor: "var(--border-color)",
+                color: "var(--text-muted)",
+              }}
+            >
+              ‹ Prev
+            </button>
+            <span
+              className='text-[12px] px-1 whitespace-nowrap'
+              style={{ color: "var(--text-muted)" }}
+            >
+              Page {safePage + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() =>
+                setPageNum((p) => Math.min(totalPages - 1, p + 1))
+              }
+              disabled={safePage >= totalPages - 1}
+              className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
+              style={{
+                borderColor: "var(--border-color)",
+                color: "var(--text-muted)",
+              }}
+            >
+              Next ›
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Table */}
       <div
         className='rounded-xl border overflow-hidden'
@@ -1812,9 +1874,11 @@ function DocumentHub({
             className='px-4 py-12 text-center text-sm'
             style={{ color: "var(--text-muted)" }}
           >
-            {filterTag
-              ? `No pages tagged "${filterTag}"`
-              : "No pages yet — click New page to start."}
+            {q
+              ? `No documents matching "${query.trim()}"`
+              : filterTag
+                ? `No pages tagged "${filterTag}"`
+                : "No pages yet — click New page to start."}
           </div>
         )}
 
@@ -1903,49 +1967,14 @@ function DocumentHub({
       </div>
 
       {filtered.length > 0 && (
-        <div className='flex items-center justify-between mt-4'>
-          <span
-            className='text-[11px]'
-            style={{ color: "var(--text-muted)" }}
-          >
-            {filtered.length} {filtered.length === 1 ? "page" : "pages"}
-            {filterTag ? ` tagged "${filterTag}"` : " total"}
-          </span>
-          {totalPages > 1 && (
-            <div className='flex items-center gap-1.5'>
-              <button
-                onClick={() => setPageNum((p) => Math.max(0, p - 1))}
-                disabled={safePage === 0}
-                className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
-                style={{
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                ‹ Prev
-              </button>
-              <span
-                className='text-[12px] px-1'
-                style={{ color: "var(--text-muted)" }}
-              >
-                Page {safePage + 1} of {totalPages}
-              </span>
-              <button
-                onClick={() =>
-                  setPageNum((p) => Math.min(totalPages - 1, p + 1))
-                }
-                disabled={safePage >= totalPages - 1}
-                className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
-                style={{
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Next ›
-              </button>
-            </div>
-          )}
-        </div>
+        <p className='text-[11px] mt-3' style={{ color: "var(--text-muted)" }}>
+          {filtered.length} {filtered.length === 1 ? "page" : "pages"}
+          {filterTag
+            ? ` tagged "${filterTag}"`
+            : q
+              ? ` matching "${query.trim()}"`
+              : " total"}
+        </p>
       )}
 
       {/* Getting-started / notifications — relocated below the hub */}
