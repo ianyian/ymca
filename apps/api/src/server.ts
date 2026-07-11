@@ -31,7 +31,7 @@ export function createServer() {
       level: process.env.NODE_ENV === "production" ? "info" : "debug",
     },
     genReqId: () => randomUUID(),
-    bodyLimit: 50 * 1024 * 1024, // 50 MB — supports pages with pasted images
+    bodyLimit: 1024 * 1024 * 1024, // 1 GB — large pages with many images/docs
   });
 
   // CORS: if CORS_ORIGINS is set, restrict to that allowlist; otherwise reflect

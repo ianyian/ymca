@@ -22,7 +22,7 @@ const ALLOWED_MIME = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/zip',
 ]);
-const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15 MB
+const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024; // 1 GB
 
 function ensurePageDir(pageId: string): string {
   const dir = join(UPLOADS_DIR, pageId);
@@ -76,7 +76,7 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
       // Decode base64 and write to disk
       const buffer = Buffer.from(content, 'base64');
       if (buffer.length > MAX_ATTACHMENT_BYTES) {
-        return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'File exceeds the 15 MB limit', traceId: request.id });
+        return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'File exceeds the 1 GB limit', traceId: request.id });
       }
       const attachId = randomUUID();
       const ext = filename.includes('.') ? '.' + filename.split('.').pop() : '';

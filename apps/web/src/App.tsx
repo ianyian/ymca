@@ -10,8 +10,14 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import type { EditorView } from "@tiptap/pm/view";
-import { Callout, SlashCommand } from "./editor-extensions";
+import { Callout, SlashCommand, SLASH_ITEMS } from "./editor-extensions";
 import { LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
+
+// ────────────────────────────────────────────────────────────
+// App version — hardcoded. Bump these two values on an official release.
+// ────────────────────────────────────────────────────────────
+const APP_VERSION = "0.1";
+const APP_RELEASE_DATE = "Jul 11, 2026";
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -489,7 +495,7 @@ const Ico = {
 // instead of inlining base64 (which bloats page content + every revision).
 // ────────────────────────────────────────────────────────────
 
-const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_INLINE_IMAGE_BYTES = 1024 * 1024 * 1024; // 1 GB
 
 async function uploadImageFile(
   file: File,
@@ -1492,55 +1498,59 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
 
   return (
     <div
-      className='mt-8 pt-6 border-t'
+      className='mt-12 pt-8 border-t'
       style={{ borderColor: "var(--border-color)" }}
     >
-      <div className='flex items-center justify-between mb-3'>
-        <h3
-          className='text-[13px] font-semibold flex items-center gap-1.5'
-          style={{ color: "var(--text-muted)" }}
-        >
-          <Ico.Paperclip /> Attachments
-          {attachments.length > 0 && (
-            <span className='text-[11px] font-normal ml-1'>
-              {attachments.length}
-            </span>
-          )}
-        </h3>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className='flex items-center gap-1.5 text-[12px] px-2.5 py-1.5 rounded-[6px] border transition-colors'
-          style={{
-            borderColor: "var(--border-color)",
-            color: "var(--text-muted)",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "var(--bg-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "transparent")
-          }
-        >
-          <Ico.Plus />
-          {uploading ? "Uploading..." : "Attach file"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type='file'
-          className='hidden'
-          accept={ALLOWED_TYPES.join(",")}
-          onChange={handleFileSelect}
-        />
-      </div>
+      <h3
+        className='text-[14px] font-semibold flex items-center gap-1.5 mb-1'
+        style={{ color: "var(--text-primary)" }}
+      >
+        <Ico.Paperclip /> Attachments
+        {attachments.length > 0 && (
+          <span
+            className='text-[12px] font-normal'
+            style={{ color: "var(--text-muted)" }}
+          >
+            ({attachments.length})
+          </span>
+        )}
+      </h3>
+      <p className='text-[12px] mb-3' style={{ color: "var(--text-muted)" }}>
+        Attach files to this page — PDF, Word, PowerPoint, Excel, images, text or
+        markdown, up to 1&nbsp;GB each.
+      </p>
 
-      {attachments.length === 0 && (
-        <p className='text-[12px] py-2' style={{ color: "var(--text-muted)" }}>
-          No attachments. Attach PDF, Word, PPT, text, markdown, or image files.
-        </p>
-      )}
+      {/* Prominent upload drop-zone so it's easy to notice */}
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className='w-full flex flex-col items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed py-6 transition-colors'
+        style={{
+          borderColor: "var(--border-color)",
+          color: "var(--text-muted)",
+        }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = "var(--bg-hover)")
+        }
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      >
+        <Ico.Plus />
+        <span className='text-[13px] font-medium'>
+          {uploading ? "Uploading…" : "Click to upload a file"}
+        </span>
+        <span className='text-[11px]'>
+          PDF · Word · PPT · Excel · images — up to 1&nbsp;GB
+        </span>
+      </button>
+      <input
+        ref={fileInputRef}
+        type='file'
+        className='hidden'
+        accept={ALLOWED_TYPES.join(",")}
+        onChange={handleFileSelect}
+      />
 
-      <div className='space-y-1.5'>
+      <div className='space-y-1.5 mt-3'>
         {attachments.map((att) => (
           <div
             key={att.id}
@@ -1607,6 +1617,82 @@ function flattenTree(nodes: PageNode[]): PageNode[] {
   return result;
 }
 
+// Compact "getting started" card shown BELOW the Document Hub table.
+function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
+  return (
+    <div
+      className='rounded-xl border p-4 mt-8'
+      style={{
+        borderColor: "var(--border-color)",
+        background: "var(--bg-secondary)",
+      }}
+    >
+      <div className='flex items-center justify-between gap-4 mb-2.5'>
+        <h2
+          className='text-[15px] font-bold flex items-center gap-2'
+          style={{ color: "var(--text-primary)" }}
+        >
+          👋 Welcome to YMCA
+          <span className='text-[12px] font-normal' style={{ color: "var(--text-muted)" }}>
+            — open a page and type{" "}
+            <kbd
+              className='px-1 py-0.5 rounded border text-[11px] font-mono'
+              style={{
+                borderColor: "var(--border-color)",
+                background: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              /
+            </kbd>{" "}
+            for these blocks:
+          </span>
+        </h2>
+        <span
+          className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap'
+          style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
+        >
+          v{APP_VERSION} · {APP_RELEASE_DATE}
+        </span>
+      </div>
+      <div
+        className='grid gap-1.5'
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
+      >
+        {SLASH_ITEMS.map((item) => (
+          <div
+            key={item.title}
+            className='flex items-center gap-2 px-2 py-1.5 rounded-[6px]'
+            style={{
+              background: "var(--bg-primary)",
+              border: "1px solid var(--border-color)",
+            }}
+            title={item.subtitle}
+          >
+            <span
+              className='flex items-center justify-center w-6 h-6 rounded-[5px] text-[12px] shrink-0'
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {item.icon}
+            </span>
+            <span
+              className='text-[12px] font-medium truncate'
+              style={{ color: "var(--text-primary)" }}
+            >
+              <span style={{ color: "var(--accent-color)" }}>/</span>
+              {item.title.toLowerCase()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DocumentHub({
   tree,
   isDark,
@@ -1618,12 +1704,24 @@ function DocumentHub({
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
 }) {
+  const PER_PAGE = 10;
   const [filterTag, setFilterTag] = useState<string | null>(null);
+  const [pageNum, setPageNum] = useState(0);
   const allPages = flattenTree(tree);
   const allTags = Array.from(new Set(allPages.flatMap((p) => p.tags))).sort();
   const filtered = filterTag
     ? allPages.filter((p) => p.tags.includes(filterTag))
     : allPages;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(pageNum, totalPages - 1);
+  const pageItems = filtered.slice(
+    safePage * PER_PAGE,
+    safePage * PER_PAGE + PER_PAGE,
+  );
+
+  // Reset to the first page whenever the tag filter changes.
+  useEffect(() => setPageNum(0), [filterTag]);
 
   return (
     <div className='flex-1 overflow-y-auto px-8 py-10 max-w-[900px] mx-auto w-full'>
@@ -1697,7 +1795,7 @@ function DocumentHub({
         <div
           className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b'
           style={{
-            gridTemplateColumns: "1fr 220px 120px 80px",
+            gridTemplateColumns: "1fr 180px 175px 70px",
             background: "var(--bg-secondary)",
             color: "var(--text-muted)",
             borderColor: "var(--border-color)",
@@ -1720,18 +1818,20 @@ function DocumentHub({
           </div>
         )}
 
-        {filtered.map((page, i) => {
+        {pageItems.map((page, i) => {
           const date = new Date(page.updatedAt);
-          const dateStr = date.toLocaleDateString("en-US", {
+          const dateStr = date.toLocaleString("en-US", {
             month: "short",
             day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
           });
           return (
             <div
               key={page.id}
               className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group'
               style={{
-                gridTemplateColumns: "1fr 220px 120px 80px",
+                gridTemplateColumns: "1fr 180px 175px 70px",
                 borderColor: "var(--border-color)",
                 background: "transparent",
               }}
@@ -1803,14 +1903,53 @@ function DocumentHub({
       </div>
 
       {filtered.length > 0 && (
-        <p
-          className='text-[11px] mt-3 text-right'
-          style={{ color: "var(--text-muted)" }}
-        >
-          {filtered.length} {filtered.length === 1 ? "page" : "pages"}
-          {filterTag ? ` tagged "${filterTag}"` : " total"}
-        </p>
+        <div className='flex items-center justify-between mt-4'>
+          <span
+            className='text-[11px]'
+            style={{ color: "var(--text-muted)" }}
+          >
+            {filtered.length} {filtered.length === 1 ? "page" : "pages"}
+            {filterTag ? ` tagged "${filterTag}"` : " total"}
+          </span>
+          {totalPages > 1 && (
+            <div className='flex items-center gap-1.5'>
+              <button
+                onClick={() => setPageNum((p) => Math.max(0, p - 1))}
+                disabled={safePage === 0}
+                className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
+                style={{
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                ‹ Prev
+              </button>
+              <span
+                className='text-[12px] px-1'
+                style={{ color: "var(--text-muted)" }}
+              >
+                Page {safePage + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() =>
+                  setPageNum((p) => Math.min(totalPages - 1, p + 1))
+                }
+                disabled={safePage >= totalPages - 1}
+                className='px-2.5 py-1 rounded-[6px] border text-[12px] transition-colors disabled:opacity-40 disabled:cursor-default'
+                style={{
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Next ›
+              </button>
+            </div>
+          )}
+        </div>
       )}
+
+      {/* Getting-started / notifications — relocated below the hub */}
+      <WelcomeCard onNewPage={onNewPage} />
     </div>
   );
 }

@@ -108,7 +108,9 @@ body {
 
 .notion-editor .ProseMirror {
   outline: none;
-  min-height: 60vh;
+  /* Kept modest so the Attachments section sits mid-page (visible without a long
+     scroll on short pages); the editor still grows as content is added. */
+  min-height: 28vh;
   color: var(--text-primary);
   font-family: var(--font-family);
   font-size: var(--font-size-base);
