@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   EditorContent,
   Node as TipTapNode,
@@ -9,8 +9,22 @@ import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
+import UniqueID from "@tiptap/extension-unique-id";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import type { EditorView } from "@tiptap/pm/view";
-import { Callout, SlashCommand, SLASH_ITEMS } from "./editor-extensions";
+import type { Node as PMNode } from "@tiptap/pm/model";
+import {
+  Callout,
+  Column,
+  ColumnList,
+  PAGE_REF_OPEN_EVENT,
+  PageRef,
+  PageRefSuggestion,
+  SlashCommand,
+  SLASH_ITEMS,
+  setPageSearchProvider,
+  type PageRefItem,
+} from "./editor-extensions";
 import { LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
 
 // ────────────────────────────────────────────────────────────
@@ -74,6 +88,9 @@ const API = (
   `${window.location.protocol}//${window.location.hostname}:4000`
 ).replace(/\/$/, "");
 
+// Matches Tailwind's `md` breakpoint; evaluated at call time so rotation/resize is respected
+const isMobileViewport = () => window.matchMedia("(max-width: 767px)").matches;
+
 // Module-level lang ref so api() can return translated errors without needing React context
 let _currentLang: Lang = (localStorage.getItem("ymca_lang") as Lang) ?? "en";
 export function _setApiLang(l: Lang) {
@@ -105,7 +122,12 @@ async function api<T = unknown>(
       code?: string;
     } | null;
     if (res.status === 413) throw new Error(T[_currentLang].err413);
-    if (res.status === 401) throw new Error(T[_currentLang].err401);
+    if (res.status === 401)
+      throw new Error(
+        b?.code === "INVALID_CREDENTIALS"
+          ? T[_currentLang].errInvalidCredentials
+          : T[_currentLang].err401,
+      );
     if (res.status === 403)
       throw new Error(b?.message ?? T[_currentLang].err403);
     if (res.status === 404)
@@ -1728,11 +1750,11 @@ function DocumentHub({
   useEffect(() => setPageNum(0), [filterTag, query]);
 
   return (
-    <div className='flex-1 overflow-y-auto px-8 py-10 max-w-[900px] mx-auto w-full'>
+    <div className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[900px] mx-auto w-full'>
       {/* Header */}
       <div className='flex items-center justify-between mb-6'>
         <h1
-          className='text-3xl font-bold'
+          className='text-2xl sm:text-3xl font-bold'
           style={{ color: "var(--text-primary)" }}
         >
           Document Hub
@@ -1792,7 +1814,7 @@ function DocumentHub({
 
       {/* Toolbar: search (left) + pagination (right, fixed here so it doesn't
           shift the layout as row counts change) */}
-      <div className='flex items-center justify-between gap-3 mb-3'>
+      <div className='flex flex-wrap items-center justify-between gap-3 mb-3'>
         <div className='relative w-full max-w-[300px]'>
           <span
             className='absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none'
@@ -1804,7 +1826,7 @@ function DocumentHub({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder='Search documents by name…'
-            className='w-full text-sm pl-8 pr-3 py-1.5 rounded-[8px] border outline-none'
+            className='w-full text-base sm:text-sm pl-8 pr-3 py-1.5 rounded-[8px] border outline-none'
             style={{
               borderColor: "var(--border-color)",
               background: "var(--bg-secondary)",
@@ -2177,7 +2199,7 @@ function RevisionDrawer({
 
   return (
     <div
-      className='w-[268px] shrink-0 flex flex-col border-l'
+      className='w-[268px] shrink-0 flex flex-col border-l max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-40 max-md:shadow-2xl'
       style={{
         background: "var(--bg-secondary)",
         borderColor: "var(--border-color)",
@@ -2755,7 +2777,7 @@ export function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showRevisions, setShowRevisions] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobileViewport());
   const [publicLink, setPublicLink] = useState("");
   const [toast, setToast] = useState("");
   const [copied, setCopied] = useState(false);
@@ -2768,6 +2790,77 @@ export function App() {
   useEffect(() => {
     csrfRef.current = csrf;
   }, [csrf]);
+
+  // ── Block editor: page references (@) + drag handle plumbing ──
+
+  const treeRef = useRef<PageNode[]>([]);
+  treeRef.current = tree;
+  const selectPageFnRef = useRef<(id: string) => void>(() => {});
+
+  // Clicking a page-reference chip in the editor opens that page.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const pageId = (e as CustomEvent<{ pageId: string }>).detail?.pageId;
+      if (pageId) selectPageFnRef.current(pageId);
+    };
+    window.addEventListener(PAGE_REF_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(PAGE_REF_OPEN_EVENT, onOpen);
+  }, []);
+
+  // The @-menu searches workspace pages (API search, tree as fallback).
+  useEffect(() => {
+    const flatten = (nodes: PageNode[], out: PageRefItem[] = []): PageRefItem[] => {
+      for (const n of nodes) {
+        if (!n.deletedAt)
+          out.push({ id: n.id, title: n.title || "Untitled", icon: n.icon });
+        flatten(n.children ?? [], out);
+      }
+      return out;
+    };
+    setPageSearchProvider(async (query) => {
+      const q = query.trim();
+      if (!q) return flatten(treeRef.current).slice(0, 8);
+      const ws = activeWs;
+      if (ws) {
+        try {
+          const r = await api<{ results: PageRefItem[] }>(
+            `/search?workspaceId=${ws.id}&q=${encodeURIComponent(q)}`,
+            {},
+            csrfRef.current ?? undefined,
+          );
+          return r.results.map((p) => ({
+            id: p.id,
+            title: p.title || "Untitled",
+            icon: p.icon,
+          }));
+        } catch {
+          // fall through to local filter
+        }
+      }
+      const ql = q.toLowerCase();
+      return flatten(treeRef.current)
+        .filter((p) => p.title.toLowerCase().includes(ql))
+        .slice(0, 8);
+    });
+  }, [activeWs]);
+
+  // Current block under the drag handle (for the + button).
+  const gutterNodeRef = useRef<{ node: PMNode | null; pos: number }>({
+    node: null,
+    pos: -1,
+  });
+  // Stable identities — DragHandle re-registers its plugin (destroying every
+  // plugin view, incl. open suggestion menus) whenever these props change.
+  const gutterNodeChange = useCallback(
+    ({ node, pos }: { node: PMNode | null; pos: number }) => {
+      gutterNodeRef.current = { node, pos };
+    },
+    [],
+  );
+  const gutterTippyOptions = useMemo(
+    () => ({ placement: "left-start" as const, offset: [0, 4] as [number, number] }),
+    [],
+  );
 
   // ── Auth ──
 
@@ -2922,7 +3015,25 @@ export function App() {
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: false }),
       Callout,
+      Column,
+      ColumnList,
+      PageRef,
+      PageRefSuggestion,
       SlashCommand,
+      UniqueID.configure({
+        types: [
+          "paragraph",
+          "heading",
+          "bulletList",
+          "orderedList",
+          "taskList",
+          "blockquote",
+          "codeBlock",
+          "callout",
+          "columnList",
+          "image",
+        ],
+      }),
     ],
     content: "<p></p>",
     editorProps: {
@@ -2986,6 +3097,20 @@ export function App() {
     },
   });
 
+  // Insert an empty block below the hovered one and open the slash menu.
+  function handleGutterPlus() {
+    if (!editor) return;
+    const { node, pos } = gutterNodeRef.current;
+    if (!node || pos < 0) return;
+    const after = pos + node.nodeSize;
+    editor
+      .chain()
+      .insertContentAt(after, { type: "paragraph" })
+      .focus(after + 1)
+      .run();
+    editor.commands.insertContent("/");
+  }
+
   // ── Page actions ──
 
   async function handleSelectPage(id: string) {
@@ -2998,6 +3123,7 @@ export function App() {
       );
       setShowRevisions(false);
       setShowPublish(false);
+      if (isMobileViewport()) setSidebarOpen(false);
       const isEmpty =
         !r.page.content ||
         Object.keys(r.page.content).length === 0 ||
@@ -3028,6 +3154,8 @@ export function App() {
       setToast(e instanceof Error ? e.message : "Failed to load page");
     }
   }
+
+  selectPageFnRef.current = (id: string) => void handleSelectPage(id);
 
   async function handleNewPage(parentId?: string) {
     if (!activeWs) return;
@@ -3398,7 +3526,7 @@ export function App() {
                 onChange={(e) => setAuthEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleAuth()}
                 autoFocus
-                className='w-full rounded-[6px] border px-3 py-2 text-sm outline-none transition'
+                className='w-full rounded-[6px] border px-3 py-2 text-base sm:text-sm outline-none transition'
                 style={{
                   background: "var(--input-bg)",
                   borderColor: "var(--border-color)",
@@ -3419,7 +3547,7 @@ export function App() {
                 value={authPw}
                 onChange={(e) => setAuthPw(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleAuth()}
-                className='w-full rounded-[6px] border px-3 py-2 text-sm outline-none transition'
+                className='w-full rounded-[6px] border px-3 py-2 text-base sm:text-sm outline-none transition'
                 style={{
                   background: "var(--input-bg)",
                   borderColor: "var(--border-color)",
@@ -3507,12 +3635,20 @@ export function App() {
         style={{
           background: "var(--bg-primary)",
           color: "var(--text-primary)",
+          // iOS Safari: keep the app inside the visible viewport (toolbar-aware)
+          height: "100dvh",
         }}
       >
         {/* ════════════════ SIDEBAR ════════════════ */}
         {sidebarOpen && (
+          <div
+            className='fixed inset-0 z-30 bg-black/40 md:hidden'
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        {sidebarOpen && (
           <aside
-            className='w-[240px] shrink-0 flex flex-col border-r overflow-hidden'
+            className='w-[240px] shrink-0 flex flex-col border-r overflow-hidden max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
             style={{
               background: "var(--bg-secondary)",
               borderColor: "var(--border-color)",
@@ -3539,7 +3675,10 @@ export function App() {
                 {
                   label: T[lang].home,
                   icon: <Ico.Grid />,
-                  action: () => setActivePage(null),
+                  action: () => {
+                    setActivePage(null);
+                    if (isMobileViewport()) setSidebarOpen(false);
+                  },
                 },
                 {
                   label: T[lang].search,
@@ -3750,7 +3889,7 @@ export function App() {
                   <span>/</span>
                   <span
                     style={{ color: "var(--text-primary)" }}
-                    className='font-medium truncate max-w-[240px]'
+                    className='font-medium truncate max-w-[110px] sm:max-w-[240px]'
                   >
                     {activePage.title || "Untitled"}
                   </span>
@@ -3764,7 +3903,7 @@ export function App() {
                 <>
                   {/* Save indicator */}
                   <span
-                    className={`text-[12px] mr-2 flex items-center gap-1 transition-all duration-300 ${
+                    className={`text-[12px] mr-2 items-center gap-1 transition-all duration-300 hidden sm:flex ${
                       saveStatus === "idle" ? "opacity-0" : "opacity-100"
                     }`}
                     style={{
@@ -3808,7 +3947,7 @@ export function App() {
                     }
                   >
                     <Ico.Clock />
-                    <span>{T[lang].history}</span>
+                    <span className='hidden sm:inline'>{T[lang].history}</span>
                   </button>
 
                   {/* Publish */}
@@ -3826,7 +3965,7 @@ export function App() {
                       }}
                     >
                       <Ico.Globe />
-                      <span>
+                      <span className='hidden sm:inline'>
                         {activePage.isPublished
                           ? T[lang].published
                           : T[lang].publish}
@@ -3987,7 +4126,7 @@ export function App() {
 
               {/* ─── Page Editor ─── */}
               {activePage && (
-                <div className='max-w-[720px] mx-auto px-[64px] py-12'>
+                <div className='max-w-[720px] mx-auto px-5 py-6 sm:px-[64px] sm:py-12'>
                   {/* Icon */}
                   <div className='mb-2'>
                     <EmojiPicker
@@ -4068,6 +4207,53 @@ export function App() {
                     style={{ borderColor: "var(--border-color)" }}
                   />
 
+                  {/* Block gutter: + to insert, ⋮⋮ to drag-reorder */}
+                  {editor && (
+                    <DragHandle
+                      editor={editor}
+                      tippyOptions={gutterTippyOptions}
+                      onNodeChange={gutterNodeChange}
+                    >
+                      <div className='block-gutter'>
+                        <button
+                          type='button'
+                          className='gutter-btn'
+                          title='Click to add a block below'
+                          draggable={false}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleGutterPlus();
+                          }}
+                        >
+                          <svg
+                            width='14'
+                            height='14'
+                            fill='none'
+                            stroke='currentColor'
+                            strokeWidth='2'
+                            strokeLinecap='round'
+                            viewBox='0 0 24 24'
+                          >
+                            <path d='M12 5v14M5 12h14' />
+                          </svg>
+                        </button>
+                        <div
+                          className='gutter-btn gutter-grip'
+                          title='Drag to move'
+                        >
+                          <svg width='14' height='14' viewBox='0 0 24 24' fill='currentColor'>
+                            <circle cx='9' cy='5' r='1.7' />
+                            <circle cx='9' cy='12' r='1.7' />
+                            <circle cx='9' cy='19' r='1.7' />
+                            <circle cx='15' cy='5' r='1.7' />
+                            <circle cx='15' cy='12' r='1.7' />
+                            <circle cx='15' cy='19' r='1.7' />
+                          </svg>
+                        </div>
+                      </div>
+                    </DragHandle>
+                  )}
                   {/* Editor */}
                   <div
                     className='notion-editor'

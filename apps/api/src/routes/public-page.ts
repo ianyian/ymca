@@ -30,6 +30,15 @@ function jsonToHtml(node: Record<string, unknown>): string {
       const emoji = escapeHtml((node.attrs as Record<string, unknown>)?.emoji as string ?? '💡');
       return `<div class="callout"><span class="callout-emoji">${emoji}</span><div class="callout-body">${inner()}</div></div>`;
     }
+    case 'columnList': return `<div class="column-list">${inner()}</div>`;
+    case 'column': return `<div class="column">${inner()}</div>`;
+    case 'pageRef': {
+      // Render as inert text — the referenced page may be private, so no link.
+      const attrs = node.attrs as Record<string, unknown> | undefined;
+      const icon = escapeHtml((attrs?.icon as string) || '📄');
+      const title = escapeHtml((attrs?.title as string) || 'Untitled');
+      return `<span class="page-ref">${icon} <u>${title}</u></span>`;
+    }
     case 'blockquote': return `<blockquote>${inner()}</blockquote>`;
     case 'codeBlock': return `<pre><code>${inner()}</code></pre>`;
     case 'horizontalRule': return `<hr>`;
@@ -263,6 +272,12 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
     .page-content .callout-body { flex: 1; min-width: 0; }
     .page-content .callout-body > *:first-child { margin-top: 0; }
     .page-content .callout-body > *:last-child { margin-bottom: 0; }
+    .page-content .column-list { display: flex; gap: 24px; margin: 4px 0; }
+    .page-content .column { flex: 1 1 0; min-width: 0; }
+    .page-content .column > *:first-child { margin-top: 0; }
+    @media (max-width: 640px) { .page-content .column-list { flex-direction: column; gap: 8px; } }
+    .page-content .page-ref { white-space: nowrap; }
+    .page-content .page-ref u { text-decoration-color: var(--border); font-weight: 500; }
 
     /* Footer */
     .page-footer {

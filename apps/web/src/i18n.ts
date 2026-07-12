@@ -55,7 +55,7 @@ type Strings = {
   // Tags
   addCategory: string;
   // Errors
-  err413: string; err401: string; err403: string;
+  err413: string; err401: string; errInvalidCredentials: string; err403: string;
   err404: string; err500: string; errNetwork: string; errImageTooLarge: string;
   // Misc
   open: string; cancel: string; remove: string;
@@ -104,6 +104,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "Add category",
     err413: "Content too large. If you pasted an image, try using a smaller one.",
     err401: "Session expired. Please sign in again.",
+    errInvalidCredentials: "Invalid email or password.",
     err403: "Permission denied.", err404: "Not found.",
     err500: "Server error. Please try again.",
     errNetwork: "Cannot connect to server. Check your connection.",
@@ -150,6 +151,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "添加分类",
     err413: "内容过大。如果您粘贴了图片，请尝试使用较小的图片。",
     err401: "会话已过期，请重新登录。",
+    errInvalidCredentials: "邮箱或密码错误。",
     err403: "权限不足。", err404: "未找到。",
     err500: "服务器错误，请重试。",
     errNetwork: "无法连接到服务器，请检查网络连接。",
@@ -198,6 +200,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "Tambah kategori",
     err413: "Kandungan terlalu besar. Jika anda menampal imej, cuba gunakan imej yang lebih kecil.",
     err401: "Sesi tamat tempoh. Sila log masuk semula.",
+    errInvalidCredentials: "E-mel atau kata laluan tidak sah.",
     err403: "Kebenaran ditolak.", err404: "Tidak ditemui.",
     err500: "Ralat pelayan. Sila cuba lagi.",
     errNetwork: "Tidak dapat menyambung ke pelayan. Semak sambungan anda.",
@@ -246,6 +249,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "வகை சேர்",
     err413: "உள்ளடக்கம் மிகவும் பெரியது. படத்தை ஒட்டியிருந்தால், சிறிய படத்தை முயற்சிக்கவும்.",
     err401: "அமர்வு காலாவதியானது. மீண்டும் உள்நுழைக.",
+    errInvalidCredentials: "மின்னஞ்சல் அல்லது கடவுச்சொல் தவறானது.",
     err403: "அனுமதி மறுக்கப்பட்டது.", err404: "கண்டுபிடிக்கவில்லை.",
     err500: "சேவையக பிழை. மீண்டும் முயற்சிக்கவும்.",
     errNetwork: "சேவையகத்துடன் இணைக்க முடியவில்லை. இணைப்பை சரிபாருங்கள்.",
@@ -294,6 +298,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "Kategorie hinzufügen",
     err413: "Inhalt zu groß. Wenn Sie ein Bild eingefügt haben, versuchen Sie ein kleineres.",
     err401: "Sitzung abgelaufen. Bitte melden Sie sich erneut an.",
+    errInvalidCredentials: "E-Mail oder Passwort ist ungültig.",
     err403: "Zugriff verweigert.", err404: "Nicht gefunden.",
     err500: "Serverfehler. Bitte versuchen Sie es erneut.",
     errNetwork: "Keine Verbindung zum Server. Überprüfen Sie Ihre Verbindung.",
@@ -342,6 +347,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "Kategória hozzáadása",
     err413: "A tartalom túl nagy. Ha képet illesztett be, próbáljon kisebbet.",
     err401: "A munkamenet lejárt. Kérjük, jelentkezzen be újra.",
+    errInvalidCredentials: "Érvénytelen e-mail-cím vagy jelszó.",
     err403: "Hozzáférés megtagadva.", err404: "Nem található.",
     err500: "Szerverhiba. Kérjük, próbálja újra.",
     errNetwork: "Nem sikerült csatlakozni a szerverhez. Ellenőrizze a kapcsolatot.",
@@ -390,6 +396,7 @@ export const T: Record<Lang, Strings> = {
     addCategory: "Agregar categoría",
     err413: "El contenido es demasiado grande. Si pegaste una imagen, intenta con una más pequeña.",
     err401: "Sesión expirada. Por favor inicia sesión de nuevo.",
+    errInvalidCredentials: "Correo o contraseña incorrectos.",
     err403: "Permiso denegado.", err404: "No encontrado.",
     err500: "Error del servidor. Por favor intenta de nuevo.",
     errNetwork: "No se puede conectar al servidor. Verifica tu conexión.",

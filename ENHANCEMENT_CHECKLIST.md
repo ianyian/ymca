@@ -84,6 +84,10 @@ Legend — effort: 🟢 small · 🟡 medium · 🔴 large · impact: ⭐ (1–3
 
 ## Phase 3 — Feature enhancements (Notion parity)
 
+> 📐 The block-editor work (drag handles, colors, page references, multi-user)
+> now has its own phased plan: see **[BLOCKS_ROADMAP.md](BLOCKS_ROADMAP.md)**.
+> The unchecked editor items below are superseded by / folded into that roadmap.
+
 **Editor — do the slash menu first; it makes every later block discoverable.**
 
 - [x] **Slash (`/`) command menu** — `@tiptap/suggestion` + self-contained popup

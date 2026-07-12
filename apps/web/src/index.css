@@ -331,6 +331,112 @@ body {
 .slash-empty { padding: 10px 12px; font-size: 13px; color: var(--text-muted); }
 
 /* ============================================================
+   BLOCK GUTTER (drag handle + plus button)
+   ============================================================ */
+
+.drag-handle {
+  z-index: 40;
+}
+.block-gutter {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-right: 2px;
+}
+.gutter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.gutter-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gutter-grip { cursor: grab; }
+.gutter-grip:active { cursor: grabbing; }
+/* No hover on touch devices — hide the floating gutter there */
+@media (hover: none) {
+  .drag-handle { display: none; }
+}
+
+/* Drop indicator while dragging blocks */
+.notion-editor .ProseMirror .ProseMirror-dropcursor,
+.ProseMirror-dropcursor {
+  background: var(--accent-color) !important;
+}
+/* Whole-block selection tint (after grabbing a block) */
+.notion-editor .ProseMirror .ProseMirror-selectednode {
+  background: rgba(35, 131, 226, 0.08);
+  border-radius: 4px;
+}
+
+/* ============================================================
+   COLUMNS (side-by-side layout blocks)
+   ============================================================ */
+
+.notion-editor .ProseMirror .notion-column-list,
+.notion-column-list {
+  display: flex;
+  gap: 24px;
+  margin: 4px 0;
+}
+.notion-editor .ProseMirror .notion-column,
+.notion-column {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 4px;
+}
+/* Subtle affordance so column boundaries are visible while editing */
+.notion-editor .ProseMirror .notion-column {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  transition: outline-color 0.15s ease;
+}
+.notion-editor .ProseMirror .notion-column-list:hover > .notion-column {
+  outline-color: var(--border-color);
+}
+.notion-editor .ProseMirror .notion-column > *:first-child { margin-top: 0; }
+/* Stack columns on phones */
+@media (max-width: 767px) {
+  .notion-editor .ProseMirror .notion-column-list,
+  .notion-column-list {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ============================================================
+   PAGE REFERENCE CHIP
+   ============================================================ */
+
+.notion-page-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.notion-page-ref:hover { background: var(--bg-hover); }
+.notion-page-ref-icon { font-size: 1em; line-height: 1; }
+.notion-page-ref-title {
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notion-page-ref.ProseMirror-selectednode {
+  background: rgba(35, 131, 226, 0.15);
+}
+
+/* ============================================================
    SCROLLBAR
    ============================================================ */
 

@@ -1,6 +1,10 @@
 import { Node, Extension, mergeAttributes } from "@tiptap/react";
 import type { Editor, Range } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
+import {
+  Plugin as PMPlugin,
+  PluginKey as PMPluginKey,
+} from "@tiptap/pm/state";
 
 // ────────────────────────────────────────────────────────────
 // Callout block — a colored box with a leading emoji.
@@ -36,6 +40,316 @@ export const Callout = Node.create({
       }),
       ["span", { class: "notion-callout-emoji", contenteditable: "false" }, emoji],
       ["div", { class: "notion-callout-body" }, 0],
+    ];
+  },
+});
+
+// ────────────────────────────────────────────────────────────
+// Columns — side-by-side block containers (Notion-style layout).
+// ────────────────────────────────────────────────────────────
+
+export const Column = Node.create({
+  name: "column",
+  content: "block+",
+  isolating: true,
+
+  parseHTML() {
+    return [{ tag: "div[data-column]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      mergeAttributes(HTMLAttributes, { "data-column": "", class: "notion-column" }),
+      0,
+    ];
+  },
+});
+
+export const ColumnList = Node.create({
+  name: "columnList",
+  group: "block",
+  content: "column{2,4}",
+  isolating: true,
+
+  parseHTML() {
+    return [{ tag: "div[data-column-list]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      mergeAttributes(HTMLAttributes, {
+        "data-column-list": "",
+        class: "notion-column-list",
+      }),
+      0,
+    ];
+  },
+});
+
+function columnsContent(count: number) {
+  return {
+    type: "columnList",
+    content: Array.from({ length: count }, () => ({
+      type: "column",
+      content: [{ type: "paragraph" }],
+    })),
+  };
+}
+
+// Insert a column layout and place the cursor inside the first column.
+function insertColumns(editor: Editor, range: Range, count: number) {
+  editor
+    .chain()
+    .focus()
+    .deleteRange(range)
+    .insertContent(columnsContent(count))
+    .run();
+  const { doc } = editor.state;
+  let best = -1;
+  let bestDist = Infinity;
+  doc.descendants((node, pos) => {
+    if (node.type.name === "columnList") {
+      const d = Math.abs(pos - range.from);
+      if (d < bestDist) {
+        bestDist = d;
+        best = pos;
+      }
+    }
+  });
+  // columnList → +1 column → +2 paragraph → +3 cursor inside it
+  if (best >= 0) editor.chain().setTextSelection(best + 3).run();
+}
+
+// ────────────────────────────────────────────────────────────
+// Page reference — inline chip linking to another page.
+// Clicking dispatches a window event the app listens for.
+// ────────────────────────────────────────────────────────────
+
+export type PageRefItem = { id: string; title: string; icon: string | null };
+
+export const PAGE_REF_OPEN_EVENT = "ymca:open-page";
+
+export const PageRef = Node.create({
+  name: "pageRef",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+
+  addAttributes() {
+    return {
+      pageId: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-page-id"),
+        renderHTML: (attrs) => ({ "data-page-id": attrs.pageId as string }),
+      },
+      title: {
+        default: "Untitled",
+        parseHTML: (el) => el.getAttribute("data-page-title") || "Untitled",
+        renderHTML: (attrs) => ({ "data-page-title": attrs.title as string }),
+      },
+      icon: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-page-icon"),
+        renderHTML: (attrs) =>
+          attrs.icon ? { "data-page-icon": attrs.icon as string } : {},
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "span[data-page-ref]" }];
+  },
+
+  renderHTML({ HTMLAttributes, node }) {
+    const icon = (node.attrs.icon as string | null) || "📄";
+    const title = (node.attrs.title as string) || "Untitled";
+    return [
+      "span",
+      mergeAttributes(HTMLAttributes, {
+        "data-page-ref": "",
+        class: "notion-page-ref",
+        role: "link",
+        tabindex: "0",
+      }),
+      ["span", { class: "notion-page-ref-icon", contenteditable: "false" }, icon],
+      ["span", { class: "notion-page-ref-title", contenteditable: "false" }, title],
+    ];
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new PMPlugin({
+        props: {
+          handleClickOn(_view, _pos, node, _nodePos, event) {
+            if (node.type.name !== "pageRef") return false;
+            const pageId = node.attrs.pageId as string | null;
+            if (!pageId) return false;
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent(PAGE_REF_OPEN_EVENT, { detail: { pageId } }),
+            );
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
+
+// The app registers a provider so the @-menu can search workspace pages.
+let _pageSearch: (query: string) => Promise<PageRefItem[]> = async () => [];
+export function setPageSearchProvider(
+  fn: (query: string) => Promise<PageRefItem[]>,
+) {
+  _pageSearch = fn;
+}
+
+function createPageRefRenderer() {
+  let el: HTMLDivElement | null = null;
+  let items: PageRefItem[] = [];
+  let rows: HTMLButtonElement[] = [];
+  let selected = 0;
+  let cmd: (item: PageRefItem) => void = () => {};
+
+  function applySelected() {
+    rows.forEach((r, i) => r.classList.toggle("is-selected", i === selected));
+  }
+
+  function build() {
+    if (!el) return;
+    el.innerHTML = "";
+    rows = [];
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "slash-empty";
+      empty.textContent = "No pages found";
+      el.appendChild(empty);
+      return;
+    }
+    items.forEach((item, i) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "slash-item";
+      const icon = document.createElement("span");
+      icon.className = "slash-item-icon";
+      icon.textContent = item.icon || "📄";
+      const text = document.createElement("span");
+      text.className = "slash-item-text";
+      const title = document.createElement("span");
+      title.className = "slash-item-title";
+      title.textContent = item.title || "Untitled";
+      text.appendChild(title);
+      row.appendChild(icon);
+      row.appendChild(text);
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        cmd(item);
+      });
+      row.addEventListener("mouseover", () => {
+        selected = i;
+        applySelected();
+      });
+      el!.appendChild(row);
+      rows.push(row);
+    });
+    applySelected();
+  }
+
+  function position(rect: DOMRect | null) {
+    if (!el || !rect) return;
+    el.style.left = `${rect.left}px`;
+    el.style.top = `${rect.bottom + 6}px`;
+  }
+
+  return {
+    onStart: (props: {
+      items: PageRefItem[];
+      command: (item: PageRefItem) => void;
+      clientRect?: (() => DOMRect | null) | null;
+    }) => {
+      items = props.items;
+      selected = 0;
+      cmd = props.command;
+      el = document.createElement("div");
+      el.className = "slash-menu";
+      document.body.appendChild(el);
+      build();
+      position(props.clientRect?.() ?? null);
+    },
+    onUpdate: (props: {
+      items: PageRefItem[];
+      command: (item: PageRefItem) => void;
+      clientRect?: (() => DOMRect | null) | null;
+    }) => {
+      items = props.items;
+      cmd = props.command;
+      if (selected >= items.length) selected = 0;
+      build();
+      position(props.clientRect?.() ?? null);
+    },
+    onKeyDown: (props: { event: KeyboardEvent }): boolean => {
+      if (!el || items.length === 0) return false;
+      const { key } = props.event;
+      if (key === "ArrowDown") {
+        selected = (selected + 1) % items.length;
+        applySelected();
+        return true;
+      }
+      if (key === "ArrowUp") {
+        selected = (selected - 1 + items.length) % items.length;
+        applySelected();
+        return true;
+      }
+      if (key === "Enter") {
+        const item = items[selected];
+        if (item) cmd(item);
+        return true;
+      }
+      if (key === "Escape") return true;
+      return false;
+    },
+    onExit: () => {
+      el?.remove();
+      el = null;
+      rows = [];
+    },
+  };
+}
+
+export const PageRefSuggestion = Extension.create({
+  name: "pageRefSuggestion",
+
+  addProseMirrorPlugins() {
+    return [
+      Suggestion<PageRefItem>({
+        editor: this.editor,
+        char: "@",
+        allowSpaces: true,
+        startOfLine: false,
+        pluginKey: new PMPluginKey("pageRefSuggestion"),
+        command: ({ editor, range, props }) => {
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, [
+              {
+                type: "pageRef",
+                attrs: {
+                  pageId: props.id,
+                  title: props.title || "Untitled",
+                  icon: props.icon,
+                },
+              },
+              { type: "text", text: " " },
+            ])
+            .run();
+        },
+        items: ({ query }) => _pageSearch(query),
+        render: createPageRefRenderer,
+      }),
     ];
   },
 });
@@ -149,6 +463,29 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: "divider horizontal rule hr line separator",
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+  },
+  {
+    title: "2 columns",
+    subtitle: "Split into left & right",
+    icon: "▥",
+    keywords: "columns two split layout side left right lego",
+    command: ({ editor, range }) => insertColumns(editor, range, 2),
+  },
+  {
+    title: "3 columns",
+    subtitle: "Split into three columns",
+    icon: "▦",
+    keywords: "columns three split layout thirds lego",
+    command: ({ editor, range }) => insertColumns(editor, range, 3),
+  },
+  {
+    title: "Page reference",
+    subtitle: "Link to another page (@)",
+    icon: "📄",
+    keywords: "page reference link mention embed relation @",
+    command: ({ editor, range }) =>
+      // Replace "/query" with "@" so the page-mention menu takes over.
+      editor.chain().focus().deleteRange(range).insertContent("@").run(),
   },
 ];
 
