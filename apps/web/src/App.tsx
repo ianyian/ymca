@@ -2950,6 +2950,44 @@ export function App() {
       });
   }, []);
 
+  // Auto-update: poll version.json (bypassing the HTTP cache). When a strictly
+  // newer build has been deployed, reload once to pick it up — this is what
+  // keeps phones from getting stuck on a stale cached bundle after a deploy.
+  useEffect(() => {
+    let stopped = false;
+    async function checkVersion() {
+      try {
+        const res = await fetch(
+          `${import.meta.env.BASE_URL}version.json?t=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const { id } = (await res.json()) as { id?: string };
+        // Numeric (timestamp) compare: only reload when the server is NEWER,
+        // so a briefly-stale CDN copy can never trigger a needless reload.
+        if (
+          id &&
+          Number(id) > Number(__BUILD_ID__) &&
+          sessionStorage.getItem("ymca_updated_to") !== id
+        ) {
+          sessionStorage.setItem("ymca_updated_to", id);
+          if (!stopped) window.location.reload();
+        }
+      } catch {
+        /* offline / transient — ignore, try again next tick */
+      }
+    }
+    void checkVersion();
+    const onFocus = () => void checkVersion();
+    window.addEventListener("focus", onFocus);
+    const timer = setInterval(checkVersion, 5 * 60 * 1000);
+    return () => {
+      stopped = true;
+      window.removeEventListener("focus", onFocus);
+      clearInterval(timer);
+    };
+  }, []);
+
   // ── Workspaces ──
 
   const loadWorkspaces = useCallback(async () => {
