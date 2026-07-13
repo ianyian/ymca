@@ -244,4 +244,80 @@ describe('GET /me', () => {
     assert.equal(body.user.id, FIXTURES.user.id);
     assert.ok(body.csrfToken);
   });
+
+  it('authenticates via Authorization: Bearer header (no cookie)', async () => {
+    setAuthSession();
+    const app = createServer();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: {
+        authorization: 'Bearer fixture-raw-token',
+      },
+    });
+    assert.equal(response.statusCode, 200);
+    const body = response.json<{ user: { id: string } }>();
+    assert.equal(body.user.id, FIXTURES.user.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token auth: responses include a bearer token, and bearer requests skip CSRF
+// ---------------------------------------------------------------------------
+
+describe('Bearer token auth', () => {
+  afterEach(() => resetMockState());
+
+  it('login response includes a session token', async () => {
+    const bcrypt = await import('bcryptjs');
+    const hash = await bcrypt.hash('StrongPass1!', 10);
+    mockState.userFindUniqueResult = { ...FIXTURES.user, passwordHash: hash };
+    const app = createServer();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: FIXTURES.user.email, password: 'StrongPass1!' },
+    });
+    assert.equal(response.statusCode, 200);
+    const body = response.json<{ token?: string }>();
+    assert.ok(body.token, 'login returns a bearer token');
+  });
+
+  it('register response includes a session token', async () => {
+    const app = createServer();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: { email: 'bearer@example.com', password: 'StrongPass1!' },
+    });
+    assert.equal(response.statusCode, 201);
+    const body = response.json<{ token?: string }>();
+    assert.ok(body.token, 'register returns a bearer token');
+  });
+
+  it('mutating request via Bearer succeeds WITHOUT a CSRF token', async () => {
+    setAuthSession();
+    const app = createServer();
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/auth/language',
+      headers: { authorization: 'Bearer fixture-raw-token' },
+      payload: { language: 'es' },
+    });
+    assert.notEqual(response.statusCode, 403);
+  });
+
+  it('mutating request via cookie STILL requires a CSRF token (regression)', async () => {
+    setAuthSession();
+    const app = createServer();
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/auth/language',
+      headers: { cookie: 'ymca_session=fixture-raw-token' },
+      payload: { language: 'es' },
+    });
+    assert.equal(response.statusCode, 403);
+    const body = response.json<{ code: string }>();
+    assert.equal(body.code, 'CSRF_MISMATCH');
+  });
 });

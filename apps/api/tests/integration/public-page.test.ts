@@ -23,19 +23,22 @@ describe('GET /public/:shareToken', () => {
 
   afterEach(() => resetMockState());
 
-  it('returns public page without authentication', async () => {
-    // pagePublishTokenResult defaults to publishedPage fixture
+  it('renders the published page as HTML without authentication', async () => {
+    mockState.pagePublishTokenResult = {
+      ...FIXTURES.publishedPage,
+      title: 'My Public Doc',
+    };
     const res = await app.inject({
       method: 'GET',
       url: `/public/${SHARE_TOKEN}`,
     });
     assert.equal(res.statusCode, 200);
-    const body = JSON.parse(res.body) as { page: { id: string; title: string; isPublished: boolean } };
-    assert.equal(body.page.id, FIXTURES.page.id);
-    assert.equal(body.page.isPublished, true);
+    assert.match(res.headers['content-type'] as string, /text\/html/);
+    assert.match(res.body, /<!DOCTYPE html>/i);
+    assert.match(res.body, /My Public Doc/);
   });
 
-  it('returns 404 for unknown token', async () => {
+  it('returns a 404 HTML page for an unknown token', async () => {
     mockState.pagePublishTokenResult = null;
 
     const res = await app.inject({
@@ -43,8 +46,8 @@ describe('GET /public/:shareToken', () => {
       url: `/public/nonexistent-token`,
     });
     assert.equal(res.statusCode, 404);
-    const body = JSON.parse(res.body) as { code: string };
-    assert.equal(body.code, 'PAGE_NOT_FOUND');
+    assert.match(res.headers['content-type'] as string, /text\/html/);
+    assert.match(res.body, /not published or does not exist/i);
   });
 
   it('returns 404 when page exists but is not published', async () => {
@@ -57,15 +60,14 @@ describe('GET /public/:shareToken', () => {
     assert.equal(res.statusCode, 404);
   });
 
-  it('returns only safe fields — title, content, icon, version, publishedAt', async () => {
+  it('does not leak internal fields (workspaceId, creatorId) in the HTML', async () => {
+    mockState.pagePublishTokenResult = { ...FIXTURES.publishedPage };
     const res = await app.inject({
       method: 'GET',
       url: `/public/${SHARE_TOKEN}`,
     });
     assert.equal(res.statusCode, 200);
-    const body = JSON.parse(res.body) as { page: Record<string, unknown> };
-    // The route selects only public-safe fields; verify the response has page data
-    assert.ok(body.page.id, 'page.id should be present');
-    assert.ok(body.page.title !== undefined, 'page.title should be present');
+    assert.doesNotMatch(res.body, new RegExp(FIXTURES.publishedPage.workspaceId));
+    assert.doesNotMatch(res.body, new RegExp(FIXTURES.publishedPage.creatorId));
   });
 });

@@ -15,6 +15,7 @@ type AuthPayload = {
   };
   sessionId: string;
   csrfToken: string;
+  viaBearer: boolean;
 };
 
 export async function createSessionForUser(params: {
@@ -71,10 +72,27 @@ export function clearSessionCookie(reply: FastifyReply) {
   });
 }
 
+/**
+ * Extract the session token from the request. Prefers the Authorization:
+ * Bearer header (used cross-origin, where third-party cookies are blocked by
+ * Safari/iOS and increasingly by Chrome), then falls back to the cookie.
+ */
+function extractSessionToken(request: FastifyRequest): {
+  token: string | undefined;
+  viaBearer: boolean;
+} {
+  const authHeader = request.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice(7).trim();
+    if (token) return { token, viaBearer: true };
+  }
+  return { token: request.cookies[SESSION_COOKIE_NAME], viaBearer: false };
+}
+
 export async function resolveAuthFromRequest(
   request: FastifyRequest,
 ): Promise<AuthPayload | null> {
-  const rawToken = request.cookies[SESSION_COOKIE_NAME];
+  const { token: rawToken, viaBearer } = extractSessionToken(request);
   if (!rawToken) {
     return null;
   }
@@ -114,6 +132,7 @@ export async function resolveAuthFromRequest(
     user: session.user,
     sessionId: session.id,
     csrfToken: session.csrfToken,
+    viaBearer,
   };
 }
 

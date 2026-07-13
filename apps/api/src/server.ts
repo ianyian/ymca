@@ -70,6 +70,7 @@ export function createServer() {
     request.authUser = authPayload.user;
     request.authSessionId = authPayload.sessionId;
     request.csrfToken = authPayload.csrfToken;
+    request.authViaBearer = authPayload.viaBearer;
   });
 
   app.addHook("preHandler", async (request, reply) => {
@@ -83,6 +84,12 @@ export function createServer() {
     }
 
     if (request.url === "/auth/register" || request.url === "/auth/login") {
+      return;
+    }
+
+    // Bearer-authenticated requests aren't subject to CSRF: the token is only
+    // ever sent explicitly by our own code, never auto-attached by the browser.
+    if (request.authViaBearer) {
       return;
     }
 

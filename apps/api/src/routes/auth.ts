@@ -108,6 +108,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         return reply.status(201).send({
           user: { ...user, language: "en" },
           csrfToken: session.csrfToken,
+          // Also returned for cross-origin clients that can't rely on the
+          // third-party session cookie; sent back as `Authorization: Bearer`.
+          token: session.rawToken,
         });
       } catch (error) {
         if (isPrismaErrorCode(error, "P2002")) {
@@ -178,6 +181,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           language: user.language ?? "en",
         },
         csrfToken: session.csrfToken,
+        // Also returned for cross-origin clients that can't rely on the
+        // third-party session cookie; sent back as `Authorization: Bearer`.
+        token: session.rawToken,
       });
     },
   );

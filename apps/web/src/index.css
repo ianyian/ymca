@@ -336,27 +336,35 @@ body {
 
 .drag-handle {
   z-index: 40;
+  /* Right padding extends the handle's hit area toward the block text so the
+     cursor never crosses a dead gap (which would trigger mouseleave → hide). */
+  padding-right: 8px;
 }
 .block-gutter {
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding-right: 2px;
+  gap: 2px;
 }
 .gutter-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 24px;
+  width: 20px;
+  height: 26px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
+  opacity: 0.65;
+  transition: background 0.1s ease, opacity 0.1s ease;
 }
-.gutter-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gutter-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
 .gutter-grip { cursor: grab; }
 .gutter-grip:active { cursor: grabbing; }
 /* No hover on touch devices — hide the floating gutter there */

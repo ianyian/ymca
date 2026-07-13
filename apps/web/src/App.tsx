@@ -97,6 +97,19 @@ export function _setApiLang(l: Lang) {
   _currentLang = l;
 }
 
+// Bearer session token. The primary auth path in production: the web app
+// (github.io) and API (onrender.com) are cross-site, so the session cookie is a
+// third-party cookie that Safari/iOS blocks outright and Chrome increasingly
+// restricts. Sending the token explicitly keeps auth working everywhere. The
+// httpOnly cookie is still set and honored as a fallback where it's allowed.
+const TOKEN_KEY = "ymca_token";
+let _authToken: string | null = localStorage.getItem(TOKEN_KEY);
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 async function api<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -106,6 +119,7 @@ async function api<T = unknown>(
   if (init.body && !h.has("content-type"))
     h.set("content-type", "application/json");
   if (csrf) h.set("x-csrf-token", csrf);
+  if (_authToken) h.set("authorization", `Bearer ${_authToken}`);
   let res: Response;
   try {
     res = await fetch(`${API}${path}`, {
@@ -2858,7 +2872,12 @@ export function App() {
     [],
   );
   const gutterTippyOptions = useMemo(
-    () => ({ placement: "left-start" as const, offset: [0, 4] as [number, number] }),
+    () => ({
+      placement: "left-start" as const,
+      // distance 0 so the handle butts right up against the block — no dead
+      // zone between text and handle where a mouseleave would hide it.
+      offset: [0, 0] as [number, number],
+    }),
     [],
   );
 
@@ -2870,10 +2889,15 @@ export function App() {
     try {
       const endpoint =
         authMode === "register" ? "/auth/register" : "/auth/login";
-      const r = await api<{ user: SessionUser; csrfToken: string }>(endpoint, {
+      const r = await api<{
+        user: SessionUser;
+        csrfToken: string;
+        token?: string;
+      }>(endpoint, {
         method: "POST",
         body: JSON.stringify({ email: authEmail, password: authPw }),
       });
+      if (r.token) setAuthToken(r.token);
       setUser(r.user);
       setCsrf(r.csrfToken);
       if (r.user.language) setLang(r.user.language as Lang);
@@ -2905,6 +2929,7 @@ export function App() {
     try {
       await api("/auth/logout", { method: "POST" }, csrf);
     } catch {}
+    setAuthToken(null);
     setUser(null);
     setCsrf("");
     setWorkspaces([]);
@@ -2933,7 +2958,10 @@ export function App() {
         setCsrf(r.csrfToken);
         if (r.user.language) setLang(r.user.language as Lang);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Stale/invalid token — drop it so it doesn't ride along on future calls.
+        setAuthToken(null);
+      });
   }, []);
 
   // ── Workspaces ──

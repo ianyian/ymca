@@ -11,8 +11,24 @@ same locally and in production.
 | API       | Fastify @ `localhost:4000`    | Render (`https://ymca-g4by.onrender.com`)      |
 | DB        | local Postgres or Neon        | Neon (Postgres)                                |
 
-Production is **cross-origin** (GitHub Pages origin → Render API origin), so the
-session cookie uses `SameSite=None; Secure` — this is required and correct.
+Production is **cross-origin** (GitHub Pages origin → Render API origin).
+
+### Auth across origins — token first, cookie fallback
+
+Because the web app (`*.github.io`) and API (`*.onrender.com`) are different
+sites, the session cookie is a **third-party cookie**. Safari/iOS blocks these
+outright (ITP) and Chrome increasingly restricts them — which caused spurious
+"Session expired" errors right after login. So auth works two ways:
+
+- **Primary — bearer token.** Login/register return `token`; the web app stores
+  it in `localStorage` (`ymca_token`) and sends it as `Authorization: Bearer` on
+  every request. Works regardless of third-party-cookie policy. Bearer requests
+  skip CSRF (the token is never auto-sent by the browser).
+- **Fallback — session cookie** (`SameSite=None; Secure`), still set and honored
+  where third-party cookies are allowed. Cookie-based mutating requests still
+  require the `x-csrf-token` header.
+
+Both resolve to the same `Session` row server-side (`resolveAuthFromRequest`).
 
 ## Web (Vite → GitHub Pages)
 
