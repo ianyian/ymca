@@ -12,7 +12,6 @@ import Highlight from "@tiptap/extension-highlight";
 import UniqueID from "@tiptap/extension-unique-id";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import type { EditorView } from "@tiptap/pm/view";
-import type { Node as PMNode } from "@tiptap/pm/model";
 import {
   Callout,
   Column,
@@ -1889,20 +1888,19 @@ function DocumentHub({
         className='rounded-xl border overflow-hidden'
         style={{ borderColor: "var(--border-color)" }}
       >
-        {/* Table header */}
+        {/* Table header — on mobile only Doc name + Modified are shown */}
         <div
-          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b'
+          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
           style={{
-            gridTemplateColumns: "1fr 180px 175px 70px",
             background: "var(--bg-secondary)",
             color: "var(--text-muted)",
             borderColor: "var(--border-color)",
           }}
         >
           <span>Doc name</span>
-          <span>Category</span>
-          <span className='text-right'>Last modified</span>
-          <span></span>
+          <span className='hidden sm:block'>Category</span>
+          <span className='text-right'>Modified</span>
+          <span className='hidden sm:block'></span>
         </div>
 
         {filtered.length === 0 && (
@@ -1929,9 +1927,8 @@ function DocumentHub({
           return (
             <div
               key={page.id}
-              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group'
+              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
               style={{
-                gridTemplateColumns: "1fr 180px 175px 70px",
                 borderColor: "var(--border-color)",
                 background: "transparent",
               }}
@@ -1959,7 +1956,7 @@ function DocumentHub({
                 </span>
               </div>
 
-              <div className='flex flex-wrap gap-1.5 overflow-hidden'>
+              <div className='hidden sm:flex flex-wrap gap-1.5 overflow-hidden'>
                 {page.tags.slice(0, 3).map((tag) => (
                   <TagBadge key={tag} tag={tag} isDark={isDark} />
                 ))}
@@ -1974,14 +1971,14 @@ function DocumentHub({
               </div>
 
               <div
-                className='text-right text-[12px]'
+                className='text-right text-[12px] whitespace-nowrap'
                 style={{ color: "var(--text-muted)" }}
               >
                 {dateStr}
               </div>
 
               {/* Open button - visible on row hover */}
-              <div className='flex justify-end'>
+              <div className='hidden sm:flex justify-end'>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2013,8 +2010,8 @@ function DocumentHub({
         </p>
       )}
 
-      {/* Getting-started / notifications — relocated below the hub */}
-      <WelcomeCard onNewPage={onNewPage} />
+      {/* Getting-started card — hidden on mobile to save space + render cost */}
+      {!isMobileViewport() && <WelcomeCard onNewPage={onNewPage} />}
     </div>
   );
 }
@@ -2858,19 +2855,8 @@ export function App() {
     });
   }, [activeWs]);
 
-  // Current block under the drag handle (for the + button).
-  const gutterNodeRef = useRef<{ node: PMNode | null; pos: number }>({
-    node: null,
-    pos: -1,
-  });
-  // Stable identities — DragHandle re-registers its plugin (destroying every
-  // plugin view, incl. open suggestion menus) whenever these props change.
-  const gutterNodeChange = useCallback(
-    ({ node, pos }: { node: PMNode | null; pos: number }) => {
-      gutterNodeRef.current = { node, pos };
-    },
-    [],
-  );
+  // Stable identity — DragHandle re-registers its plugin (destroying every
+  // plugin view, incl. open suggestion menus) whenever this prop changes.
   const gutterTippyOptions = useMemo(
     () => ({
       placement: "left-start" as const,
@@ -3124,20 +3110,6 @@ export function App() {
       }, 1800);
     },
   });
-
-  // Insert an empty block below the hovered one and open the slash menu.
-  function handleGutterPlus() {
-    if (!editor) return;
-    const { node, pos } = gutterNodeRef.current;
-    if (!node || pos < 0) return;
-    const after = pos + node.nodeSize;
-    editor
-      .chain()
-      .insertContentAt(after, { type: "paragraph" })
-      .focus(after + 1)
-      .run();
-    editor.commands.insertContent("/");
-  }
 
   // ── Page actions ──
 
@@ -4240,45 +4212,19 @@ export function App() {
                     <DragHandle
                       editor={editor}
                       tippyOptions={gutterTippyOptions}
-                      onNodeChange={gutterNodeChange}
                     >
-                      <div className='block-gutter'>
-                        <button
-                          type='button'
-                          className='gutter-btn'
-                          title='Click to add a block below'
-                          draggable={false}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleGutterPlus();
-                          }}
-                        >
-                          <svg
-                            width='14'
-                            height='14'
-                            fill='none'
-                            stroke='currentColor'
-                            strokeWidth='2'
-                            strokeLinecap='round'
-                            viewBox='0 0 24 24'
-                          >
-                            <path d='M12 5v14M5 12h14' />
-                          </svg>
-                        </button>
-                        <div
-                          className='gutter-btn gutter-grip'
-                          title='Drag to move'
-                        >
-                          <svg width='14' height='14' viewBox='0 0 24 24' fill='currentColor'>
-                            <circle cx='9' cy='5' r='1.7' />
-                            <circle cx='9' cy='12' r='1.7' />
-                            <circle cx='9' cy='19' r='1.7' />
-                            <circle cx='15' cy='5' r='1.7' />
-                            <circle cx='15' cy='12' r='1.7' />
-                            <circle cx='15' cy='19' r='1.7' />
-                          </svg>
-                        </div>
+                      <div
+                        className='gutter-btn gutter-grip'
+                        title='Drag to move'
+                      >
+                        <svg width='15' height='15' viewBox='0 0 24 24' fill='currentColor'>
+                          <circle cx='9' cy='5' r='1.7' />
+                          <circle cx='9' cy='12' r='1.7' />
+                          <circle cx='9' cy='19' r='1.7' />
+                          <circle cx='15' cy='5' r='1.7' />
+                          <circle cx='15' cy='12' r='1.7' />
+                          <circle cx='15' cy='19' r='1.7' />
+                        </svg>
                       </div>
                     </DragHandle>
                   )}
