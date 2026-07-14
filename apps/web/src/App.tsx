@@ -1486,6 +1486,11 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -2832,6 +2837,13 @@ export function App() {
   // drives the Hub's loading skeleton so it doesn't look empty/broken while
   // those (sequential) requests are in flight. Never reset to true again.
   const [initialLoad, setInitialLoad] = useState(true);
+  // Login → fully-loaded timing, shown in the top bar as a diagnostic while
+  // we track down perceived slowness. Set at the moment the login/register
+  // form is submitted; cleared (and turned into loginLoadMs) the first time
+  // initialLoad flips to false afterward. Not set on a silently-resumed
+  // session (the /me bootstrap), only on an interactive submit.
+  const loginStartRef = useRef<number | null>(null);
+  const [loginLoadMs, setLoginLoadMs] = useState<number | null>(null);
 
   // Pages
   const [tree, setTree] = useState<PageNode[]>([]);
@@ -2933,6 +2945,8 @@ export function App() {
   async function handleAuth() {
     setAuthErr("");
     setAuthBusy(true);
+    loginStartRef.current = performance.now();
+    setLoginLoadMs(null);
     try {
       const endpoint =
         authMode === "register" ? "/auth/register" : "/auth/login";
@@ -2983,6 +2997,10 @@ export function App() {
     setActiveWs(null);
     setTree([]);
     setActivePage(null);
+    // Reset so the next sign-in (within this same app instance) gets its own
+    // loading skeleton and a fresh login-timing measurement.
+    setInitialLoad(true);
+    setLoginLoadMs(null);
   }
 
   async function handleLangChange(newLang: Lang) {
@@ -3089,6 +3107,15 @@ export function App() {
   useEffect(() => {
     void loadTree();
   }, [loadTree]);
+
+  // Fires exactly once per interactive login: the first time initialLoad
+  // settles to false after handleAuth recorded a start time.
+  useEffect(() => {
+    if (!initialLoad && loginStartRef.current != null) {
+      setLoginLoadMs(performance.now() - loginStartRef.current);
+      loginStartRef.current = null;
+    }
+  }, [initialLoad]);
 
   const loadTrash = useCallback(async () => {
     if (!activeWs) return;
@@ -4006,6 +4033,17 @@ export function App() {
 
             {/* Right actions */}
             <div className='flex items-center gap-1'>
+              {/* Diagnostic: time from login submit to workspace fully loaded */}
+              {loginLoadMs != null && (
+                <span
+                  className='flex items-center gap-1 text-[11px] mr-1 px-1.5 py-0.5 rounded-[4px]'
+                  style={{ color: "var(--text-muted)" }}
+                  title='Time from pressing sign-in to the workspace finishing its initial load'
+                >
+                  <Ico.Clock />
+                  {formatDuration(loginLoadMs)}
+                </span>
+              )}
               {activePage && (
                 <>
                   {/* Save indicator */}
