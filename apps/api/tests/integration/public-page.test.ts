@@ -70,4 +70,33 @@ describe('GET /public/:shareToken', () => {
     assert.doesNotMatch(res.body, new RegExp(FIXTURES.publishedPage.workspaceId));
     assert.doesNotMatch(res.body, new RegExp(FIXTURES.publishedPage.creatorId));
   });
+
+  it('renders no attachments section when the page has no attachments', async () => {
+    mockState.pagePublishTokenResult = { ...FIXTURES.publishedPage };
+    mockState.pageAttachmentFindManyResult = [];
+    const res = await app.inject({
+      method: 'GET',
+      url: `/public/${SHARE_TOKEN}`,
+    });
+    assert.equal(res.statusCode, 200);
+    // The CSS rule (.page-attachments {...}) is always present in <style>;
+    // only the rendered <section> element proves the list itself is absent.
+    assert.doesNotMatch(res.body, /<section class="page-attachments">/);
+  });
+
+  it('lists attachments with a working download link and formatted size', async () => {
+    mockState.pagePublishTokenResult = { ...FIXTURES.publishedPage };
+    mockState.pageAttachmentFindManyResult = [
+      { id: 'att-1', originalName: 'quarterly-report.pdf', size: 2_500_000 },
+    ];
+    const res = await app.inject({
+      method: 'GET',
+      url: `/public/${SHARE_TOKEN}`,
+    });
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /<section class="page-attachments">/);
+    assert.match(res.body, /quarterly-report\.pdf/);
+    assert.match(res.body, /href="\/attachments\/att-1\/inline"/);
+    assert.match(res.body, /2\.4 MB/);
+  });
 });

@@ -179,6 +179,9 @@ export type MockState = {
   // Phase 3: pageRevision.findUnique (for restore)
   pageRevisionFindUniqueResult: typeof FIXTURES.revision | null;
 
+  // Attachments — public-page route lists them for the published-page download section
+  pageAttachmentFindManyResult: { id: string; originalName: string; size: number }[];
+
   // Phase 3: $queryRaw search results
   searchQueryResult: Array<{ id: string; title: string; icon: string | null; workspaceId: string; deletedAt: Date | null }>;
 };
@@ -207,6 +210,7 @@ export const mockState: MockState = {
   pagePublishTokenResult: FIXTURES.publishedPage,
   pageRevisionFindManyResult: [FIXTURES.revision],
   pageRevisionFindUniqueResult: FIXTURES.revision,
+  pageAttachmentFindManyResult: [],
   searchQueryResult: [],
 };
 
@@ -234,6 +238,7 @@ export function resetMockState(overrides: Partial<MockState> = {}): void {
   mockState.pagePublishTokenResult = FIXTURES.publishedPage;
   mockState.pageRevisionFindManyResult = [FIXTURES.revision];
   mockState.pageRevisionFindUniqueResult = FIXTURES.revision;
+  mockState.pageAttachmentFindManyResult = [];
   mockState.searchQueryResult = [];
 
   Object.assign(mockState, overrides);
@@ -347,6 +352,10 @@ export const mockPrisma = {
     findMany: async (_args: unknown) => mockState.pageRevisionFindManyResult,
     findUnique: async (_args: unknown) => mockState.pageRevisionFindUniqueResult,
     deleteMany: async (_args: unknown) => ({ count: 0 }),
+  },
+
+  pageAttachment: {
+    findMany: async (_args: unknown) => mockState.pageAttachmentFindManyResult,
   },
 
   pagePermission: {

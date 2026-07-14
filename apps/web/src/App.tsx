@@ -1180,6 +1180,7 @@ function ProfileDropdown({
   const [open, setOpen] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1195,11 +1196,32 @@ function ProfileDropdown({
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  // Auto-close shortly after the mouse leaves the button+panel — the short
+  // delay (rather than closing instantly) tolerates the cursor briefly
+  // crossing the gap between the button and the panel below it. Cancelled on
+  // re-entry, and cleared on unmount so it can't fire against a stale panel.
+  function scheduleClose() {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => setOpen(false), 350);
+  }
+  function cancelScheduledClose() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+  useEffect(() => () => cancelScheduledClose(), []);
+
   const initials = (user.displayName ?? user.email).slice(0, 2).toUpperCase();
   const displayName = user.displayName ?? user.email.split("@")[0];
 
   return (
-    <div className='relative px-2 pt-2 pb-1' ref={ref}>
+    <div
+      className='relative px-2 pt-2 pb-1'
+      ref={ref}
+      onMouseLeave={() => open && scheduleClose()}
+      onMouseEnter={cancelScheduledClose}
+    >
       <button
         onClick={() => setOpen((v) => !v)}
         className='w-full flex items-center gap-2 px-2 py-2 rounded-[6px] transition-colors text-left'
@@ -1731,11 +1753,13 @@ function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
 function DocumentHub({
   tree,
   isDark,
+  isLoading,
   onSelectPage,
   onNewPage,
 }: {
   tree: PageNode[];
   isDark: boolean;
+  isLoading: boolean;
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
 }) {
@@ -1746,11 +1770,16 @@ function DocumentHub({
   const allPages = flattenTree(tree);
   const allTags = Array.from(new Set(allPages.flatMap((p) => p.tags))).sort();
   const q = query.trim().toLowerCase();
-  const filtered = allPages.filter(
-    (p) =>
-      (!filterTag || p.tags.includes(filterTag)) &&
-      (!q || (p.title || "Untitled").toLowerCase().includes(q)),
-  );
+  const filtered = allPages
+    .filter(
+      (p) =>
+        (!filterTag || p.tags.includes(filterTag)) &&
+        (!q || (p.title || "Untitled").toLowerCase().includes(q)),
+    )
+    // Most recently modified first — matches the "Modified" column.
+    .sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(pageNum, totalPages - 1);
@@ -1903,7 +1932,35 @@ function DocumentHub({
           <span className='hidden sm:block'></span>
         </div>
 
-        {filtered.length === 0 && (
+        {isLoading && filtered.length === 0 && (
+          <div className='px-4 py-2.5' aria-label='Loading pages'>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className='grid items-center py-2.5 grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
+              >
+                <div
+                  className='h-4 rounded animate-pulse'
+                  style={{
+                    background: "var(--bg-hover)",
+                    width: `${60 - i * 12}%`,
+                  }}
+                />
+                <div
+                  className='hidden sm:block h-4 rounded animate-pulse'
+                  style={{ background: "var(--bg-hover)", width: "40%" }}
+                />
+                <div
+                  className='h-4 rounded animate-pulse justify-self-end'
+                  style={{ background: "var(--bg-hover)", width: "70px" }}
+                />
+                <div className='hidden sm:block' />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && filtered.length === 0 && (
           <div
             className='px-4 py-12 text-center text-sm'
             style={{ color: "var(--text-muted)" }}
@@ -2771,6 +2828,10 @@ export function App() {
   // Workspaces
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWs, setActiveWs] = useState<Workspace | null>(null);
+  // True until the very first workspace+tree fetch after login settles —
+  // drives the Hub's loading skeleton so it doesn't look empty/broken while
+  // those (sequential) requests are in flight. Never reset to true again.
+  const [initialLoad, setInitialLoad] = useState(true);
 
   // Pages
   const [tree, setTree] = useState<PageNode[]>([]);
@@ -2996,8 +3057,12 @@ export function App() {
       const r = await api<{ workspaces: Workspace[] }>("/workspaces");
       setWorkspaces(r.workspaces);
       if (r.workspaces.length > 0 && !activeWs) setActiveWs(r.workspaces[0]!);
+      // No workspace at all — nothing will ever trigger loadTree, so the
+      // skeleton would otherwise spin forever.
+      else if (r.workspaces.length === 0) setInitialLoad(false);
     } catch (e) {
       setToast(e instanceof Error ? e.message : "Load failed");
+      setInitialLoad(false);
     }
   }, [user, activeWs]);
 
@@ -3014,7 +3079,11 @@ export function App() {
         csrf,
       );
       setTree(r.tree);
-    } catch {}
+    } catch {
+      /* toast is unnecessary here — the hub just shows empty */
+    } finally {
+      setInitialLoad(false);
+    }
   }, [activeWs, csrf]);
 
   useEffect(() => {
@@ -4157,6 +4226,7 @@ export function App() {
                 <DocumentHub
                   tree={tree}
                   isDark={isDark}
+                  isLoading={initialLoad}
                   onSelectPage={(id) => void handleSelectPage(id)}
                   onNewPage={() => void handleNewPage()}
                 />

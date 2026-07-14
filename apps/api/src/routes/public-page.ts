@@ -76,6 +76,13 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 /**
  * Only allow safe URL schemes in published HTML. Blocks javascript:, data:,
  * vbscript:, etc. which would otherwise execute in a viewer's browser.
@@ -89,7 +96,9 @@ function sanitizeUrl(raw: string): string {
   return '#';
 }
 
-function renderPublicPage(title: string, icon: string | null, tags: string[], bodyHtml: string, publishedAt: Date | null, publishTheme: string, webOrigin: string): string {
+type PublicAttachment = { id: string; originalName: string; size: number };
+
+function renderPublicPage(title: string, icon: string | null, tags: string[], bodyHtml: string, publishedAt: Date | null, publishTheme: string, webOrigin: string, attachments: PublicAttachment[]): string {
   const displayTitle = escapeHtml(title || 'Untitled');
   const iconHtml = icon ? `<span class="page-icon">${icon}</span>` : '';
   const dateStr = publishedAt
@@ -139,6 +148,23 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
         const { bg, fg } = tagColor(t);
         return `<span class="page-tag" style="background:${bg};color:${fg}">${escapeHtml(t)}</span>`;
       }).join('')}</div>`
+    : '';
+
+  const attachmentsHtml = attachments.length > 0
+    ? `<section class="page-attachments">
+        <h2 class="attachments-title">Attachments</h2>
+        <ul class="attachments-list">
+          ${attachments.map((a) => `
+          <li class="attachment-row">
+            <a href="/attachments/${a.id}/inline" class="attachment-link" download="${escapeHtml(a.originalName)}">
+              <span class="attachment-icon">📎</span>
+              <span class="attachment-name">${escapeHtml(a.originalName)}</span>
+              <span class="attachment-size">${formatBytes(a.size)}</span>
+              <span class="attachment-download">Download</span>
+            </a>
+          </li>`).join('')}
+        </ul>
+      </section>`
     : '';
 
   return `<!DOCTYPE html>
@@ -279,6 +305,22 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
     .page-content .page-ref { white-space: nowrap; }
     .page-content .page-ref u { text-decoration-color: var(--border); font-weight: 500; }
 
+    /* Attachments */
+    .page-attachments { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+    .attachments-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px; }
+    .attachments-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .attachment-row { margin: 0; }
+    .attachment-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);
+      text-decoration: none; color: var(--text); transition: background 0.1s ease;
+    }
+    .attachment-link:hover { background: var(--code-bg); }
+    .attachment-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
+    .attachment-name { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attachment-size { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+    .attachment-download { font-size: 12px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
+
     /* Footer */
     .page-footer {
       max-width: 720px; margin: 60px auto 0;
@@ -311,6 +353,8 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
       <article class="page-content">
         ${bodyHtml || '<p style="color:#9b9a97">This page has no content yet.</p>'}
       </article>
+
+      ${attachmentsHtml}
     </div>
 
     <footer class="page-footer">
@@ -370,8 +414,14 @@ export async function registerPublicPageRoutes(app: FastifyInstance) {
             </div></body></html>`);
       }
 
+      const attachments = await prisma.pageAttachment.findMany({
+        where: { pageId: page.id },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, originalName: true, size: true },
+      });
+
       const bodyHtml = jsonToHtml(page.content as Record<string, unknown>);
-      const html = renderPublicPage(page.title, page.icon, page.tags, bodyHtml, page.publishedAt, page.publishTheme, webOrigin);
+      const html = renderPublicPage(page.title, page.icon, page.tags, bodyHtml, page.publishedAt, page.publishTheme, webOrigin, attachments);
 
       return reply
         .status(200)
