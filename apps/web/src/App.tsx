@@ -232,6 +232,23 @@ const Ico = {
       <path d='m6 9 6 6 6-6' />
     </svg>
   ),
+  Sort: () => (
+    <svg
+      width='11'
+      height='11'
+      fill='none'
+      stroke='currentColor'
+      strokeWidth='2'
+      strokeLinecap='round'
+      strokeLinejoin='round'
+      viewBox='0 0 24 24'
+    >
+      <path d='M7 5v14' />
+      <path d='m4 8 3-3 3 3' />
+      <path d='m17 19 3-3 3 3' />
+      <path d='M17 5v14' />
+    </svg>
+  ),
   Page: () => (
     <svg
       width='13'
@@ -1339,66 +1356,56 @@ function ProfileDropdown({
               ))}
             </div>
 
-            {/* Font size */}
-            <p
-              className='text-[11px] font-semibold mb-1.5'
-              style={{ color: "var(--text-muted)" }}
-            >
-              {t.fontSize}
-            </p>
-            <div className='flex items-center gap-1 mb-2'>
-              {FONT_SIZES.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => onFontChange(f.id)}
-                  className='flex-1 text-[11px] py-1 rounded-[6px] font-medium transition-colors'
+            <div className='space-y-2 mb-1'>
+              <label className='flex items-center justify-between gap-2'>
+                <span
+                  className='text-[11px] font-semibold shrink-0'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t.fontSize}
+                </span>
+                <select
+                  value={fontSize}
+                  onChange={(e) => onFontChange(e.target.value as FontSize)}
+                  className='min-w-0 flex-1 max-w-[150px] rounded-[6px] border px-2 py-1.5 text-[11px] outline-none'
                   style={{
-                    background:
-                      fontSize === f.id
-                        ? "var(--accent-color)"
-                        : "var(--bg-hover)",
-                    color: fontSize === f.id ? "#fff" : "var(--text-muted)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    borderColor: "var(--border-color)",
                   }}
                 >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+                  {FONT_SIZES.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            {/* Language */}
-            <p
-              className='text-[11px] font-semibold mb-1.5'
-              style={{ color: "var(--text-muted)" }}
-            >
-              {t.language}
-            </p>
-            <div className='grid grid-cols-2 gap-1 mb-1'>
-              {LANGUAGES.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => onLangChange(l.id)}
-                  className='flex items-center gap-1.5 px-2 py-1.5 rounded-[6px] text-[11px] text-left transition-colors truncate'
+              <label className='flex items-center justify-between gap-2'>
+                <span
+                  className='text-[11px] font-semibold shrink-0'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t.language}
+                </span>
+                <select
+                  value={lang}
+                  onChange={(e) => onLangChange(e.target.value as Lang)}
+                  className='min-w-0 flex-1 max-w-[150px] rounded-[6px] border px-2 py-1.5 text-[11px] outline-none'
                   style={{
-                    background:
-                      lang === l.id ? "var(--bg-active)" : "transparent",
-                    color:
-                      lang === l.id
-                        ? "var(--accent-color)"
-                        : "var(--text-primary)",
-                    border:
-                      lang === l.id
-                        ? "1px solid var(--accent-color)"
-                        : "1px solid transparent",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    borderColor: "var(--border-color)",
                   }}
                 >
-                  <span className='truncate'>{l.native}</span>
-                  {lang === l.id && (
-                    <span className='ml-auto shrink-0'>
-                      <Ico.Check />
-                    </span>
-                  )}
-                </button>
-              ))}
+                  {LANGUAGES.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.native}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
@@ -1690,13 +1697,15 @@ function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
       }}
     >
       <div className='flex items-center justify-between gap-4 mb-2.5'>
-        <h2
-          className='text-[15px] font-bold flex items-center gap-2'
-          style={{ color: "var(--text-primary)" }}
-        >
-          👋 Welcome to YMCA
-          <span className='text-[12px] font-normal' style={{ color: "var(--text-muted)" }}>
-            — open a page and type{" "}
+        <div>
+          <h2
+            className='text-[15px] font-bold'
+            style={{ color: "var(--text-primary)" }}
+          >
+            Information Center
+          </h2>
+          <p className='mt-1 text-[12px]' style={{ color: "var(--text-muted)" }}>
+            Open a page and type{" "}
             <kbd
               className='px-1 py-0.5 rounded border text-[11px] font-mono'
               style={{
@@ -1707,9 +1716,9 @@ function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
             >
               /
             </kbd>{" "}
-            for these blocks:
-          </span>
-        </h2>
+            to insert blocks, or start typing to write.
+          </p>
+        </div>
         <span
           className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap'
           style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
@@ -1922,18 +1931,21 @@ function DocumentHub({
         className='rounded-xl border overflow-hidden'
         style={{ borderColor: "var(--border-color)" }}
       >
-        {/* Table header — on mobile only Doc name + Modified are shown */}
+        {/* Table header — on mobile only Title + Update are shown */}
         <div
-          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
+          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
           style={{
             background: "var(--bg-secondary)",
             color: "var(--text-muted)",
             borderColor: "var(--border-color)",
           }}
         >
-          <span>Doc name</span>
-          <span className='hidden sm:block'>Category</span>
-          <span className='text-right'>Modified</span>
+          <span>Title</span>
+          <span className='text-right hidden sm:flex items-center justify-end gap-1'>
+            <span>Update</span>
+            <Ico.Sort />
+          </span>
+          <span className='hidden sm:block'>Tag</span>
           <span className='hidden sm:block'></span>
         </div>
 
@@ -1942,7 +1954,7 @@ function DocumentHub({
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className='grid items-center py-2.5 grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
+                className='grid items-center py-2.5 grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
               >
                 <div
                   className='h-4 rounded animate-pulse'
@@ -1952,12 +1964,12 @@ function DocumentHub({
                   }}
                 />
                 <div
-                  className='hidden sm:block h-4 rounded animate-pulse'
-                  style={{ background: "var(--bg-hover)", width: "40%" }}
-                />
-                <div
                   className='h-4 rounded animate-pulse justify-self-end'
                   style={{ background: "var(--bg-hover)", width: "70px" }}
+                />
+                <div
+                  className='hidden sm:block h-4 rounded animate-pulse'
+                  style={{ background: "var(--bg-hover)", width: "40%" }}
                 />
                 <div className='hidden sm:block' />
               </div>
@@ -1989,7 +2001,7 @@ function DocumentHub({
           return (
             <div
               key={page.id}
-              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_175px_70px]'
+              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
               style={{
                 borderColor: "var(--border-color)",
                 background: "transparent",
@@ -2018,6 +2030,13 @@ function DocumentHub({
                 </span>
               </div>
 
+              <div
+                className='text-right text-[12px] whitespace-nowrap'
+                style={{ color: "var(--text-muted)" }}
+              >
+                {dateStr}
+              </div>
+
               <div className='hidden sm:flex flex-wrap gap-1.5 overflow-hidden'>
                 {page.tags.slice(0, 3).map((tag) => (
                   <TagBadge key={tag} tag={tag} isDark={isDark} />
@@ -2030,13 +2049,6 @@ function DocumentHub({
                     +{page.tags.length - 3}
                   </span>
                 )}
-              </div>
-
-              <div
-                className='text-right text-[12px] whitespace-nowrap'
-                style={{ color: "var(--text-muted)" }}
-              >
-                {dateStr}
               </div>
 
               {/* Open button - visible on row hover */}
@@ -4102,11 +4114,14 @@ export function App() {
                       className='flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] text-[12px] font-medium text-white transition-colors'
                       style={{
                         background: activePage.isPublished
-                          ? "rgba(35,131,226,0.15)"
+                          ? "var(--bg-active)"
                           : "var(--accent-color)",
                         color: activePage.isPublished
                           ? "var(--accent-color)"
                           : "#fff",
+                        border: activePage.isPublished
+                          ? "1px solid var(--accent-color)"
+                          : "1px solid transparent",
                       }}
                     >
                       <Ico.Globe />
