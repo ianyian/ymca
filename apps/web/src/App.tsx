@@ -1931,9 +1931,9 @@ function DocumentHub({
         className='rounded-xl border overflow-hidden'
         style={{ borderColor: "var(--border-color)" }}
       >
-        {/* Table header — on mobile only Title + Update are shown */}
+        {/* Table header — title, tags, and actions on desktop; title only on mobile */}
         <div
-          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
+          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
           style={{
             background: "var(--bg-secondary)",
             color: "var(--text-muted)",
@@ -1941,10 +1941,6 @@ function DocumentHub({
           }}
         >
           <span>Title</span>
-          <span className='text-right hidden sm:flex items-center justify-end gap-1'>
-            <span>Update</span>
-            <Ico.Sort />
-          </span>
           <span className='hidden sm:block'>Tag</span>
           <span className='hidden sm:block'></span>
         </div>
@@ -1954,7 +1950,7 @@ function DocumentHub({
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className='grid items-center py-2.5 grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
+                className='grid items-center py-2.5 grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
               >
                 <div
                   className='h-4 rounded animate-pulse'
@@ -1962,10 +1958,6 @@ function DocumentHub({
                     background: "var(--bg-hover)",
                     width: `${60 - i * 12}%`,
                   }}
-                />
-                <div
-                  className='h-4 rounded animate-pulse justify-self-end'
-                  style={{ background: "var(--bg-hover)", width: "70px" }}
                 />
                 <div
                   className='hidden sm:block h-4 rounded animate-pulse'
@@ -2001,7 +1993,7 @@ function DocumentHub({
           return (
             <div
               key={page.id}
-              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr_auto] sm:grid-cols-[1fr_175px_180px_70px]'
+              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
               style={{
                 borderColor: "var(--border-color)",
                 background: "transparent",
@@ -2014,27 +2006,28 @@ function DocumentHub({
               }
               onClick={() => onSelectPage(page.id)}
             >
-              <div className='flex items-center gap-2 min-w-0'>
-                <span style={{ color: "var(--text-muted)" }}>
-                  {page.icon ? (
-                    <span className='text-base'>{page.icon}</span>
-                  ) : (
-                    <Ico.Page />
-                  )}
-                </span>
-                <span
-                  className='text-sm truncate font-medium'
-                  style={{ color: "var(--text-primary)" }}
+              <div className='flex flex-col min-w-0'>
+                <div className='flex items-center gap-2 min-w-0'>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {page.icon ? (
+                      <span className='text-base'>{page.icon}</span>
+                    ) : (
+                      <Ico.Page />
+                    )}
+                  </span>
+                  <span
+                    className='text-sm truncate font-medium'
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {page.title || "Untitled"}
+                  </span>
+                </div>
+                <div
+                  className='text-[11px] mt-0.5 sm:mt-0'
+                  style={{ color: "var(--text-muted)" }}
                 >
-                  {page.title || "Untitled"}
-                </span>
-              </div>
-
-              <div
-                className='text-right text-[12px] whitespace-nowrap'
-                style={{ color: "var(--text-muted)" }}
-              >
-                {dateStr}
+                  {dateStr}
+                </div>
               </div>
 
               <div className='hidden sm:flex flex-wrap gap-1.5 overflow-hidden'>
