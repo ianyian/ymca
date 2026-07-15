@@ -239,7 +239,14 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
     }
 
     .topbar-name { font-size: 14px; font-weight: 600; }
-    .topbar-badge { font-size: 11px; color: var(--muted); background: #f1f0ee; border-radius: 4px; padding: 2px 8px; }
+    .topbar-badge {
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(35,131,226,0.10);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
 
     /* Page layout */
     .page-wrapper { padding-top: 80px; padding-bottom: 120px; }
