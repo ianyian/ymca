@@ -1,0 +1,24 @@
+[
+  {
+    "id": "2026-07-16-version-log",
+    "title": "Version log added",
+    "summary": "Added a bottom-sidebar version log and a latest-update badge in the information center.",
+    "bullets": [
+      "Open the new Version log button from the left menu.",
+      "Review recent release notes and PR-style updates in one place.",
+      "See the information center timestamp refresh from the latest log entry."
+    ],
+    "publishedAt": "2026-07-16T00:00:00.000Z"
+  },
+  {
+    "id": "2026-07-11-release-v0.1",
+    "title": "Initial v0.1 release",
+    "summary": "Launched the Notion-style workspace with the TipTap editor, publishing, revisions, and multilingual UI.",
+    "bullets": [
+      "Block editor with slash commands, checklists, callouts, images, and page references.",
+      "Workspaces, permissions, publish-to-web, search, trash, and revision history.",
+      "7 languages, 4 themes, and adjustable font size."
+    ],
+    "publishedAt": "2026-07-11T00:00:00.000Z"
+  }
+]

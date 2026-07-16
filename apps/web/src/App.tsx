@@ -77,6 +77,13 @@ type Revision = {
   createdBy: string | null;
   createdAt: string;
 };
+type VersionLogEntry = {
+  id: string;
+  title: string;
+  summary: string;
+  bullets?: string[];
+  publishedAt: string;
+};
 
 // ────────────────────────────────────────────────────────────
 // API
@@ -172,6 +179,14 @@ function tagColor(tag: string, isDark: boolean) {
   for (let i = 0; i < tag.length; i++) h = tag.charCodeAt(i) + ((h << 5) - h);
   const p = TAG_PALETTE[Math.abs(h) % TAG_PALETTE.length]!;
   return { bg: p.bg, fg: isDark ? p.dark_fg : p.fg };
+}
+
+function formatVersionLogTimestamp(iso: string) {
+  const date = new Date(iso);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1687,7 +1702,15 @@ function flattenTree(nodes: PageNode[]): PageNode[] {
 }
 
 // Compact "getting started" card shown BELOW the Document Hub table.
-function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
+function WelcomeCard({
+  onNewPage,
+  latestUpdateAt,
+  onOpenVersionLog,
+}: {
+  onNewPage: () => void;
+  latestUpdateAt: string | null;
+  onOpenVersionLog: () => void;
+}) {
   return (
     <div
       className='rounded-xl border p-4 mt-8'
@@ -1719,12 +1742,17 @@ function WelcomeCard({ onNewPage }: { onNewPage: () => void }) {
             to insert blocks, or start typing to write.
           </p>
         </div>
-        <span
+        <button
+          type='button'
+          onClick={onOpenVersionLog}
           className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap'
           style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
+          title='Open version log'
         >
-          v{APP_VERSION} · {APP_RELEASE_DATE}
-        </span>
+          {latestUpdateAt
+            ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}`
+            : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
+        </button>
       </div>
       <div
         className='grid gap-1.5'
@@ -1770,12 +1798,16 @@ function DocumentHub({
   isLoading,
   onSelectPage,
   onNewPage,
+  latestUpdateAt,
+  onOpenVersionLog,
 }: {
   tree: PageNode[];
   isDark: boolean;
   isLoading: boolean;
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
+  latestUpdateAt: string | null;
+  onOpenVersionLog: () => void;
 }) {
   const PER_PAGE = 10;
   const [filterTag, setFilterTag] = useState<string | null>(null);
@@ -2078,7 +2110,13 @@ function DocumentHub({
       )}
 
       {/* Getting-started card — hidden on mobile to save space + render cost */}
-      {!isMobileViewport() && <WelcomeCard onNewPage={onNewPage} />}
+      {!isMobileViewport() && (
+        <WelcomeCard
+          onNewPage={onNewPage}
+          latestUpdateAt={latestUpdateAt}
+          onOpenVersionLog={onOpenVersionLog}
+        />
+      )}
     </div>
   );
 }
@@ -2353,6 +2391,107 @@ function RevisionDrawer({
                 {restoring === rev.id ? "..." : t.restore}
               </button>
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VersionLogDrawer({
+  entries,
+  loading,
+  onClose,
+}: {
+  entries: VersionLogEntry[];
+  loading: boolean;
+  onClose: () => void;
+}) {
+  const latest = entries[0] ?? null;
+
+  return (
+    <div
+      className='fixed inset-y-0 right-0 z-40 w-[320px] max-w-[calc(100vw-1rem)] flex flex-col border-l max-md:shadow-2xl'
+      style={{
+        background: "var(--bg-secondary)",
+        borderColor: "var(--border-color)",
+      }}
+    >
+      <div
+        className='flex items-center justify-between px-4 py-3 border-b text-sm font-medium'
+        style={{
+          borderColor: "var(--border-color)",
+          color: "var(--text-primary)",
+        }}
+      >
+        <div className='flex items-center gap-2'>
+          <Ico.Clock />
+          <span>Version log</span>
+        </div>
+        <button
+          onClick={onClose}
+          className='transition-colors'
+          style={{ color: "var(--text-muted)" }}
+        >
+          <Ico.X />
+        </button>
+      </div>
+      <div className='px-4 py-3 border-b' style={{ borderColor: "var(--border-color)" }}>
+        <p
+          className='text-[11px] uppercase tracking-wider'
+          style={{ color: "var(--text-muted)" }}
+        >
+          Latest update
+        </p>
+        <p className='mt-1 text-sm font-medium' style={{ color: "var(--text-primary)" }}>
+          {latest ? formatVersionLogTimestamp(latest.publishedAt) : APP_RELEASE_DATE}
+        </p>
+      </div>
+      <div className='flex-1 overflow-y-auto py-1'>
+        {loading && (
+          <p
+            className='px-4 py-6 text-xs text-center'
+            style={{ color: "var(--text-muted)" }}
+          >
+            Loading...
+          </p>
+        )}
+        {!loading && entries.length === 0 && (
+          <p
+            className='px-4 py-6 text-xs text-center'
+            style={{ color: "var(--text-muted)" }}
+          >
+            No version log entries yet.
+          </p>
+        )}
+        {entries.map((entry) => (
+          <div
+            key={entry.id}
+            className='px-4 py-3 border-b last:border-0'
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <p className='text-xs font-medium' style={{ color: "var(--text-primary)" }}>
+              {entry.title}
+            </p>
+            <p className='text-[11px] mt-0.5' style={{ color: "var(--text-muted)" }}>
+              {formatVersionLogTimestamp(entry.publishedAt)}
+            </p>
+            <p className='mt-2 text-[12px] leading-5' style={{ color: "var(--text-primary)" }}>
+              {entry.summary}
+            </p>
+            {entry.bullets?.length ? (
+              <ul className='mt-2 space-y-1 text-[12px]' style={{ color: "var(--text-muted)" }}>
+                {entry.bullets.map((bullet) => (
+                  <li key={bullet} className='flex gap-2'>
+                    <span
+                      className='mt-[7px] h-1.5 w-1.5 rounded-full shrink-0'
+                      style={{ background: "var(--accent-color)" }}
+                    />
+                    <span className='leading-5'>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ))}
       </div>
@@ -2866,10 +3005,13 @@ export function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showRevisions, setShowRevisions] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
+  const [showVersionLog, setShowVersionLog] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => !isMobileViewport());
   const [publicLink, setPublicLink] = useState("");
   const [toast, setToast] = useState("");
   const [copied, setCopied] = useState(false);
+  const [versionLogEntries, setVersionLogEntries] = useState<VersionLogEntry[]>([]);
+  const [versionLogLoading, setVersionLogLoading] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleAreaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -3002,6 +3144,7 @@ export function App() {
     setActiveWs(null);
     setTree([]);
     setActivePage(null);
+    setShowVersionLog(false);
     // Reset so the next sign-in (within this same app instance) gets its own
     // loading skeleton and a fresh login-timing measurement.
     setInitialLoad(true);
@@ -3033,6 +3176,40 @@ export function App() {
         setAuthToken(null);
       });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadVersionLog() {
+      setVersionLogLoading(true);
+      try {
+        const res = await fetch(
+          `${import.meta.env.BASE_URL}version-log.json?t=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) throw new Error("Failed to load version log");
+        const data = (await res.json()) as VersionLogEntry[];
+        const entries = Array.isArray(data)
+          ? [...data].sort(
+              (a, b) =>
+                new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+            )
+          : [];
+        if (!cancelled) setVersionLogEntries(entries);
+      } catch {
+        if (!cancelled) setVersionLogEntries([]);
+      } finally {
+        if (!cancelled) setVersionLogLoading(false);
+      }
+    }
+
+    void loadVersionLog();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const latestVersionLogAt = versionLogEntries[0]?.publishedAt ?? null;
 
   // Auto-update: poll version.json (bypassing the HTTP cache). When a strictly
   // newer build has been deployed, reload once to pick it up — this is what
@@ -3452,6 +3629,7 @@ export function App() {
       if (e.key === "Escape") {
         setShowSearch(false);
         setShowPublish(false);
+        setShowVersionLog(false);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -3910,6 +4088,24 @@ export function App() {
               className='px-1 pb-1.5 pt-1 border-t space-y-px'
               style={{ borderColor: "var(--border-color)" }}
             >
+              {/* Version log */}
+              <button
+                onClick={() => setShowVersionLog(true)}
+                className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors'
+                style={{ color: "var(--text-muted)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--bg-hover)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <span className='w-4 flex justify-center'>
+                  <Ico.Clock />
+                </span>
+                <span className='flex-1 text-left'>Version log</span>
+              </button>
+
               {/* Trash */}
               <button
                 onClick={() => setShowTrash((v) => !v)}
@@ -4275,6 +4471,8 @@ export function App() {
                   isLoading={initialLoad}
                   onSelectPage={(id) => void handleSelectPage(id)}
                   onNewPage={() => void handleNewPage()}
+                  latestUpdateAt={latestVersionLogAt}
+                  onOpenVersionLog={() => setShowVersionLog(true)}
                 />
               )}
 
@@ -4415,6 +4613,19 @@ export function App() {
                 onRestore={() => void handleSelectPage(activePage.id)}
                 onClose={() => setShowRevisions(false)}
               />
+            )}
+            {showVersionLog && (
+              <>
+                <div
+                  className='fixed inset-0 z-30 bg-black/40'
+                  onClick={() => setShowVersionLog(false)}
+                />
+                <VersionLogDrawer
+                  entries={versionLogEntries}
+                  loading={versionLogLoading}
+                  onClose={() => setShowVersionLog(false)}
+                />
+              </>
             )}
           </div>
         </div>
