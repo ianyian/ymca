@@ -37,6 +37,30 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 - **7 languages** (English, Chinese, Malay, Tamil, German, Hungarian, Spanish)
 - **4 themes** (Light, Dark, Muji, VS Code) and adjustable font size
 
+## 🧩 Core Components
+
+| Component | What it does | Where it is used |
+|-----------|--------------|------------------|
+| `App` | Main web shell for sign-in, workspace navigation, page editing, search, publishing, revisions, trash, and profile settings. | `apps/web/src/App.tsx` |
+| `editor-extensions` | Custom TipTap nodes and extensions for callouts, columns, page references, slash commands, and page lookup suggestions. | `apps/web/src/editor-extensions.ts` |
+| `i18n` | Language labels and translated UI strings for the editor, auth flow, sidebar, publishing, trash, and errors. | `apps/web/src/i18n.ts` |
+| `shared-types` | Shared TypeScript primitives used by the web app and API to keep data contracts aligned. | `packages/shared-types/src/index.ts` |
+
+These components cover the main public-facing usage areas: editing content, browsing page trees, linking pages, managing workspaces, publishing pages, and switching languages or appearance.
+
+## 📚 Libraries In Use
+
+| Library | Purpose |
+|---------|---------|
+| React | UI rendering and state management in the web app. |
+| TipTap / ProseMirror | Rich block editor, custom nodes, slash menu, and inline page references. |
+| Fastify | API routing, auth, uploads, and workspace/page operations. |
+| Prisma | Database access and migration management for PostgreSQL. |
+| Zod | Runtime validation for API inputs and structured payloads. |
+| Tailwind CSS | Styling and layout for the web interface. |
+| Vite | Frontend development server and production bundling. |
+| bcryptjs | Password hashing for local authentication flows. |
+
 ---
 
 ## 🏗️ Architecture
@@ -62,7 +86,7 @@ matrix.
 | Layer     | Technology                                             |
 |-----------|--------------------------------------------------------|
 | Frontend  | React, TypeScript, Vite, Tailwind CSS, TipTap          |
-| Backend   | Node.js, TypeScript, Fastify, Zod                      |
+| Backend   | Node.js, TypeScript, Fastify, Zod, Prisma              |
 | Database  | PostgreSQL (Neon), Prisma ORM                          |
 | Auth      | Cookie sessions (hashed tokens), CSRF, bcrypt          |
 | Hosting   | GitHub Pages (web), Render (API), Neon (DB)            |
