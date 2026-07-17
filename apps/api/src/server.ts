@@ -4,6 +4,11 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { startNeonProxy } from "./lib/neon-proxy.js";
+import {
+  recordActivity,
+  startActivityBuffer,
+  stopActivityBuffer,
+} from "./lib/activity-buffer.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { resolveAuthFromRequest } from "./auth/session.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
@@ -18,6 +23,7 @@ import { registerPublicPageRoutes } from "./routes/public-page.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerRevisionRoutes } from "./routes/revisions.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
+import { registerAdminRoutes } from "./routes/admin.js";
 
 type ErrorEnvelope = {
   code: string;
@@ -116,6 +122,46 @@ export function createServer() {
   app.register(registerSearchRoutes);
   app.register(registerRevisionRoutes);
   app.register(registerAttachmentRoutes);
+  app.register(registerAdminRoutes);
+
+  // ── Activity logging ──────────────────────────────────────────────────────
+  // Record every finished request into the batched activity buffer, which powers
+  // the CoMa monitoring dashboard (API-call volume, active users). Uses the
+  // route *pattern* (e.g. "/pages/:id") to keep cardinality bounded, and never
+  // blocks the response. Disabled under test.
+  if (process.env.NODE_ENV !== "test") {
+    startActivityBuffer();
+
+    app.addHook("onResponse", async (request, reply) => {
+      const method = request.method;
+      if (method === "OPTIONS" || method === "HEAD") return;
+
+      const routePattern =
+        request.routeOptions?.url ?? request.url.split("?")[0] ?? request.url;
+
+      // Skip noise: health checks and the monitoring endpoints themselves, so
+      // the dashboard's own 3s polling doesn't inflate the API-call metric.
+      if (
+        routePattern === "/health" ||
+        routePattern.startsWith("/admin/metrics")
+      ) {
+        return;
+      }
+
+      recordActivity({
+        userId: request.authUser?.id ?? null,
+        method,
+        path: routePattern.slice(0, 256),
+        statusCode: reply.statusCode,
+        durationMs: Math.round(reply.elapsedTime ?? 0),
+        createdAt: new Date(),
+      });
+    });
+
+    app.addHook("onClose", async () => {
+      await stopActivityBuffer();
+    });
+  }
 
   app.get(
     "/health",

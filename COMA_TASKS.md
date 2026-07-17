@@ -30,19 +30,19 @@ Add an admin-only **CoMa** (Configuration Manager) area:
 
 ## Backend (apps/api)
 
-- [ ] **B1. Prisma schema** — add `AppRole` model, `User.appRoleId` + relation & index,
+- [x] **B1. Prisma schema** — add `AppRole` model, `User.appRoleId` + relation & index,
       `ActivityEvent` model + indexes. (`prisma/schema.prisma`)
-- [ ] **B2. Migration SQL** — new migration dir `.../<ts>_coma_admin_roles_activity/migration.sql`:
+- [x] **B2. Migration SQL** — new migration dir `.../<ts>_coma_admin_roles_activity/migration.sql`:
       create `AppRole`, seed admin(1)/user(2), add `User.appRoleId` default 2, backfill existing → 1,
       add FK + index, create `ActivityEvent` + indexes.
-- [ ] **B3. Roles domain** — `src/domain/app-roles.ts` (keys, ranks, helpers).
-- [ ] **B4. Auth payload + session** — include appRole in `resolveAuthFromRequest`; extend
+- [x] **B3. Roles domain** — `src/domain/app-roles.ts` (keys, ranks, helpers).
+- [x] **B4. Auth payload + session** — include appRole in `resolveAuthFromRequest`; extend
       `AuthPayload`/`request.authUser` types (`types/fastify.d.ts`); expose in `/me`.
-- [ ] **B5. requireAdmin guard** — `src/auth/require-admin.ts`.
-- [ ] **B6. Activity logging** — `src/lib/activity-buffer.ts` (batched insert) + `onResponse`
+- [x] **B5. requireAdmin guard** — `src/auth/require-admin.ts`.
+- [x] **B6. Activity logging** — `src/lib/activity-buffer.ts` (batched insert) + `onResponse`
       hook in `server.ts` (skip health/metrics/static; store route pattern not raw path).
-- [ ] **B7. Metrics service** — `src/domain/metrics.ts`: overview + windowed activity, with 2s cache.
-- [ ] **B8. Admin routes** — `src/routes/admin.ts`: 
+- [x] **B7. Metrics service** — `src/domain/metrics.ts`: overview + windowed activity, with 2s cache.
+- [x] **B8. Admin routes** — `src/routes/admin.ts`: 
       `GET /admin/users` (paginated+search), `PATCH /admin/users/:id/role`,
       `GET /admin/metrics/overview`, `GET /admin/metrics/activity?window=6h|12h|24h`.
       Register in `server.ts`. All behind `requireAdmin`.
