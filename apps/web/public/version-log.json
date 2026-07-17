@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-17-rate-limit-and-top-paging",
+    "title": "Login rate-limit tuning + top pager",
+    "summary": "Reworked auth rate limiting so normal use no longer trips the limit, with a clear localized retry message, and moved the Console user-management pager to the top of the grid.",
+    "bullets": [
+      "Only sensitive auth endpoints (login/register/password reset) are throttled now — logout and language changes no longer count.",
+      "Rate-limit errors show a friendly, translated 'try again in N seconds' message.",
+      "User management page navigation now sits at the top, so no scrolling is needed to switch pages."
+    ],
+    "publishedAt": "2026-07-17T09:09:00.000Z"
+  },
+  {
     "id": "2026-07-17-console-i18n-paging",
     "title": "Console panel refinements",
     "summary": "Renamed the admin panel to Console, moved it to the bottom of the sidebar, localized it into all supported languages, and paginated user management.",

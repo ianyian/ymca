@@ -53,13 +53,46 @@ export function createServer() {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
-  // Rate limiting: tight on auth endpoints (brute-force protection), looser
-  // elsewhere. Disabled under test so the suite isn't throttled.
+  // Rate limiting: strict only on the *sensitive* auth endpoints (brute-force
+  // protection), generous everywhere else. Previously every /auth/* call shared
+  // one tight 10/min bucket, so benign traffic — logout, language changes, even
+  // repeated login/logout cycles during normal use — tripped the limit. Now only
+  // credential-guessing endpoints are throttled, with a clear structured 429.
+  // Disabled under test so the suite isn't throttled.
+  const SENSITIVE_AUTH_PATHS = new Set([
+    "/auth/login",
+    "/auth/register",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+  ]);
   if (process.env.NODE_ENV !== "test") {
     app.register(rateLimit, {
       global: true,
-      max: (request) => (request.url.startsWith("/auth/") ? 10 : 200),
+      max: (request) =>
+        SENSITIVE_AUTH_PATHS.has(request.url.split("?")[0] ?? request.url)
+          ? 20
+          : 300,
       timeWindow: "1 minute",
+      // Structured, machine-readable 429 so the client can localize the message
+      // and show a precise "retry in N seconds". The plugin *throws* this value,
+      // so it must be an Error carrying `statusCode` (otherwise the global error
+      // handler treats it as a 500). `retryAfter` is surfaced in the response
+      // body — readable by the browser cross-origin, unlike the Retry-After
+      // header. `ttl` is milliseconds remaining in the window.
+      errorResponseBuilder: (request, context) => {
+        const retryAfter = Math.max(1, Math.ceil(context.ttl / 1000));
+        const err = new Error(
+          `Too many attempts. Please try again in ${retryAfter} seconds.`,
+        ) as Error & {
+          statusCode: number;
+          code: string;
+          retryAfter: number;
+        };
+        err.statusCode = 429;
+        err.code = "RATE_LIMITED";
+        err.retryAfter = retryAfter;
+        return err;
+      },
     });
   }
 
@@ -200,7 +233,28 @@ export function createServer() {
     const normalizedError = error as {
       statusCode?: unknown;
       message?: unknown;
+      code?: unknown;
+      retryAfter?: unknown;
     };
+
+    // Rate-limit rejections carry a structured, localizable payload; pass it
+    // through verbatim (including retryAfter in the body) instead of flattening
+    // it into the generic error envelope.
+    if (normalizedError.code === "RATE_LIMITED") {
+      return reply.status(429).send({
+        code: "RATE_LIMITED",
+        message:
+          typeof normalizedError.message === "string"
+            ? normalizedError.message
+            : "Too many attempts",
+        retryAfter:
+          typeof normalizedError.retryAfter === "number"
+            ? normalizedError.retryAfter
+            : undefined,
+        traceId: request.id,
+      });
+    }
+
     const statusCode =
       typeof normalizedError.statusCode === "number"
         ? normalizedError.statusCode
