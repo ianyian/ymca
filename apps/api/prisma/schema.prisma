@@ -23,14 +23,33 @@ enum PageRole {
   Viewer
 }
 
+/// Global, application-wide role for a user. This is a lookup table (not an enum)
+/// so new roles (viewer, debugger, superUser, ...) can be added by inserting a row,
+/// with no schema migration. `rank` gives a coarse privilege ordering for future use.
+/// Seeded ids are stable: admin = 1, user = 2.
+model AppRole {
+  id           Int      @id @default(autoincrement()) @db.SmallInt
+  key          String   @unique @db.VarChar(32)
+  label        String   @db.VarChar(64)
+  description  String?
+  rank         Int      @default(0)
+  isAssignable Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+  users        User[]
+}
+
 model User {
   id              String            @id @default(uuid()) @db.Uuid
   email           String            @unique
   passwordHash    String
   displayName     String?
   language        String            @default("en")
+  // Global app role. DB default 2 ("user"); existing rows backfilled to 1 ("admin").
+  appRoleId       Int               @default(2) @db.SmallInt
   createdAt       DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime          @updatedAt @db.Timestamptz(6)
+  appRole         AppRole           @relation(fields: [appRoleId], references: [id], onDelete: Restrict)
   sessions        Session[]
   workspacesOwned Workspace[]            @relation("WorkspaceOwner")
   memberships     WorkspaceMember[]
@@ -38,6 +57,28 @@ model User {
   pagePermissions PagePermission[]       @relation("PermissionGrantedTo")
   invitesCreated  InviteToken[]          @relation("InviteCreator")
   passwordResets  PasswordResetToken[]
+  activityEvents  ActivityEvent[]
+
+  @@index([appRoleId])
+}
+
+/// Append-only activity log powering the CoMa monitoring dashboard (API-call volume,
+/// active-user counts). Rows are written via a batched, in-memory buffer to keep write
+/// amplification low at scale. `path` stores the normalized route pattern (e.g.
+/// "/pages/:id") rather than the raw URL, to bound cardinality. Prune/rollup for very
+/// long retention is a future concern; indexes are tuned for recent-window queries.
+model ActivityEvent {
+  id         BigInt   @id @default(autoincrement())
+  userId     String?  @db.Uuid
+  method     String   @db.VarChar(8)
+  path       String   @db.VarChar(256)
+  statusCode Int      @db.SmallInt
+  durationMs Int?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 model Session {

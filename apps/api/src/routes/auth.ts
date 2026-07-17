@@ -213,7 +213,12 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     });
 
     return reply.send({
-      user: { ...request.authUser, language: dbUser?.language ?? "en" },
+      user: {
+        ...request.authUser,
+        language: dbUser?.language ?? "en",
+        appRoleKey: request.authUser.appRoleKey,
+        appRoleRank: request.authUser.appRoleRank,
+      },
       csrfToken: request.csrfToken,
     });
   });
