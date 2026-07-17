@@ -57,6 +57,7 @@ type Strings = {
   // Errors
   err413: string; err401: string; errInvalidCredentials: string; err403: string;
   err404: string; err500: string; errNetwork: string; errImageTooLarge: string;
+  errRateLimited: string;
   // Misc
   open: string; cancel: string; remove: string;
   removeIcon: string; searchEmoji: string; delete: string;
@@ -109,6 +110,7 @@ export const T: Record<Lang, Strings> = {
     err500: "Server error. Please try again.",
     errNetwork: "Cannot connect to server. Check your connection.",
     errImageTooLarge: "Image is too large. Maximum size is 1 GB.",
+    errRateLimited: "Too many attempts. Please try again in {s} seconds.",
     open: "Open", cancel: "Cancel", remove: "Remove",
     removeIcon: "Remove icon", searchEmoji: "Search emoji...",
   },
@@ -156,6 +158,7 @@ export const T: Record<Lang, Strings> = {
     err500: "服务器错误，请重试。",
     errNetwork: "无法连接到服务器，请检查网络连接。",
     errImageTooLarge: "图片过大。最大为 1 GB。",
+    errRateLimited: "尝试次数过多，请在 {s} 秒后重试。",
     open: "打开", cancel: "取消", remove: "移除",
     removeIcon: "移除图标", searchEmoji: "搜索表情...",
   },
@@ -205,6 +208,7 @@ export const T: Record<Lang, Strings> = {
     err500: "Ralat pelayan. Sila cuba lagi.",
     errNetwork: "Tidak dapat menyambung ke pelayan. Semak sambungan anda.",
     errImageTooLarge: "Imej terlalu besar. Saiz maksimum ialah 1 GB.",
+    errRateLimited: "Terlalu banyak percubaan. Sila cuba lagi dalam {s} saat.",
     open: "Buka", cancel: "Batal", remove: "Buang",
     removeIcon: "Buang ikon", searchEmoji: "Cari emoji...",
   },
@@ -254,6 +258,7 @@ export const T: Record<Lang, Strings> = {
     err500: "சேவையக பிழை. மீண்டும் முயற்சிக்கவும்.",
     errNetwork: "சேவையகத்துடன் இணைக்க முடியவில்லை. இணைப்பை சரிபாருங்கள்.",
     errImageTooLarge: "படம் மிகப் பெரியது. அதிகபட்சம் 1 GB.",
+    errRateLimited: "பல முயற்சிகள். {s} விநாடிகளில் மீண்டும் முயற்சிக்கவும்.",
     open: "திற", cancel: "ரத்து செய்", remove: "அகற்று",
     removeIcon: "சின்னம் அகற்று", searchEmoji: "எமோஜி தேடு...",
   },
@@ -303,6 +308,7 @@ export const T: Record<Lang, Strings> = {
     err500: "Serverfehler. Bitte versuchen Sie es erneut.",
     errNetwork: "Keine Verbindung zum Server. Überprüfen Sie Ihre Verbindung.",
     errImageTooLarge: "Das Bild ist zu groß. Maximale Größe ist 1 GB.",
+    errRateLimited: "Zu viele Versuche. Bitte versuchen Sie es in {s} Sekunden erneut.",
     open: "Öffnen", cancel: "Abbrechen", remove: "Entfernen",
     removeIcon: "Symbol entfernen", searchEmoji: "Emoji suchen...",
   },
@@ -352,6 +358,7 @@ export const T: Record<Lang, Strings> = {
     err500: "Szerverhiba. Kérjük, próbálja újra.",
     errNetwork: "Nem sikerült csatlakozni a szerverhez. Ellenőrizze a kapcsolatot.",
     errImageTooLarge: "A kép túl nagy. A maximális méret 1 GB.",
+    errRateLimited: "Túl sok próbálkozás. Kérjük, próbálja újra {s} másodperc múlva.",
     open: "Megnyitás", cancel: "Mégse", remove: "Eltávolítás",
     removeIcon: "Ikon eltávolítása", searchEmoji: "Emoji keresése...",
   },
@@ -401,6 +408,7 @@ export const T: Record<Lang, Strings> = {
     err500: "Error del servidor. Por favor intenta de nuevo.",
     errNetwork: "No se puede conectar al servidor. Verifica tu conexión.",
     errImageTooLarge: "La imagen es demasiado grande. El tamaño máximo es 1 GB.",
+    errRateLimited: "Demasiados intentos. Vuelve a intentarlo en {s} segundos.",
     open: "Abrir", cancel: "Cancelar", remove: "Quitar",
     removeIcon: "Quitar ícono", searchEmoji: "Buscar emoji...",
   },

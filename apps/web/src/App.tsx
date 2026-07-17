@@ -143,7 +143,16 @@ async function api<T = unknown>(
     const b = (await res.json().catch(() => null)) as {
       message?: string;
       code?: string;
+      retryAfter?: number;
     } | null;
+    if (res.status === 429) {
+      const raw = b?.retryAfter ?? Number(res.headers.get("retry-after"));
+      // Server always sends retryAfter; fall back to the window length if absent.
+      const retry = Number.isFinite(raw) && raw > 0 ? Math.ceil(raw) : 30;
+      throw new Error(
+        T[_currentLang].errRateLimited.replace("{s}", String(retry)),
+      );
+    }
     if (res.status === 413) throw new Error(T[_currentLang].err413);
     if (res.status === 401)
       throw new Error(
@@ -3251,7 +3260,7 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
 
   return (
     <div className='space-y-3'>
-      <div className='flex items-center justify-between gap-3'>
+      <div className='flex items-center justify-between gap-3 flex-wrap'>
         <input
           value={search}
           onChange={(e) => {
@@ -3266,9 +3275,41 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
             color: "var(--text-primary)",
           }}
         />
-        <span className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-          {total} {t.users}
-        </span>
+        {/* Count + pager sit at the top so admins never have to scroll to page. */}
+        <div className='flex items-center gap-3'>
+          <span className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+            {total} {t.users}
+          </span>
+          {totalPages > 1 && (
+            <div className='flex items-center gap-2 text-[12px]'>
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
+                style={{
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {t.prev}
+              </button>
+              <span style={{ color: "var(--text-muted)" }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
+                style={{
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {t.next}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {err && (
@@ -3381,36 +3422,6 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
           </tbody>
         </table>
       </div>
-
-      {totalPages > 1 && (
-        <div className='flex items-center justify-end gap-2 text-[12px]'>
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
-            style={{
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {t.prev}
-          </button>
-          <span style={{ color: "var(--text-muted)" }}>
-            {page} / {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
-            style={{
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {t.next}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
