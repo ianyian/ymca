@@ -406,6 +406,155 @@ export const T: Record<Lang, Strings> = {
   },
 };
 
+// ── Console / Configuration Manager (admin panel) translations ─────────────
+// Kept as a dedicated dictionary (rather than expanding the big `Strings` type)
+// so the admin surface stays self-contained while still following the app's
+// selected language.
+export type AdminStrings = {
+  console: string;
+  configManager: string;
+  configSubtitle: string;
+  monitoring: string;
+  userManagement: string;
+  systemOverview: string;
+  totalUsers: string;
+  active24h: string;
+  inactive: string;
+  admins: string;
+  normal: string;
+  workspaces: string;
+  totalPages: string;
+  storageUsed: string;
+  recentActivity: string;
+  live: string;
+  activeUsers: string;
+  apiCalls: string;
+  newUsers: string;
+  searchUsers: string;
+  users: string;
+  colUser: string;
+  colPages: string;
+  colLastSeen: string;
+  colRole: string;
+  loading: string;
+  noUsers: string;
+  prev: string;
+  next: string;
+  never: string;
+  justNow: string;
+  // Localized labels for known role keys. Unknown roles fall back to the
+  // server-provided label, so future roles still render (just untranslated).
+  roles: Record<string, string>;
+};
+
+export const AT: Record<Lang, AdminStrings> = {
+  en: {
+    console: "Console", configManager: "Configuration Manager",
+    configSubtitle: "Manage users and monitor system usage.",
+    monitoring: "Monitoring", userManagement: "User management",
+    systemOverview: "System overview", totalUsers: "Total users",
+    active24h: "Active (24h)", inactive: "inactive", admins: "Admins",
+    normal: "normal", workspaces: "Workspaces", totalPages: "Total pages",
+    storageUsed: "Storage used", recentActivity: "Recent activity", live: "live",
+    activeUsers: "Active users", apiCalls: "API calls", newUsers: "New users",
+    searchUsers: "Search by email or name…", users: "users",
+    colUser: "User", colPages: "Pages", colLastSeen: "Last seen", colRole: "Role",
+    loading: "Loading…", noUsers: "No users found", prev: "Prev", next: "Next",
+    never: "never", justNow: "just now",
+    roles: { admin: "Administrator", user: "Normal User" },
+  },
+  zh: {
+    console: "控制台", configManager: "配置管理器",
+    configSubtitle: "管理用户并监控系统使用情况。",
+    monitoring: "监控", userManagement: "用户管理",
+    systemOverview: "系统概览", totalUsers: "用户总数",
+    active24h: "活跃 (24小时)", inactive: "不活跃", admins: "管理员",
+    normal: "普通", workspaces: "工作区", totalPages: "页面总数",
+    storageUsed: "已用存储", recentActivity: "近期活动", live: "实时",
+    activeUsers: "活跃用户", apiCalls: "API 调用", newUsers: "新用户",
+    searchUsers: "按邮箱或姓名搜索…", users: "位用户",
+    colUser: "用户", colPages: "页面", colLastSeen: "最后活跃", colRole: "角色",
+    loading: "加载中…", noUsers: "未找到用户", prev: "上一页", next: "下一页",
+    never: "从不", justNow: "刚刚",
+    roles: { admin: "管理员", user: "普通用户" },
+  },
+  ms: {
+    console: "Konsol", configManager: "Pengurus Konfigurasi",
+    configSubtitle: "Urus pengguna dan pantau penggunaan sistem.",
+    monitoring: "Pemantauan", userManagement: "Pengurusan pengguna",
+    systemOverview: "Gambaran sistem", totalUsers: "Jumlah pengguna",
+    active24h: "Aktif (24j)", inactive: "tidak aktif", admins: "Pentadbir",
+    normal: "biasa", workspaces: "Ruang kerja", totalPages: "Jumlah halaman",
+    storageUsed: "Storan digunakan", recentActivity: "Aktiviti terkini", live: "langsung",
+    activeUsers: "Pengguna aktif", apiCalls: "Panggilan API", newUsers: "Pengguna baharu",
+    searchUsers: "Cari mengikut e-mel atau nama…", users: "pengguna",
+    colUser: "Pengguna", colPages: "Halaman", colLastSeen: "Terakhir dilihat", colRole: "Peranan",
+    loading: "Memuatkan…", noUsers: "Tiada pengguna dijumpai", prev: "Sebelum", next: "Seterusnya",
+    never: "tidak pernah", justNow: "sebentar tadi",
+    roles: { admin: "Pentadbir", user: "Pengguna Biasa" },
+  },
+  ta: {
+    console: "பணியகம்", configManager: "கட்டமைப்பு மேலாளர்",
+    configSubtitle: "பயனர்களை நிர்வகித்து கணினி பயன்பாட்டைக் கண்காணிக்கவும்.",
+    monitoring: "கண்காணிப்பு", userManagement: "பயனர் மேலாண்மை",
+    systemOverview: "கணினி கண்ணோட்டம்", totalUsers: "மொத்த பயனர்கள்",
+    active24h: "செயலில் (24ம)", inactive: "செயலற்ற", admins: "நிர்வாகிகள்",
+    normal: "சாதாரண", workspaces: "பணியிடங்கள்", totalPages: "மொத்த பக்கங்கள்",
+    storageUsed: "பயன்படுத்திய சேமிப்பு", recentActivity: "சமீபத்திய செயல்பாடு", live: "நேரலை",
+    activeUsers: "செயலில் பயனர்கள்", apiCalls: "API அழைப்புகள்", newUsers: "புதிய பயனர்கள்",
+    searchUsers: "மின்னஞ்சல் அல்லது பெயரால் தேடு…", users: "பயனர்கள்",
+    colUser: "பயனர்", colPages: "பக்கங்கள்", colLastSeen: "கடைசியாக பார்த்தது", colRole: "பங்கு",
+    loading: "ஏற்றுகிறது…", noUsers: "பயனர்கள் இல்லை", prev: "முந்தைய", next: "அடுத்து",
+    never: "ஒருபோதும்", justNow: "இப்போது",
+    roles: { admin: "நிர்வாகி", user: "சாதாரண பயனர்" },
+  },
+  de: {
+    console: "Konsole", configManager: "Konfigurationsmanager",
+    configSubtitle: "Benutzer verwalten und Systemnutzung überwachen.",
+    monitoring: "Überwachung", userManagement: "Benutzerverwaltung",
+    systemOverview: "Systemübersicht", totalUsers: "Benutzer gesamt",
+    active24h: "Aktiv (24 Std.)", inactive: "inaktiv", admins: "Admins",
+    normal: "normal", workspaces: "Arbeitsbereiche", totalPages: "Seiten gesamt",
+    storageUsed: "Speicher belegt", recentActivity: "Letzte Aktivität", live: "live",
+    activeUsers: "Aktive Benutzer", apiCalls: "API-Aufrufe", newUsers: "Neue Benutzer",
+    searchUsers: "Nach E-Mail oder Name suchen…", users: "Benutzer",
+    colUser: "Benutzer", colPages: "Seiten", colLastSeen: "Zuletzt gesehen", colRole: "Rolle",
+    loading: "Wird geladen…", noUsers: "Keine Benutzer gefunden", prev: "Zurück", next: "Weiter",
+    never: "nie", justNow: "gerade eben",
+    roles: { admin: "Administrator", user: "Normaler Benutzer" },
+  },
+  hu: {
+    console: "Konzol", configManager: "Konfigurációkezelő",
+    configSubtitle: "Felhasználók kezelése és a rendszerhasználat figyelése.",
+    monitoring: "Megfigyelés", userManagement: "Felhasználókezelés",
+    systemOverview: "Rendszer áttekintése", totalUsers: "Összes felhasználó",
+    active24h: "Aktív (24ó)", inactive: "inaktív", admins: "Adminok",
+    normal: "normál", workspaces: "Munkaterületek", totalPages: "Összes oldal",
+    storageUsed: "Felhasznált tárhely", recentActivity: "Legutóbbi tevékenység", live: "élő",
+    activeUsers: "Aktív felhasználók", apiCalls: "API-hívások", newUsers: "Új felhasználók",
+    searchUsers: "Keresés e-mail vagy név szerint…", users: "felhasználó",
+    colUser: "Felhasználó", colPages: "Oldalak", colLastSeen: "Utoljára látva", colRole: "Szerep",
+    loading: "Betöltés…", noUsers: "Nincs felhasználó", prev: "Előző", next: "Következő",
+    never: "soha", justNow: "épp most",
+    roles: { admin: "Rendszergazda", user: "Normál felhasználó" },
+  },
+  es: {
+    console: "Consola", configManager: "Gestor de configuración",
+    configSubtitle: "Gestiona usuarios y supervisa el uso del sistema.",
+    monitoring: "Monitoreo", userManagement: "Gestión de usuarios",
+    systemOverview: "Resumen del sistema", totalUsers: "Usuarios totales",
+    active24h: "Activos (24h)", inactive: "inactivos", admins: "Administradores",
+    normal: "normales", workspaces: "Espacios de trabajo", totalPages: "Páginas totales",
+    storageUsed: "Almacenamiento usado", recentActivity: "Actividad reciente", live: "en vivo",
+    activeUsers: "Usuarios activos", apiCalls: "Llamadas API", newUsers: "Usuarios nuevos",
+    searchUsers: "Buscar por correo o nombre…", users: "usuarios",
+    colUser: "Usuario", colPages: "Páginas", colLastSeen: "Última vez", colRole: "Rol",
+    loading: "Cargando…", noUsers: "No se encontraron usuarios", prev: "Anterior", next: "Siguiente",
+    never: "nunca", justNow: "ahora mismo",
+    roles: { admin: "Administrador", user: "Usuario normal" },
+  },
+};
+
 // React context — provides the current translation strings
 export const LangContext = createContext<Strings>(T.en);
 

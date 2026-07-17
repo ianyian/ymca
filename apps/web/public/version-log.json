@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-17-console-i18n-paging",
+    "title": "Console panel refinements",
+    "summary": "Renamed the admin panel to Console, moved it to the bottom of the sidebar, localized it into all supported languages, and paginated user management.",
+    "bullets": [
+      "The admin entry is now called Console and sits above Version log in the left menu.",
+      "The Configuration Manager (Console) now follows your selected app language.",
+      "User management lists 10 records per page with Prev/Next paging."
+    ],
+    "publishedAt": "2026-07-17T08:29:00.000Z"
+  },
+  {
     "id": "2026-07-16-version-log",
     "title": "Version log added",
     "summary": "Added a bottom-sidebar version log and a latest-update badge in the information center.",

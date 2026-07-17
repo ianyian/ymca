@@ -24,7 +24,7 @@ import {
   setPageSearchProvider,
   type PageRefItem,
 } from "./editor-extensions";
-import { LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
+import { AT, LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
 
 // ────────────────────────────────────────────────────────────
 // App version — hardcoded. Bump these two values on an official release.
@@ -2968,17 +2968,18 @@ type ActivityMetrics = {
 };
 type MetricWindow = "6h" | "12h" | "24h";
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "never";
+function relativeTime(iso: string | null, at: (typeof AT)[Lang]): string {
+  if (!iso) return at.never;
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return "just now";
+  if (s < 60) return at.justNow;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  // Compact, language-neutral durations (avoids "ago" word-order pitfalls).
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
+  if (d < 30) return `${d}d`;
   return new Date(iso).toLocaleDateString();
 }
 
@@ -3024,7 +3025,8 @@ function KpiCard({
   );
 }
 
-function MonitoringPanel() {
+function MonitoringPanel({ lang }: { lang: Lang }) {
+  const t = AT[lang];
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [activity, setActivity] = useState<ActivityMetrics | null>(null);
   const [window, setWindow] = useState<MetricWindow>("24h");
@@ -3082,27 +3084,27 @@ function MonitoringPanel() {
           className='text-[13px] font-semibold mb-2'
           style={{ color: "var(--text-primary)" }}
         >
-          System overview
+          {t.systemOverview}
         </h3>
         <div className='grid gap-3 grid-cols-2 md:grid-cols-4'>
-          <KpiCard label='Total users' value={overview?.totalUsers ?? "—"} />
+          <KpiCard label={t.totalUsers} value={overview?.totalUsers ?? "—"} />
           <KpiCard
-            label='Active (24h)'
+            label={t.active24h}
             value={overview?.activeUsers24h ?? "—"}
             sub={
-              overview ? `${overview.inactiveUsers} inactive` : undefined
+              overview ? `${overview.inactiveUsers} ${t.inactive}` : undefined
             }
             accent
           />
           <KpiCard
-            label='Admins'
+            label={t.admins}
             value={overview?.adminUsers ?? "—"}
-            sub={overview ? `${overview.normalUsers} normal` : undefined}
+            sub={overview ? `${overview.normalUsers} ${t.normal}` : undefined}
           />
-          <KpiCard label='Workspaces' value={overview?.totalWorkspaces ?? "—"} />
-          <KpiCard label='Total pages' value={overview?.totalPages ?? "—"} />
+          <KpiCard label={t.workspaces} value={overview?.totalWorkspaces ?? "—"} />
+          <KpiCard label={t.totalPages} value={overview?.totalPages ?? "—"} />
           <KpiCard
-            label='Storage used'
+            label={t.storageUsed}
             value={
               overview ? formatBytes(overview.totalStorageBytes) : "—"
             }
@@ -3117,13 +3119,12 @@ function MonitoringPanel() {
             className='text-[13px] font-semibold'
             style={{ color: "var(--text-primary)" }}
           >
-            Recent activity
+            {t.recentActivity}
           </h3>
           <div className='flex items-center gap-2'>
             <span
               className='flex items-center gap-1 text-[11px]'
               style={{ color: "var(--text-muted)" }}
-              title='Live — auto-refreshing every 3 seconds'
             >
               <span
                 className='inline-block w-1.5 h-1.5 rounded-full'
@@ -3132,7 +3133,7 @@ function MonitoringPanel() {
                   boxShadow: "0 0 0 3px rgba(45,138,45,0.15)",
                 }}
               />
-              live · {Math.max(0, Math.round((Date.now() - lastTick) / 1000))}s
+              {t.live} · {Math.max(0, Math.round((Date.now() - lastTick) / 1000))}s
             </span>
             <div
               className='flex rounded-[6px] overflow-hidden border'
@@ -3158,18 +3159,18 @@ function MonitoringPanel() {
         </div>
         <div className='grid gap-3 grid-cols-2 md:grid-cols-3'>
           <KpiCard
-            label={`Active users · ${window}`}
+            label={`${t.activeUsers} · ${window}`}
             value={activity?.activeUsers ?? "—"}
             accent
           />
           <KpiCard
-            label={`API calls · ${window}`}
+            label={`${t.apiCalls} · ${window}`}
             value={
               activity ? activity.apiCalls.toLocaleString() : "—"
             }
           />
           <KpiCard
-            label={`New users · ${window}`}
+            label={`${t.newUsers} · ${window}`}
             value={activity?.newUsers ?? "—"}
           />
         </div>
@@ -3178,7 +3179,8 @@ function MonitoringPanel() {
   );
 }
 
-function UserManagementPanel({ csrf }: { csrf: string }) {
+function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
+  const t = AT[lang];
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [search, setSearch] = useState("");
@@ -3199,7 +3201,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
     setLoading(true);
     const params = new URLSearchParams({
       page: String(page),
-      pageSize: "25",
+      pageSize: "10",
     });
     if (search.trim()) params.set("search", search.trim());
     api<{
@@ -3256,7 +3258,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
             setPage(1);
             setSearch(e.target.value);
           }}
-          placeholder='Search by email or name…'
+          placeholder={t.searchUsers}
           className='flex-1 max-w-[320px] px-3 py-1.5 rounded-[6px] text-[13px] outline-none border'
           style={{
             background: "var(--bg-primary)",
@@ -3265,7 +3267,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
           }}
         />
         <span className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-          {total} user{total === 1 ? "" : "s"}
+          {total} {t.users}
         </span>
       </div>
 
@@ -3290,14 +3292,14 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
                 color: "var(--text-muted)",
               }}
             >
-              <th className='text-left font-medium px-3 py-2'>User</th>
+              <th className='text-left font-medium px-3 py-2'>{t.colUser}</th>
               <th className='text-left font-medium px-3 py-2 hidden sm:table-cell'>
-                Pages
+                {t.colPages}
               </th>
               <th className='text-left font-medium px-3 py-2 hidden md:table-cell'>
-                Last seen
+                {t.colLastSeen}
               </th>
-              <th className='text-left font-medium px-3 py-2'>Role</th>
+              <th className='text-left font-medium px-3 py-2'>{t.colRole}</th>
             </tr>
           </thead>
           <tbody>
@@ -3308,7 +3310,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
                   className='px-3 py-6 text-center'
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Loading…
+                  {t.loading}
                 </td>
               </tr>
             ) : users.length === 0 ? (
@@ -3318,7 +3320,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
                   className='px-3 py-6 text-center'
                   style={{ color: "var(--text-muted)" }}
                 >
-                  No users found
+                  {t.noUsers}
                 </td>
               </tr>
             ) : (
@@ -3352,7 +3354,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
                     className='px-3 py-2 hidden md:table-cell'
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {relativeTime(u.lastSeenAt)}
+                    {relativeTime(u.lastSeenAt, t)}
                   </td>
                   <td className='px-3 py-2'>
                     <select
@@ -3368,7 +3370,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
                     >
                       {roles.map((r) => (
                         <option key={r.key} value={r.key}>
-                          {r.label}
+                          {t.roles[r.key] ?? r.label}
                         </option>
                       ))}
                     </select>
@@ -3391,7 +3393,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
               color: "var(--text-primary)",
             }}
           >
-            Prev
+            {t.prev}
           </button>
           <span style={{ color: "var(--text-muted)" }}>
             {page} / {totalPages}
@@ -3405,7 +3407,7 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
               color: "var(--text-primary)",
             }}
           >
-            Next
+            {t.next}
           </button>
         </div>
       )}
@@ -3413,7 +3415,8 @@ function UserManagementPanel({ csrf }: { csrf: string }) {
   );
 }
 
-function ConfigurationManager({ csrf }: { csrf: string }) {
+function ConfigurationManager({ csrf, lang }: { csrf: string; lang: Lang }) {
+  const t = AT[lang];
   const [tab, setTab] = useState<"monitoring" | "users">("monitoring");
   return (
     <div className='max-w-[1040px] mx-auto px-5 py-6 sm:px-8 sm:py-10 w-full'>
@@ -3425,11 +3428,11 @@ function ConfigurationManager({ csrf }: { csrf: string }) {
           className='text-[22px] font-semibold'
           style={{ color: "var(--text-primary)" }}
         >
-          Configuration Manager
+          {t.configManager}
         </h1>
       </div>
       <p className='text-[13px] mb-5' style={{ color: "var(--text-muted)" }}>
-        Manage users and monitor system usage.
+        {t.configSubtitle}
       </p>
 
       <div
@@ -3438,8 +3441,8 @@ function ConfigurationManager({ csrf }: { csrf: string }) {
       >
         {(
           [
-            ["monitoring", "Monitoring"],
-            ["users", "User management"],
+            ["monitoring", t.monitoring],
+            ["users", t.userManagement],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -3457,9 +3460,9 @@ function ConfigurationManager({ csrf }: { csrf: string }) {
       </div>
 
       {tab === "monitoring" ? (
-        <MonitoringPanel />
+        <MonitoringPanel lang={lang} />
       ) : (
-        <UserManagementPanel csrf={csrf} />
+        <UserManagementPanel csrf={csrf} lang={lang} />
       )}
     </div>
   );
@@ -4585,45 +4588,6 @@ export function App() {
                   )}
                 </button>
               ))}
-
-              {/* CoMa — Configuration Manager (admin only) */}
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setShowComa(true);
-                    setActivePage(null);
-                    if (isMobileViewport()) setSidebarOpen(false);
-                  }}
-                  className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors text-left'
-                  style={{
-                    color: showComa
-                      ? "var(--accent-color)"
-                      : "var(--text-primary)",
-                    background: showComa ? "var(--bg-active)" : "transparent",
-                  }}
-                  onMouseEnter={(e) =>
-                    !showComa &&
-                    (e.currentTarget.style.background = "var(--bg-hover)")
-                  }
-                  onMouseLeave={(e) =>
-                    !showComa &&
-                    (e.currentTarget.style.background = "transparent")
-                  }
-                  title='Configuration Manager'
-                >
-                  <span
-                    className='w-4 flex justify-center'
-                    style={{
-                      color: showComa
-                        ? "var(--accent-color)"
-                        : "var(--text-muted)",
-                    }}
-                  >
-                    <Ico.Settings />
-                  </span>
-                  <span className='flex-1'>CoMa</span>
-                </button>
-              )}
             </div>
 
             {/* Pages */}
@@ -4671,6 +4635,45 @@ export function App() {
               className='px-1 pb-1.5 pt-1 border-t space-y-px'
               style={{ borderColor: "var(--border-color)" }}
             >
+              {/* Console — Configuration Manager (admin only) */}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setShowComa(true);
+                    setActivePage(null);
+                    if (isMobileViewport()) setSidebarOpen(false);
+                  }}
+                  className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors text-left'
+                  style={{
+                    color: showComa
+                      ? "var(--accent-color)"
+                      : "var(--text-muted)",
+                    background: showComa ? "var(--bg-active)" : "transparent",
+                  }}
+                  onMouseEnter={(e) =>
+                    !showComa &&
+                    (e.currentTarget.style.background = "var(--bg-hover)")
+                  }
+                  onMouseLeave={(e) =>
+                    !showComa &&
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                  title={AT[lang].configManager}
+                >
+                  <span
+                    className='w-4 flex justify-center'
+                    style={{
+                      color: showComa
+                        ? "var(--accent-color)"
+                        : "var(--text-muted)",
+                    }}
+                  >
+                    <Ico.Settings />
+                  </span>
+                  <span className='flex-1'>{AT[lang].console}</span>
+                </button>
+              )}
+
               {/* Version log */}
               <button
                 onClick={() => setShowVersionLog(true)}
@@ -5047,7 +5050,9 @@ export function App() {
           <div className='flex flex-1 overflow-hidden'>
             <div className='flex-1 overflow-y-auto'>
               {/* ─── CoMa — Configuration Manager (admin only) ─── */}
-              {showComa && isAdmin && <ConfigurationManager csrf={csrf} />}
+              {showComa && isAdmin && (
+                <ConfigurationManager csrf={csrf} lang={lang} />
+              )}
 
               {/* ─── Home / Document Hub ─── */}
               {!activePage && !showComa && (
