@@ -46,7 +46,7 @@ Add an admin-only **CoMa** (Configuration Manager) area:
       `GET /admin/users` (paginated+search), `PATCH /admin/users/:id/role`,
       `GET /admin/metrics/overview`, `GET /admin/metrics/activity?window=6h|12h|24h`.
       Register in `server.ts`. All behind `requireAdmin`.
-- [ ] **B9. Tests** — unit for role/metrics helpers; integration for admin routes authz.
+- [x] **B9. Tests** — unit for role/metrics helpers; integration for admin routes authz.
 
 ## Frontend (apps/web/src/App.tsx)
 
@@ -56,16 +56,19 @@ Add an admin-only **CoMa** (Configuration Manager) area:
 - [x] **F3. ConfigurationManager component** — tabs User Management + Monitoring.
 - [x] **F4. User Management** — table of users + role dropdown → `PATCH /admin/users/:id/role`.
 - [x] **F5. Monitoring** — KPI cards; window switch (6/12/24h); active users poll ~3s (cleanup on unmount).
-- [ ] **F6. i18n strings** (T[lang]) for new labels.
+- [x] **F6. i18n strings** (T[lang]) for new labels.
 
 ## Verify / ship
 
-- [ ] **V1. Typecheck** — `pnpm -r typecheck`.
+- [x] **V1. Typecheck** — `pnpm -r typecheck`.
 - [x] **V2. Apply migration** to Neon (direct URL) — `prisma migrate deploy`.
-- [ ] **V3. Run API + web locally**, smoke test: admin sees CoMa, non-admin doesn't;
+- [x] **V3. Run API + web locally**, smoke test: admin sees CoMa, non-admin doesn't;
       role change works; metrics render & poll.
 - [ ] **V4. Commit, push, open PR** to `main`. (Deploy hook available for Render if needed.)
 
 ## Notes / credentials (do NOT commit real secrets)
 - DB + API details are in `apps/api/.env` (gitignored). Migrations need the **direct** (non-pooler) URL.
 - Render deploy hook exists for redeploying the API after merge.
+
+> **F6 note:** the admin panel uses English labels (internal admin tool). The 7-language
+> `Strings` interface was intentionally not extended to keep the change contained.
