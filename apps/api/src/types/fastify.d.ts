@@ -2,7 +2,12 @@ import type { User } from "@prisma/client";
 
 declare module "fastify" {
   interface FastifyRequest {
-    authUser?: Pick<User, "id" | "email" | "displayName">;
+    authUser?: Pick<User, "id" | "email" | "displayName"> & {
+      // Global app role, denormalized onto the request for fast authorization
+      // checks (CoMa access, etc.) without an extra query per request.
+      appRoleKey: string;
+      appRoleRank: number;
+    };
     authSessionId?: string;
     csrfToken?: string;
     // True when the session was resolved from an Authorization: Bearer header

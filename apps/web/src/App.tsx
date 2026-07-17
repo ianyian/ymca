@@ -44,6 +44,9 @@ type SessionUser = {
   email: string;
   displayName: string | null;
   language?: string;
+  // Global app role (CoMa/Configuration Manager access). Provided by the API.
+  appRoleKey?: string;
+  appRoleRank?: number;
 };
 type Workspace = { id: string; name: string; slug: string; role: string };
 type PageNode = {
@@ -2928,6 +2931,541 @@ function ResetPasswordPage({ token }: { token: string }) {
 }
 
 // ────────────────────────────────────────────────────────────
+// CoMa — Configuration Manager (admin only)
+// ────────────────────────────────────────────────────────────
+type AdminUser = {
+  id: string;
+  email: string;
+  displayName: string | null;
+  createdAt: string;
+  roleKey: string;
+  roleLabel: string;
+  pageCount: number;
+  lastSeenAt: string | null;
+};
+type AdminRole = {
+  id: number;
+  key: string;
+  label: string;
+  description: string | null;
+  rank: number;
+};
+type OverviewMetrics = {
+  totalUsers: number;
+  adminUsers: number;
+  normalUsers: number;
+  activeUsers24h: number;
+  inactiveUsers: number;
+  totalWorkspaces: number;
+  totalPages: number;
+  totalStorageBytes: number;
+};
+type ActivityMetrics = {
+  window: string;
+  activeUsers: number;
+  apiCalls: number;
+  newUsers: number;
+};
+type MetricWindow = "6h" | "12h" | "24h";
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return "never";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className='rounded-[10px] border p-4 flex flex-col gap-1'
+      style={{
+        background: "var(--bg-secondary)",
+        borderColor: "var(--border-color)",
+      }}
+    >
+      <span
+        className='text-[11px] font-medium uppercase tracking-wider'
+        style={{ color: "var(--text-muted)" }}
+      >
+        {label}
+      </span>
+      <span
+        className='text-[26px] font-semibold leading-tight'
+        style={{
+          color: accent ? "var(--accent-color)" : "var(--text-primary)",
+        }}
+      >
+        {value}
+      </span>
+      {sub && (
+        <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+          {sub}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MonitoringPanel() {
+  const [overview, setOverview] = useState<OverviewMetrics | null>(null);
+  const [activity, setActivity] = useState<ActivityMetrics | null>(null);
+  const [window, setWindow] = useState<MetricWindow>("24h");
+  const [err, setErr] = useState<string | null>(null);
+  const [lastTick, setLastTick] = useState<number>(Date.now());
+
+  // Overview refreshes on a slow cadence; it's aggregate & changes slowly.
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api<OverviewMetrics>("/admin/metrics/overview")
+        .then((r) => alive && setOverview(r))
+        .catch((e) => alive && setErr(e instanceof Error ? e.message : "Error"));
+    void load();
+    const id = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  // Active-users / API-call metrics poll every 3s per the window selection.
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api<ActivityMetrics>(`/admin/metrics/activity?window=${window}`)
+        .then((r) => {
+          if (!alive) return;
+          setActivity(r);
+          setLastTick(Date.now());
+        })
+        .catch((e) => alive && setErr(e instanceof Error ? e.message : "Error"));
+    void load();
+    const id = setInterval(load, 3_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [window]);
+
+  return (
+    <div className='space-y-6'>
+      {err && (
+        <div
+          className='text-[12px] px-3 py-2 rounded-[6px]'
+          style={{ background: "var(--bg-hover)", color: "#c03030" }}
+        >
+          {err}
+        </div>
+      )}
+
+      {/* System totals */}
+      <div>
+        <h3
+          className='text-[13px] font-semibold mb-2'
+          style={{ color: "var(--text-primary)" }}
+        >
+          System overview
+        </h3>
+        <div className='grid gap-3 grid-cols-2 md:grid-cols-4'>
+          <KpiCard label='Total users' value={overview?.totalUsers ?? "—"} />
+          <KpiCard
+            label='Active (24h)'
+            value={overview?.activeUsers24h ?? "—"}
+            sub={
+              overview ? `${overview.inactiveUsers} inactive` : undefined
+            }
+            accent
+          />
+          <KpiCard
+            label='Admins'
+            value={overview?.adminUsers ?? "—"}
+            sub={overview ? `${overview.normalUsers} normal` : undefined}
+          />
+          <KpiCard label='Workspaces' value={overview?.totalWorkspaces ?? "—"} />
+          <KpiCard label='Total pages' value={overview?.totalPages ?? "—"} />
+          <KpiCard
+            label='Storage used'
+            value={
+              overview ? formatBytes(overview.totalStorageBytes) : "—"
+            }
+          />
+        </div>
+      </div>
+
+      {/* Windowed activity */}
+      <div>
+        <div className='flex items-center justify-between mb-2'>
+          <h3
+            className='text-[13px] font-semibold'
+            style={{ color: "var(--text-primary)" }}
+          >
+            Recent activity
+          </h3>
+          <div className='flex items-center gap-2'>
+            <span
+              className='flex items-center gap-1 text-[11px]'
+              style={{ color: "var(--text-muted)" }}
+              title='Live — auto-refreshing every 3 seconds'
+            >
+              <span
+                className='inline-block w-1.5 h-1.5 rounded-full'
+                style={{
+                  background: "#2d8a2d",
+                  boxShadow: "0 0 0 3px rgba(45,138,45,0.15)",
+                }}
+              />
+              live · {Math.max(0, Math.round((Date.now() - lastTick) / 1000))}s
+            </span>
+            <div
+              className='flex rounded-[6px] overflow-hidden border'
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              {(["6h", "12h", "24h"] as MetricWindow[]).map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setWindow(w)}
+                  className='px-2.5 py-1 text-[12px] transition-colors'
+                  style={{
+                    background:
+                      window === w ? "var(--accent-color)" : "transparent",
+                    color:
+                      window === w ? "#fff" : "var(--text-muted)",
+                  }}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className='grid gap-3 grid-cols-2 md:grid-cols-3'>
+          <KpiCard
+            label={`Active users · ${window}`}
+            value={activity?.activeUsers ?? "—"}
+            accent
+          />
+          <KpiCard
+            label={`API calls · ${window}`}
+            value={
+              activity ? activity.apiCalls.toLocaleString() : "—"
+            }
+          />
+          <KpiCard
+            label={`New users · ${window}`}
+            value={activity?.newUsers ?? "—"}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserManagementPanel({ csrf }: { csrf: string }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [roles, setRoles] = useState<AdminRole[]>([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<{ roles: AdminRole[] }>("/admin/roles")
+      .then((r) => setRoles(r.roles))
+      .catch(() => {});
+  }, []);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: "25",
+    });
+    if (search.trim()) params.set("search", search.trim());
+    api<{
+      users: AdminUser[];
+      total: number;
+      totalPages: number;
+    }>(`/admin/users?${params.toString()}`)
+      .then((r) => {
+        setUsers(r.users);
+        setTotal(r.total);
+        setTotalPages(r.totalPages);
+        setErr(null);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : "Error"))
+      .finally(() => setLoading(false));
+  }, [page, search]);
+
+  // Debounce search; reset to page 1 when the query changes.
+  useEffect(() => {
+    const id = setTimeout(load, 250);
+    return () => clearTimeout(id);
+  }, [load]);
+
+  const changeRole = async (u: AdminUser, roleKey: string) => {
+    if (roleKey === u.roleKey) return;
+    setSavingId(u.id);
+    setErr(null);
+    try {
+      const r = await api<{ user: { roleKey: string; roleLabel: string } }>(
+        `/admin/users/${u.id}/role`,
+        { method: "PATCH", body: JSON.stringify({ appRoleKey: roleKey }) },
+        csrf,
+      );
+      setUsers((prev) =>
+        prev.map((x) =>
+          x.id === u.id
+            ? { ...x, roleKey: r.user.roleKey, roleLabel: r.user.roleLabel }
+            : x,
+        ),
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to update role");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <div className='space-y-3'>
+      <div className='flex items-center justify-between gap-3'>
+        <input
+          value={search}
+          onChange={(e) => {
+            setPage(1);
+            setSearch(e.target.value);
+          }}
+          placeholder='Search by email or name…'
+          className='flex-1 max-w-[320px] px-3 py-1.5 rounded-[6px] text-[13px] outline-none border'
+          style={{
+            background: "var(--bg-primary)",
+            borderColor: "var(--border-color)",
+            color: "var(--text-primary)",
+          }}
+        />
+        <span className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+          {total} user{total === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {err && (
+        <div
+          className='text-[12px] px-3 py-2 rounded-[6px]'
+          style={{ background: "var(--bg-hover)", color: "#c03030" }}
+        >
+          {err}
+        </div>
+      )}
+
+      <div
+        className='rounded-[10px] border overflow-hidden'
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        <table className='w-full text-[13px]'>
+          <thead>
+            <tr
+              style={{
+                background: "var(--bg-secondary)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <th className='text-left font-medium px-3 py-2'>User</th>
+              <th className='text-left font-medium px-3 py-2 hidden sm:table-cell'>
+                Pages
+              </th>
+              <th className='text-left font-medium px-3 py-2 hidden md:table-cell'>
+                Last seen
+              </th>
+              <th className='text-left font-medium px-3 py-2'>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && users.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className='px-3 py-6 text-center'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Loading…
+                </td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className='px-3 py-6 text-center'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No users found
+                </td>
+              </tr>
+            ) : (
+              users.map((u) => (
+                <tr
+                  key={u.id}
+                  className='border-t'
+                  style={{ borderColor: "var(--border-color)" }}
+                >
+                  <td className='px-3 py-2'>
+                    <div
+                      className='font-medium'
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {u.displayName || u.email.split("@")[0]}
+                    </div>
+                    <div
+                      className='text-[11px]'
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {u.email}
+                    </div>
+                  </td>
+                  <td
+                    className='px-3 py-2 hidden sm:table-cell'
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {u.pageCount}
+                  </td>
+                  <td
+                    className='px-3 py-2 hidden md:table-cell'
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {relativeTime(u.lastSeenAt)}
+                  </td>
+                  <td className='px-3 py-2'>
+                    <select
+                      value={u.roleKey}
+                      disabled={savingId === u.id}
+                      onChange={(e) => void changeRole(u, e.target.value)}
+                      className='px-2 py-1 rounded-[6px] text-[12px] outline-none border'
+                      style={{
+                        background: "var(--bg-primary)",
+                        borderColor: "var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {roles.map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className='flex items-center justify-end gap-2 text-[12px]'>
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
+            style={{
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Prev
+          </button>
+          <span style={{ color: "var(--text-muted)" }}>
+            {page} / {totalPages}
+          </span>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className='px-2.5 py-1 rounded-[6px] border disabled:opacity-40'
+            style={{
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfigurationManager({ csrf }: { csrf: string }) {
+  const [tab, setTab] = useState<"monitoring" | "users">("monitoring");
+  return (
+    <div className='max-w-[1040px] mx-auto px-5 py-6 sm:px-8 sm:py-10 w-full'>
+      <div className='mb-1 flex items-center gap-2'>
+        <span style={{ color: "var(--accent-color)" }}>
+          <Ico.Settings />
+        </span>
+        <h1
+          className='text-[22px] font-semibold'
+          style={{ color: "var(--text-primary)" }}
+        >
+          Configuration Manager
+        </h1>
+      </div>
+      <p className='text-[13px] mb-5' style={{ color: "var(--text-muted)" }}>
+        Manage users and monitor system usage.
+      </p>
+
+      <div
+        className='flex gap-1 mb-5 border-b'
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        {(
+          [
+            ["monitoring", "Monitoring"],
+            ["users", "User management"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className='px-3 py-2 text-[13px] font-medium -mb-px border-b-2 transition-colors'
+            style={{
+              borderColor: tab === key ? "var(--accent-color)" : "transparent",
+              color: tab === key ? "var(--text-primary)" : "var(--text-muted)",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "monitoring" ? (
+        <MonitoringPanel />
+      ) : (
+        <UserManagementPanel csrf={csrf} />
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 // Main App
 // ────────────────────────────────────────────────────────────
 
@@ -3003,6 +3541,10 @@ export function App() {
   >("idle");
   const [showTrash, setShowTrash] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  // CoMa (Configuration Manager) view — admin only. When true, the main content
+  // area shows the admin panel instead of the document hub / editor.
+  const [showComa, setShowComa] = useState(false);
+  const isAdmin = user?.appRoleKey === "admin";
   const [showRevisions, setShowRevisions] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showVersionLog, setShowVersionLog] = useState(false);
@@ -3432,6 +3974,7 @@ export function App() {
   async function handleSelectPage(id: string) {
     try {
       const r = await api<{ page: PageDetail }>(`/pages/${id}`, {}, csrf);
+      setShowComa(false);
       setActivePage(r.page);
       setPageTitle(r.page.title);
       setPublicLink(
@@ -3993,6 +4536,7 @@ export function App() {
                   label: T[lang].home,
                   icon: <Ico.Grid />,
                   action: () => {
+                    setShowComa(false);
                     setActivePage(null);
                     if (isMobileViewport()) setSidebarOpen(false);
                   },
@@ -4041,6 +4585,45 @@ export function App() {
                   )}
                 </button>
               ))}
+
+              {/* CoMa — Configuration Manager (admin only) */}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setShowComa(true);
+                    setActivePage(null);
+                    if (isMobileViewport()) setSidebarOpen(false);
+                  }}
+                  className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors text-left'
+                  style={{
+                    color: showComa
+                      ? "var(--accent-color)"
+                      : "var(--text-primary)",
+                    background: showComa ? "var(--bg-active)" : "transparent",
+                  }}
+                  onMouseEnter={(e) =>
+                    !showComa &&
+                    (e.currentTarget.style.background = "var(--bg-hover)")
+                  }
+                  onMouseLeave={(e) =>
+                    !showComa &&
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                  title='Configuration Manager'
+                >
+                  <span
+                    className='w-4 flex justify-center'
+                    style={{
+                      color: showComa
+                        ? "var(--accent-color)"
+                        : "var(--text-muted)",
+                    }}
+                  >
+                    <Ico.Settings />
+                  </span>
+                  <span className='flex-1'>CoMa</span>
+                </button>
+              )}
             </div>
 
             {/* Pages */}
@@ -4463,8 +5046,11 @@ export function App() {
           {/* Content */}
           <div className='flex flex-1 overflow-hidden'>
             <div className='flex-1 overflow-y-auto'>
+              {/* ─── CoMa — Configuration Manager (admin only) ─── */}
+              {showComa && isAdmin && <ConfigurationManager csrf={csrf} />}
+
               {/* ─── Home / Document Hub ─── */}
-              {!activePage && (
+              {!activePage && !showComa && (
                 <DocumentHub
                   tree={tree}
                   isDark={isDark}

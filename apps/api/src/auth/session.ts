@@ -12,6 +12,8 @@ type AuthPayload = {
     id: string;
     email: string;
     displayName: string | null;
+    appRoleKey: string;
+    appRoleRank: number;
   };
   sessionId: string;
   csrfToken: string;
@@ -109,6 +111,7 @@ export async function resolveAuthFromRequest(
           id: true,
           email: true,
           displayName: true,
+          appRole: { select: { key: true, rank: true } },
         },
       },
     },
@@ -128,8 +131,13 @@ export async function resolveAuthFromRequest(
     });
   }
 
+  const { appRole, ...userFields } = session.user;
   return {
-    user: session.user,
+    user: {
+      ...userFields,
+      appRoleKey: appRole?.key ?? "user",
+      appRoleRank: appRole?.rank ?? 0,
+    },
     sessionId: session.id,
     csrfToken: session.csrfToken,
     viaBearer,

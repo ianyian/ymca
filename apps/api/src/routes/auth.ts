@@ -106,7 +106,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
         setSessionCookie(reply, session.rawToken, session.expiresAt);
         return reply.status(201).send({
-          user: { ...user, language: "en" },
+          // New accounts are always normal users (DB default role = "user").
+          user: { ...user, language: "en", appRoleKey: "user", appRoleRank: 10 },
           csrfToken: session.csrfToken,
           // Also returned for cross-origin clients that can't rely on the
           // third-party session cookie; sent back as `Authorization: Bearer`.
@@ -143,6 +144,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
       const user = await prisma.user.findUnique({
         where: { email: normalizedEmail },
+        include: { appRole: { select: { key: true, rank: true } } },
       });
 
       if (!user) {
@@ -179,6 +181,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           email: user.email,
           displayName: user.displayName,
           language: user.language ?? "en",
+          appRoleKey: user.appRole?.key ?? "user",
+          appRoleRank: user.appRole?.rank ?? 0,
         },
         csrfToken: session.csrfToken,
         // Also returned for cross-origin clients that can't rely on the
@@ -213,7 +217,12 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     });
 
     return reply.send({
-      user: { ...request.authUser, language: dbUser?.language ?? "en" },
+      user: {
+        ...request.authUser,
+        language: dbUser?.language ?? "en",
+        appRoleKey: request.authUser.appRoleKey,
+        appRoleRank: request.authUser.appRoleRank,
+      },
       csrfToken: request.csrfToken,
     });
   });
