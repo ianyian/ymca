@@ -86,6 +86,134 @@ function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
   };
 }
 
+function buildSyntheticSummary(
+  userId: string,
+  window: AnalyticsWindowKey,
+): UserActivitySummary {
+  const days = ANALYTICS_WINDOW_DAYS[window];
+  const from = since(days);
+  const fromDay = startOfDay(from);
+  const random = rand(hashSeed(`${userId}:${window}:synthetic`));
+
+  const heatmap: UserActivityHeatmapCell[] = [];
+  const clickHeatmap = Array.from({ length: 5 }, () =>
+    Array.from({ length: 5 }, () => 0),
+  );
+  const topTargets = [
+    { label: "demo:home:open_page", count: 0 },
+    { label: "demo:editor:focus", count: 0 },
+    { label: "demo:sidebar:new_page", count: 0 },
+    { label: "demo:profile:open", count: 0 },
+  ];
+
+  const recentEvents: UserActivityRecentEvent[] = [];
+  let totalEvents = 0;
+  let clickEvents = 0;
+  let dwellMs = 0;
+  let uniquePages = 0;
+  let scrollDepthMax = 0;
+  let scrollDepthSum = 0;
+  let scrollDepthCount = 0;
+
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(fromDay);
+    date.setDate(date.getDate() + i);
+    const weekend = date.getDay() === 0 || date.getDay() === 6;
+    const base = weekend ? 1 : 3;
+    const intensity = base + Math.floor(random() * 5);
+    heatmap.push({ date: date.toISOString().slice(0, 10), count: intensity });
+    totalEvents += intensity;
+  }
+
+  const sampleDays = Math.min(14, days);
+  for (let i = 0; i < sampleDays; i += 1) {
+    const dayOffset = sampleDays - 1 - i;
+    const baseTs = Date.now() - dayOffset * 24 * 60 * 60 * 1000;
+    const clicks = 2 + Math.floor(random() * 6);
+    const dwell = 20_000 + Math.floor(random() * 180_000);
+    const scroll = 35 + Math.floor(random() * 65);
+    const pageCount = 1 + Math.floor(random() * 3);
+
+    clickEvents += clicks;
+    dwellMs += dwell;
+    uniquePages += pageCount;
+    scrollDepthMax = Math.max(scrollDepthMax, scroll);
+    scrollDepthSum += scroll;
+    scrollDepthCount += 1;
+
+    for (let c = 0; c < clicks; c += 1) {
+      const x = Math.floor(random() * 5);
+      const y = Math.floor(random() * 5);
+      clickHeatmap[y]![x]! += 1;
+      topTargets[c % topTargets.length]!.count += 1;
+    }
+
+    if (recentEvents.length < 16) {
+      recentEvents.push({
+        createdAt: new Date(baseTs + 9 * 60 * 1000).toISOString(),
+        eventType: "ui_click",
+        target: "demo:home:open_page",
+        pageId: null,
+        durationMs: null,
+      });
+      recentEvents.push({
+        createdAt: new Date(baseTs + 19 * 60 * 1000).toISOString(),
+        eventType: "surface_scroll",
+        target: "demo:page",
+        pageId: null,
+        durationMs: null,
+      });
+      recentEvents.push({
+        createdAt: new Date(baseTs + 24 * 60 * 1000).toISOString(),
+        eventType: "surface_dwell",
+        target: "demo:page",
+        pageId: null,
+        durationMs: dwell,
+      });
+    }
+  }
+
+  recentEvents.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  const clickHeatmapTotal = clickHeatmap
+    .flat()
+    .reduce((sum, count) => sum + count, 0);
+  const scrollDepthAvg =
+    scrollDepthCount > 0 ? Math.round(scrollDepthSum / scrollDepthCount) : 0;
+  const attentionScore = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        (Math.min(dwellMs / (10 * 60 * 1000), 1) * 40) +
+          (Math.min(clickEvents / 35, 1) * 25) +
+          ((scrollDepthAvg / 100) * 20 + (scrollDepthMax / 100) * 10) +
+          Math.min(uniquePages / 8, 1) * 5,
+        100,
+      ),
+    ),
+  );
+
+  return {
+    window,
+    generatedAt: new Date().toISOString(),
+    isSynthetic: true,
+    totalEvents: Math.max(totalEvents, clickEvents + sampleDays * 2),
+    clickEvents,
+    dwellMs,
+    scrollDepthMax,
+    scrollDepthAvg,
+    attentionScore,
+    uniquePages,
+    heatmap,
+    clickHeatmap,
+    clickHeatmapTotal,
+    topTargets: topTargets.filter((item) => item.count > 0),
+    recentEvents: recentEvents.slice(0, 16),
+  };
+}
+
 function hashSeed(input: string): number {
   let h = 0;
   for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0;
@@ -233,7 +361,7 @@ export async function getUserActivitySummary(
   window: AnalyticsWindowKey,
 ): Promise<UserActivitySummary> {
   if (!(await hasAnalyticsColumns())) {
-    return emptySummary(window);
+    return buildSyntheticSummary(userId, window);
   }
 
   await ensureDemoActivityForUser(userId);
@@ -351,7 +479,7 @@ export async function getUserActivitySummary(
   const pageScore = Math.min(Number(totals[0]?.unique_pages ?? 0n) * 5, 10);
   const attentionScore = Math.round(Math.max(0, Math.min(dwellScore + clickScore + scrollScore + pageScore, 100)));
 
-  return {
+  const result = {
     window,
     generatedAt: new Date().toISOString(),
     isSynthetic,
@@ -376,4 +504,10 @@ export async function getUserActivitySummary(
       durationMs: row.durationMs,
     })),
   };
+
+  if (result.totalEvents === 0) {
+    return buildSyntheticSummary(userId, window);
+  }
+
+  return result;
 }

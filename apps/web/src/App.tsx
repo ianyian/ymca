@@ -2607,9 +2607,11 @@ function ProfileActivityDrawer({
   type AnalyticsTab = (typeof tabs)[number];
   const [windowIndex, setWindowIndex] = useState(1);
   const [tab, setTab] = useState<AnalyticsTab>("graphical");
+  const [pinned, setPinned] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [summary, setSummary] = useState<UserActivitySummary | null>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   const windowKey = windows[windowIndex];
 
@@ -2634,6 +2636,27 @@ function ProfileActivityDrawer({
       alive = false;
     };
   }, [endpoint, windowKey]);
+
+  useEffect(() => {
+    if (pinned) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (drawerRef.current?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [onClose, pinned]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const heatmapWeeks = useMemo(() => {
     const cells = summary?.heatmap ?? [];
@@ -2723,6 +2746,7 @@ function ProfileActivityDrawer({
 
   return (
     <div
+      ref={drawerRef}
       className='fixed inset-y-0 right-0 z-50 w-[420px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col min-h-0'
       style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
       data-analytics-zone='profile-activity'
@@ -2742,9 +2766,24 @@ function ProfileActivityDrawer({
             {subtitle}
           </p>
         </div>
-        <button onClick={onClose} style={{ color: "var(--text-muted)" }}>
-          <Ico.X />
-        </button>
+        <div className='flex items-center gap-1'>
+          <button
+            type='button'
+            onClick={() => setPinned((v) => !v)}
+            className='px-2 py-1 rounded-[6px] border text-[11px] transition-colors'
+            style={{
+              borderColor: pinned ? "var(--accent-color)" : "var(--border-color)",
+              color: pinned ? "var(--accent-color)" : "var(--text-muted)",
+              background: pinned ? "rgba(35,131,226,0.08)" : "transparent",
+            }}
+            title={pinned ? "Pinned" : "Auto-hide enabled"}
+          >
+            {pinned ? "Pinned" : "Pin"}
+          </button>
+          <button onClick={onClose} style={{ color: "var(--text-muted)" }}>
+            <Ico.X />
+          </button>
+        </div>
       </div>
 
       <div className='px-4 pt-2 pb-1 border-b' style={{ borderColor: "var(--border-color)" }}>
