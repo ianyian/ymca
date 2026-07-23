@@ -1586,6 +1586,7 @@ function ProfileDropdown({
           endpoint='/me/activity'
           title='Your activity heatmap'
           subtitle='How you are using the app'
+          isDark={isDark}
         />
       )}
     </div>
@@ -1827,7 +1828,7 @@ function activityHeatmapIntensity(count: number) {
 }
 
 function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary }) {
-  const cells = summary.heatmap.slice(-30);
+  const cells = summary.heatmap;
   const dayHighlights = useMemo(
     () => new Map((summary.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
     [summary.dayHighlights],
@@ -1859,10 +1860,22 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
 
   const weekLabels = useMemo(
     () =>
-      heatmapWeeks.map((week) => {
+      heatmapWeeks.map((week, index) => {
         const firstCell = week.find((cell) => cell != null);
         if (!firstCell) return "";
-        return new Date(`${firstCell.date}T00:00:00`).toLocaleDateString([], { month: "short" });
+        const month = new Date(`${firstCell.date}T00:00:00`).toLocaleDateString([], {
+          month: "short",
+        });
+        if (index > 0) {
+          const previousCell = heatmapWeeks[index - 1]?.find((cell) => cell != null);
+          const previousMonth = previousCell
+            ? new Date(`${previousCell.date}T00:00:00`).toLocaleDateString([], {
+                month: "short",
+              })
+            : "";
+          if (previousMonth === month) return "";
+        }
+        return month;
       }),
     [heatmapWeeks],
   );
@@ -1881,6 +1894,16 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
                 {label}
               </span>
             ))}
+          </div>
+          <div className='mb-1 grid grid-rows-7 text-[10px]' style={{ color: "var(--text-muted)" }}>
+            {Array.from({ length: 7 }).map((_, index) => {
+              const label = index === 1 ? "Mon" : index === 3 ? "Wed" : index === 5 ? "Fri" : "";
+              return (
+                <div key={index} className='h-[12px] leading-[12px] pr-1 text-right'>
+                  {label}
+                </div>
+              );
+            })}
           </div>
           <div className='grid gap-1.5' style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}>
             {heatmapWeeks.flatMap((week, weekIndex) =>
@@ -1963,11 +1986,7 @@ function WelcomeCard({
             <div>
               <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Page</p>
               <h3 className='text-[14px] font-semibold' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
-              <p className='text-[12px] mt-1' style={{ color: "var(--text-muted)" }}>Last 30 days, newest activity at the right edge.</p>
             </div>
-            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
-              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
-            </button>
           </div>
           {activityLoading ? (
             <div className='space-y-2' aria-label='Loading contribution chart'>
@@ -1988,6 +2007,15 @@ function WelcomeCard({
         </div>
       ) : (
         <div className='space-y-3'>
+          <div className='flex items-center justify-between gap-3'>
+            <div>
+              <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Guide</p>
+              <p className='text-[12px] mt-1' style={{ color: "var(--text-muted)" }}>Shortcuts, blocks, and release notes.</p>
+            </div>
+            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
+              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
+            </button>
+          </div>
           <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
             {SLASH_ITEMS.map((item) => (
               <div key={item.title} className='flex items-center gap-2 px-2 py-1.5 rounded-[6px]' style={{ background: "var(--bg-primary)", border: "1px solid var(--border-color)" }} title={item.subtitle}>
@@ -2732,11 +2760,13 @@ function ProfileActivityDrawer({
   endpoint,
   title,
   subtitle,
+  isDark,
 }: {
   onClose: () => void;
   endpoint: string;
   title: string;
   subtitle: string;
+  isDark: boolean;
 }) {
   const windows = ["24h", "7d", "30d", "365d"] as const;
   const tabs = ["graphical", "events"] as const;
@@ -2832,14 +2862,18 @@ function ProfileActivityDrawer({
         {
           label: "Clicks",
           data: (summary?.topTargets ?? []).slice(0, 5).map((item) => item.count),
-          backgroundColor: "rgba(126, 192, 245, 0.95)",
+          backgroundColor: isDark ? "rgba(126, 192, 245, 0.96)" : "rgba(35, 131, 226, 0.75)",
           borderRadius: 6,
           borderSkipped: false as const,
         },
       ],
     }),
-    [summary?.topTargets],
+    [isDark, summary?.topTargets],
   );
+
+  const chartTextColor = isDark ? "#f5f0e8" : "#1f1f1f";
+  const chartMutedColor = isDark ? "rgba(245,240,232,0.68)" : "rgba(80,80,80,0.8)";
+  const chartGridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(127,127,127,0.12)";
 
   const barOptions = useMemo(
     () => ({
@@ -2852,16 +2886,16 @@ function ProfileActivityDrawer({
       },
       scales: {
         x: {
-          grid: { color: "rgba(127,127,127,0.12)" },
-          ticks: { color: "var(--text-muted)", precision: 0 },
+          grid: { color: chartGridColor },
+          ticks: { color: chartMutedColor, precision: 0 },
         },
         y: {
           grid: { display: false },
-          ticks: { color: "var(--text-primary)" },
+          ticks: { color: chartTextColor },
         },
       },
     }),
-    [],
+    [chartGridColor, chartMutedColor, chartTextColor],
   );
 
   const heatmapIntensity = (count: number) => {
@@ -2949,7 +2983,7 @@ function ProfileActivityDrawer({
         </div>
       </div>
 
-      <div className='px-4 py-3 border-b space-y-3' style={{ borderColor: "var(--border-color)" }}>
+      <div className='px-4 py-3 border-b space-y-2.5' style={{ borderColor: "var(--border-color)" }}>
         {summary?.isSynthetic && (
           <div
             className='rounded-[8px] border px-2.5 py-2 text-[11px]'
@@ -2963,7 +2997,7 @@ function ProfileActivityDrawer({
           </div>
         )}
         <div>
-          <div className='flex items-center justify-between text-[11px] mb-2' style={{ color: "var(--text-muted)" }}>
+          <div className='flex items-center justify-between text-[10px] mb-1' style={{ color: "var(--text-muted)" }}>
             <span>Time range</span>
             <span>{windowKey}</span>
           </div>
@@ -2976,25 +3010,25 @@ function ProfileActivityDrawer({
             onChange={(e) => setWindowIndex(Number(e.target.value))}
             className='w-full'
           />
-          <div className='mt-1 flex justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
+          <div className='mt-1 flex justify-between text-[9px]' style={{ color: "var(--text-muted)" }}>
             {windows.map((item) => (
               <span key={item}>{item}</span>
             ))}
           </div>
         </div>
 
-        <div className='grid grid-cols-2 gap-2'>
-          <KpiCard label='Actions' value={summary?.totalEvents ?? "—"} />
-          <KpiCard label='Clicks' value={summary?.clickEvents ?? "—"} accent />
-          <KpiCard label='Time spent' value={summary ? formatDuration(summary.dwellMs) : "—"} />
-          <KpiCard label='Pages' value={summary?.uniquePages ?? "—"} />
-          <KpiCard label='Scroll max' value={summary ? `${summary.scrollDepthMax}%` : "—"} />
-          <KpiCard label='Scroll avg' value={summary ? `${summary.scrollDepthAvg}%` : "—"} />
-          <KpiCard label='Attention' value={summary?.attentionScore ?? "—"} accent />
+        <div className='grid grid-cols-3 gap-1.5'>
+          <KpiCard compact label='Actions' value={summary?.totalEvents ?? "—"} />
+          <KpiCard compact label='Clicks' value={summary?.clickEvents ?? "—"} accent />
+          <KpiCard compact label='Time spent' value={summary ? formatDuration(summary.dwellMs) : "—"} />
+          <KpiCard compact label='Pages' value={summary?.uniquePages ?? "—"} />
+          <KpiCard compact label='Scroll max' value={summary ? `${summary.scrollDepthMax}%` : "—"} />
+          <KpiCard compact label='Scroll avg' value={summary ? `${summary.scrollDepthAvg}%` : "—"} />
+          <KpiCard compact label='Attention' value={summary?.attentionScore ?? "—"} accent />
         </div>
       </div>
 
-      <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-5'>
+      <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4'>
         {err && (
           <div className='rounded-lg border px-3 py-2 text-[12px]' style={{ borderColor: "rgba(200,48,48,0.3)", color: "#c03030", background: "rgba(200,48,48,0.06)" }}>
             {err}
@@ -3008,15 +3042,15 @@ function ProfileActivityDrawer({
                 Activity by day
               </h4>
               {loading && !summary ? (
-                <div className='grid grid-cols-7 gap-1.5'>
+                <div className='grid grid-cols-7 gap-1'>
                   {Array.from({ length: 35 }).map((_, index) => (
-                    <div key={index} className='h-3.5 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
+                    <div key={index} className='h-3 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
                   ))}
                 </div>
               ) : heatmapWeeks.length > 0 ? (
                 <div className='overflow-x-auto pb-1'>
                   <div
-                    className='grid gap-1.5'
+                    className='grid gap-1'
                     style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}
                   >
                     {heatmapWeeks.flatMap((week, weekIndex) =>
@@ -3051,7 +3085,7 @@ function ProfileActivityDrawer({
               <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
                 Top interactions
               </h4>
-              <div className='h-[220px] rounded-xl border p-3' style={{ borderColor: "var(--border-color)" }}>
+              <div className='h-[180px] rounded-xl border p-2.5' style={{ borderColor: "var(--border-color)" }}>
                 <Bar data={barData} options={barOptions} />
               </div>
             </section>
@@ -3582,28 +3616,30 @@ function KpiCard({
   value,
   sub,
   accent,
+  compact,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   accent?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div
-      className='rounded-[10px] border p-4 flex flex-col gap-1'
+      className={`rounded-[10px] border flex flex-col gap-1 ${compact ? "p-2.5" : "p-4"}`}
       style={{
         background: "var(--bg-secondary)",
         borderColor: "var(--border-color)",
       }}
     >
       <span
-        className='text-[11px] font-medium uppercase tracking-wider'
+        className='text-[10px] font-medium uppercase tracking-wider'
         style={{ color: "var(--text-muted)" }}
       >
         {label}
       </span>
       <span
-        className='text-[26px] font-semibold leading-tight'
+        className={`font-semibold leading-tight ${compact ? "text-[18px]" : "text-[26px]"}`}
         style={{
           color: accent ? "var(--accent-color)" : "var(--text-primary)",
         }}
@@ -3611,7 +3647,7 @@ function KpiCard({
         {value}
       </span>
       {sub && (
-        <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+        <span className='text-[10px]' style={{ color: "var(--text-muted)" }}>
           {sub}
         </span>
       )}
@@ -3773,7 +3809,7 @@ function MonitoringPanel({ lang }: { lang: Lang }) {
   );
 }
 
-function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
+function UserManagementPanel({ csrf, lang, isDark }: { csrf: string; lang: Lang; isDark: boolean }) {
   const t = AT[lang];
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -4033,13 +4069,14 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
           endpoint={`/admin/users/${activityUser.id}/activity`}
           title={`${activityUser.displayName || activityUser.email.split("@")[0]}'s activity`}
           subtitle={activityUser.email}
+          isDark={isDark}
         />
       )}
     </div>
   );
 }
 
-function ConfigurationManager({ csrf, lang }: { csrf: string; lang: Lang }) {
+function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang; isDark: boolean }) {
   const t = AT[lang];
   const [tab, setTab] = useState<"monitoring" | "users">("monitoring");
   return (
@@ -4086,7 +4123,7 @@ function ConfigurationManager({ csrf, lang }: { csrf: string; lang: Lang }) {
       {tab === "monitoring" ? (
         <MonitoringPanel lang={lang} />
       ) : (
-        <UserManagementPanel csrf={csrf} lang={lang} />
+        <UserManagementPanel csrf={csrf} lang={lang} isDark={isDark} />
       )}
     </div>
   );
@@ -4548,7 +4585,7 @@ export function App() {
 
     let alive = true;
     setHomeActivityLoading(true);
-    api<UserActivitySummary>("/me/activity?window=30d")
+    api<UserActivitySummary>("/me/activity?window=365d")
       .then((data) => {
         if (!alive) return;
         setHomeActivitySummary(data);
@@ -5901,7 +5938,7 @@ export function App() {
             <div className='flex-1 overflow-y-auto' data-scroll-host='main'>
               {/* ─── CoMa — Configuration Manager (admin only) ─── */}
               {showComa && isAdmin && (
-                <ConfigurationManager csrf={csrf} lang={lang} />
+                <ConfigurationManager csrf={csrf} lang={lang} isDark={isDark} />
               )}
 
               {/* ─── Home / Document Hub ─── */}
