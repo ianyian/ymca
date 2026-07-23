@@ -4,6 +4,9 @@ YMCA is a self-hosted, block-based knowledge workspace: create nested pages, wri
 with a rich block editor, organise with tags, collaborate inside workspaces with
 role-based access, publish pages to the web, and keep a full revision history.
 
+The web app also includes a landing-page contribution heatmap, a profile activity
+panel, and an admin configuration console for monitoring and workspace control.
+
 It is built as a TypeScript monorepo — a React web app, a Fastify API, and a
 PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 (API), and **Neon** (database).
@@ -30,6 +33,7 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 - **Revision history** with restore (pruned to the latest 50 per page)
 - **Trash** (soft delete) and restore
 - **Full-text search** and colored **tags** with filtering
+- Landing-page **contribution heatmap** and profile **activity analytics**
 
 **Platform**
 - Cookie-based sessions with **CSRF protection**, **bcrypt** password hashing,
@@ -42,6 +46,7 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 | Component | What it does | Where it is used |
 |-----------|--------------|------------------|
 | `App` | Main web shell for sign-in, workspace navigation, page editing, search, publishing, revisions, trash, and profile settings. | `apps/web/src/App.tsx` |
+| `Activity analytics` | Landing contribution heatmap, profile activity drawer, and admin monitoring metrics. | `apps/web/src/App.tsx`, `apps/api/src/domain/user-analytics.ts`, `apps/api/src/domain/metrics.ts` |
 | `editor-extensions` | Custom TipTap nodes and extensions for callouts, columns, page references, slash commands, and page lookup suggestions. | `apps/web/src/editor-extensions.ts` |
 | `i18n` | Language labels and translated UI strings for the editor, auth flow, sidebar, publishing, trash, and errors. | `apps/web/src/i18n.ts` |
 | `shared-types` | Shared TypeScript primitives used by the web app and API to keep data contracts aligned. | `packages/shared-types/src/index.ts` |
@@ -145,7 +150,7 @@ Useful scripts: `pnpm typecheck`, `pnpm build`, `pnpm --filter @ymca/api test`.
 
 - **Web → GitHub Pages:** pushing to `main` runs the *Deploy Web* workflow, which
   builds `apps/web` (with `VITE_API_URL` from a repo variable) and publishes to the
-  `gh-pages` branch. Pages serves it under `/ymca/`.
+  `gh-pages` branch. GitHub Pages serves the site under `/ymca/`.
 - **API → Render:** deploys from `main`; set `DATABASE_URL`, `DIRECT_DATABASE_URL`,
   `APP_URL`, and `CORS_ORIGINS` as Render environment variables.
 - **Database → Neon:** managed PostgreSQL; use the pooled URL for the app and the
