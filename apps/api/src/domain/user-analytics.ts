@@ -101,7 +101,7 @@ function buildSyntheticSummary(
 ): UserActivitySummary {
   const days = ANALYTICS_WINDOW_DAYS[window];
   const from = since(days);
-  const fromDay = startOfDay(from);
+  const fromDay = startOfDay(new Date(from.getTime() + 24 * 60 * 60 * 1000));
   const random = rand(hashSeed(`${userId}:${window}:synthetic`));
 
   const heatmap: UserActivityHeatmapCell[] = [];
@@ -420,7 +420,7 @@ export async function getUserActivitySummary(
 
   const days = ANALYTICS_WINDOW_DAYS[window];
   const from = since(days);
-  const fromDay = startOfDay(from);
+  const fromDay = startOfDay(new Date(from.getTime() + 24 * 60 * 60 * 1000));
 
   const [totals, targetRows, heatmapRows, dayTargetRows, clickRows, scrollRows, recentRows] = await Promise.all([
     prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint; real_events: bigint }[]>`

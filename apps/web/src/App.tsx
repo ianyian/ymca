@@ -2985,10 +2985,13 @@ function ProfileActivityDrawer({
               ) : summary?.heatmap?.length ? (
                 <div className='rounded-xl border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
                   <div className='mb-2 flex items-center justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
-                    <span>7 days</span>
+                    <span>14 days</span>
                     <span>today</span>
                   </div>
-                  <div className='grid grid-cols-7 gap-1.5'>
+                  <div
+                    className='grid gap-1.5'
+                    style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
+                  >
                     {summary.heatmap.slice(-14).map((cell) => {
                       const highlights = dayHighlights.get(cell.date) ?? [];
                       return (
