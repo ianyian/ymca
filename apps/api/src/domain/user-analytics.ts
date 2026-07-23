@@ -65,6 +65,7 @@ let analyticsColumnsCache: { checkedAt: number; ready: boolean } | null = null;
 const ANALYTICS_COLUMNS_TTL_MS = 60_000;
 const AUTO_SEED_DEMO_ANALYTICS =
   (process.env.AUTO_SEED_DEMO_ANALYTICS ?? "true") === "true";
+const MIN_DEMO_HEATMAP_DAYS = 14;
 
 function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
   return {
@@ -231,13 +232,47 @@ function rand(seed: number) {
 async function ensureDemoActivityForUser(userId: string): Promise<void> {
   if (!AUTO_SEED_DEMO_ANALYTICS) return;
 
-  const existing = await prisma.activityEvent.count({
-    where: { userId, eventType: { not: "http" } },
-  });
-  if (existing > 0) return;
+  const [stats] = await prisma.$queryRaw<
+    { total_events: bigint; real_events: bigint }[]
+  >`
+    SELECT
+      COUNT(*)::bigint AS total_events,
+      COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
+    FROM "ActivityEvent"
+    WHERE "userId" = ${userId}
+      AND "eventType" <> 'http'
+  `;
+
+  if (Number(stats?.real_events ?? 0n) > 0) {
+    return;
+  }
+
+  const seedFrom = since(MIN_DEMO_HEATMAP_DAYS);
+  const seededRows = await prisma.$queryRaw<{ day: Date }[]>`
+    SELECT date_trunc('day', "createdAt") AS day
+    FROM "ActivityEvent"
+    WHERE "userId" = ${userId}
+      AND "eventType" <> 'http'
+      AND "createdAt" >= ${seedFrom}
+    GROUP BY 1
+  `;
+  const existingDays = new Set(
+    seededRows.map((row) => startOfDay(row.day).toISOString().slice(0, 10)),
+  );
+  const missingDays: Date[] = [];
+  for (let d = MIN_DEMO_HEATMAP_DAYS - 1; d >= 0; d -= 1) {
+    const day = startOfDay(new Date(Date.now() - d * 24 * 60 * 60 * 1000));
+    const key = day.toISOString().slice(0, 10);
+    if (!existingDays.has(key)) {
+      missingDays.push(day);
+    }
+  }
+
+  if (missingDays.length === 0 && Number(stats?.total_events ?? 0n) > 0) {
+    return;
+  }
 
   const random = rand(hashSeed(userId));
-  const now = Date.now();
   const records: Array<{
     userId: string;
     eventType: string;
@@ -252,9 +287,8 @@ async function ensureDemoActivityForUser(userId: string): Promise<void> {
     createdAt: Date;
   }> = [];
 
-  for (let d = 13; d >= 0; d -= 1) {
-    const dayTs = now - d * 24 * 60 * 60 * 1000;
-    const dayDate = new Date(dayTs);
+  const daysToSeed = missingDays.length > 0 ? missingDays : [startOfDay(new Date())];
+  for (const dayDate of daysToSeed) {
     const sessions = 1 + Math.floor(random() * 2);
     for (let s = 0; s < sessions; s += 1) {
       const sessionStart = new Date(dayDate.getTime() + Math.floor(random() * 12 * 60 * 60 * 1000));
