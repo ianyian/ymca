@@ -1965,11 +1965,7 @@ function WelcomeCard({
 
   return (
     <div className='rounded-xl border p-4 mt-8' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }} data-analytics-zone='information-center'>
-      <div className='flex flex-wrap items-start justify-between gap-3 mb-3'>
-        <div>
-          <h2 className='text-[15px] font-bold' style={{ color: "var(--text-primary)" }}>Information Center</h2>
-          <p className='mt-1 text-[12px]' style={{ color: "var(--text-muted)" }}>Page shows your contribution chart. Guide keeps the shortcuts and release notes.</p>
-        </div>
+      <div className='flex flex-wrap items-center justify-between gap-3 mb-3'>
         <div className='flex items-center gap-1 rounded-full border p-1' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
           {([ ["page", "Page"], ["guide", "Guide"] ] as const).map(([key, label]) => (
             <button
@@ -1983,19 +1979,14 @@ function WelcomeCard({
             </button>
           ))}
         </div>
+        <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2.5 py-1.5 rounded-full whitespace-nowrap border' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)", color: "var(--text-muted)" }} title={latestUpdateAt ? formatVersionLogTimestamp(latestUpdateAt) : "Open version log"}>
+          Log
+        </button>
       </div>
 
       {tab === "page" ? (
         <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
-          <div className='flex items-center justify-between gap-3 mb-3'>
-            <div>
-              <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Page</p>
-              <h3 className='text-[14px] font-semibold' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
-            </div>
-            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
-              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
-            </button>
-          </div>
+          <h3 className='text-[14px] font-semibold mb-3' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
           {activityLoading ? (
             <div className='space-y-2' aria-label='Loading contribution chart'>
               <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
@@ -2015,15 +2006,6 @@ function WelcomeCard({
         </div>
       ) : (
         <div className='space-y-3'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Guide</p>
-              <p className='text-[12px] mt-1' style={{ color: "var(--text-muted)" }}>Shortcuts, blocks, and release notes.</p>
-            </div>
-            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
-              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
-            </button>
-          </div>
           <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
             {SLASH_ITEMS.map((item) => (
               <div key={item.title} className='flex items-center gap-2 px-2 py-1.5 rounded-[6px]' style={{ background: "var(--bg-primary)", border: "1px solid var(--border-color)" }} title={item.subtitle}>
@@ -2777,7 +2759,7 @@ function ProfileActivityDrawer({
   isDark: boolean;
 }) {
   const windows = ["7d"] as const;
-  const tabs = ["graphical"] as const;
+  const tabs = ["graphical", "list"] as const;
   type AnalyticsTab = (typeof tabs)[number];
   const [windowIndex] = useState(0);
   const [tab, setTab] = useState<AnalyticsTab>("graphical");
@@ -2831,32 +2813,6 @@ function ProfileActivityDrawer({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const heatmapWeeks = useMemo(() => {
-    const cells = summary?.heatmap ?? [];
-    if (cells.length === 0) return [] as Array<Array<UserActivityHeatmapCell | null>>;
-    const first = new Date(`${cells[0]!.date}T00:00:00`);
-    const last = new Date(`${cells[cells.length - 1]!.date}T00:00:00`);
-    const start = new Date(first);
-    start.setDate(start.getDate() - start.getDay());
-    const end = new Date(last);
-    end.setDate(end.getDate() + (6 - end.getDay()));
-
-    const byDate = new Map(cells.map((cell) => [cell.date, cell.count]));
-    const weeks: Array<Array<UserActivityHeatmapCell | null>> = [];
-    let week: Array<UserActivityHeatmapCell | null> = [];
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      const key = cursor.toISOString().slice(0, 10);
-      week.push({ date: key, count: byDate.get(key) ?? 0 });
-      if (week.length === 7) {
-        weeks.push(week);
-        week = [];
-      }
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return weeks;
-  }, [summary?.heatmap]);
 
   const dayHighlights = useMemo(
     () => new Map((summary?.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
@@ -2921,7 +2877,7 @@ function ProfileActivityDrawer({
     return "rgba(35,131,226,0.78)";
   };
 
-  const allHeatmapCells = summary?.heatmap ?? [];
+  const recentEvents = summary?.recentEvents ?? [];
 
   return (
     <div
@@ -2981,6 +2937,20 @@ function ProfileActivityDrawer({
           >
             Graphical
           </button>
+          <button
+            type='button'
+            onClick={() => setTab("list")}
+            className='px-3 py-1.5 text-[12px] rounded-[6px] border transition-colors'
+            style={{
+              borderColor:
+                tab === "list" ? "var(--accent-color)" : "var(--border-color)",
+              color: tab === "list" ? "var(--accent-color)" : "var(--text-muted)",
+              background:
+                tab === "list" ? "rgba(35,131,226,0.08)" : "transparent",
+            }}
+          >
+            List
+          </button>
         </div>
       </div>
 
@@ -3038,31 +3008,45 @@ function ProfileActivityDrawer({
                     <div key={index} className='h-3 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
                   ))}
                 </div>
-              ) : heatmapWeeks.length > 0 ? (
-                <div className='overflow-x-auto pb-1'>
-                  <div
-                    className='grid gap-1'
-                    style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}
-                  >
-                    {heatmapWeeks.flatMap((week, weekIndex) =>
-                      week.map((cell, dayIndex) => {
-                        if (!cell) {
-                          return <div key={`${weekIndex}-${dayIndex}`} />;
-                        }
-                        const highlights = dayHighlights.get(cell.date) ?? [];
-                        return (
+              ) : summary?.heatmap?.length ? (
+                <div className='rounded-xl border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+                  <div className='mb-2 flex items-center justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
+                    <span>7 days</span>
+                    <span>today</span>
+                  </div>
+                  <div className='grid grid-cols-7 gap-1.5'>
+                    {summary.heatmap.slice(-7).map((cell) => {
+                      const highlights = dayHighlights.get(cell.date) ?? [];
+                      return (
+                        <div key={cell.date} className='space-y-1'>
+                          <div className='text-center text-[10px]' style={{ color: "var(--text-muted)" }}>
+                            {new Date(`${cell.date}T00:00:00`).toLocaleDateString([], { weekday: "short" }).slice(0, 1)}
+                          </div>
                           <div
-                            key={cell.date}
                             title={formatActivityDayTooltip(cell, highlights)}
-                            className='rounded-[3px] border'
+                            className='h-3.5 rounded-[3px] border'
                             style={{
                               background: heatmapIntensity(cell.count),
                               borderColor: "rgba(127,127,127,0.08)",
                             }}
                           />
-                        );
-                      }),
-                    )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className='mt-3 flex items-center justify-between gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
+                    <span>Less</span>
+                    <div className='flex items-center gap-1'>
+                      {[0, 1, 3, 6, 10].map((count) => (
+                        <span
+                          key={count}
+                          className='block h-2.5 w-2.5 rounded-[2px] border'
+                          style={{ background: heatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
+                          title={`${count}+ actions`}
+                        />
+                      ))}
+                    </div>
+                    <span>More</span>
                   </div>
                 </div>
               ) : (
@@ -3081,12 +3065,52 @@ function ProfileActivityDrawer({
               </div>
             </section>
           </>
-        ) : null}
+        ) : (
+          <section>
+            <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+              Recent activities
+            </h4>
+            <div className='space-y-2'>
+              {loading && !summary ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className='h-12 rounded-xl border animate-pulse' style={{ borderColor: "var(--border-color)", background: "var(--bg-hover)" }} />
+                ))
+              ) : recentEvents.length > 0 ? (
+                recentEvents.slice(0, 10).map((event) => (
+                  <div key={`${event.createdAt}-${event.eventType}-${event.target ?? event.pageId ?? "event"}`} className='rounded-xl border px-3 py-2.5' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+                    <div className='flex items-start justify-between gap-3'>
+                      <div className='min-w-0'>
+                        <div className='text-[12px] font-medium truncate' style={{ color: "var(--text-primary)" }}>
+                          {event.target ?? event.pageId ?? event.eventType}
+                        </div>
+                        <div className='mt-1 text-[10px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>
+                          {event.eventType.replace(/_/g, " ")}
+                        </div>
+                      </div>
+                      <div className='shrink-0 text-right text-[10px]' style={{ color: "var(--text-muted)" }}>
+                        <div>{new Date(event.createdAt).toLocaleDateString()}</div>
+                        <div>{new Date(event.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                      </div>
+                    </div>
+                    <div className='mt-2 flex flex-wrap gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
+                      {event.pageId && <span className='rounded-full border px-2 py-0.5' style={{ borderColor: "var(--border-color)" }}>{event.pageId}</span>}
+                      <span className='rounded-full border px-2 py-0.5' style={{ borderColor: "var(--border-color)" }}>{event.durationMs ? formatDuration(event.durationMs) : "no duration"}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+                  No recent activities in this range yet.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
           Generated {summary ? new Date(summary.generatedAt).toLocaleString() : "—"}
         </p>
-        {summary && allHeatmapCells.length === 0 && (
+        {summary && recentEvents.length === 0 && (
           <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
             No interaction history has been captured for this account yet.
           </p>
@@ -5526,24 +5550,6 @@ export function App() {
                   <span className='flex-1'>{AT[lang].console}</span>
                 </button>
               )}
-
-              {/* Version log */}
-              <button
-                onClick={() => setShowVersionLog(true)}
-                className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors'
-                style={{ color: "var(--text-muted)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "var(--bg-hover)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <span className='w-4 flex justify-center'>
-                  <Ico.Clock />
-                </span>
-                <span className='flex-1 text-left'>Version log</span>
-              </button>
 
               {/* Trash */}
               <button
