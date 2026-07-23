@@ -110,6 +110,7 @@ type UserActivityRecentEvent = {
 type UserActivitySummary = {
   window: "24h" | "7d" | "30d" | "365d";
   generatedAt: string;
+  isSynthetic: boolean;
   totalEvents: number;
   clickEvents: number;
   dwellMs: number;
@@ -1900,7 +1901,7 @@ function DocumentHub({
   latestUpdateAt: string | null;
   onOpenVersionLog: () => void;
 }) {
-  const PER_PAGE = 10;
+  const PER_PAGE = 5;
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [pageNum, setPageNum] = useState(0);
@@ -2602,7 +2603,10 @@ function ProfileActivityDrawer({
   subtitle: string;
 }) {
   const windows = ["24h", "7d", "30d", "365d"] as const;
+  const tabs = ["graphical", "events"] as const;
+  type AnalyticsTab = (typeof tabs)[number];
   const [windowIndex, setWindowIndex] = useState(1);
+  const [tab, setTab] = useState<AnalyticsTab>("graphical");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [summary, setSummary] = useState<UserActivitySummary | null>(null);
@@ -2719,7 +2723,7 @@ function ProfileActivityDrawer({
 
   return (
     <div
-      className='fixed inset-y-0 right-0 z-50 w-[420px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col'
+      className='fixed inset-y-0 right-0 z-50 w-[420px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col min-h-0'
       style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
       data-analytics-zone='profile-activity'
     >
@@ -2743,7 +2747,52 @@ function ProfileActivityDrawer({
         </button>
       </div>
 
+      <div className='px-4 pt-2 pb-1 border-b' style={{ borderColor: "var(--border-color)" }}>
+        <div className='flex items-center gap-1'>
+          <button
+            type='button'
+            onClick={() => setTab("graphical")}
+            className='px-3 py-1.5 text-[12px] rounded-[6px] border transition-colors'
+            style={{
+              borderColor:
+                tab === "graphical" ? "var(--accent-color)" : "var(--border-color)",
+              color: tab === "graphical" ? "var(--accent-color)" : "var(--text-muted)",
+              background:
+                tab === "graphical" ? "rgba(35,131,226,0.08)" : "transparent",
+            }}
+          >
+            Graphical
+          </button>
+          <button
+            type='button'
+            onClick={() => setTab("events")}
+            className='px-3 py-1.5 text-[12px] rounded-[6px] border transition-colors'
+            style={{
+              borderColor:
+                tab === "events" ? "var(--accent-color)" : "var(--border-color)",
+              color: tab === "events" ? "var(--accent-color)" : "var(--text-muted)",
+              background:
+                tab === "events" ? "rgba(35,131,226,0.08)" : "transparent",
+            }}
+          >
+            Events
+          </button>
+        </div>
+      </div>
+
       <div className='px-4 py-3 border-b space-y-3' style={{ borderColor: "var(--border-color)" }}>
+        {summary?.isSynthetic && (
+          <div
+            className='rounded-[8px] border px-2.5 py-2 text-[11px]'
+            style={{
+              borderColor: "rgba(35,131,226,0.35)",
+              background: "rgba(35,131,226,0.07)",
+              color: "var(--text-muted)",
+            }}
+          >
+            Showing demo analytics for the last 14 days. Real metrics will replace this once usage data is collected.
+          </div>
+        )}
         <div>
           <div className='flex items-center justify-between text-[11px] mb-2' style={{ color: "var(--text-muted)" }}>
             <span>Time range</span>
@@ -2776,123 +2825,127 @@ function ProfileActivityDrawer({
         </div>
       </div>
 
-      <div className='flex-1 overflow-y-auto px-4 py-4 space-y-5'>
+      <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-5'>
         {err && (
           <div className='rounded-lg border px-3 py-2 text-[12px]' style={{ borderColor: "rgba(200,48,48,0.3)", color: "#c03030", background: "rgba(200,48,48,0.06)" }}>
             {err}
           </div>
         )}
 
-        <section>
-          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-            Activity by day
-          </h4>
-          {loading && !summary ? (
-            <div className='grid grid-cols-7 gap-1.5'>
-              {Array.from({ length: 35 }).map((_, index) => (
-                <div key={index} className='h-3.5 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
-              ))}
-            </div>
-          ) : heatmapWeeks.length > 0 ? (
-            <div className='overflow-x-auto pb-1'>
-              <div
-                className='grid gap-1.5'
-                style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}
-              >
-                {heatmapWeeks.flatMap((week, weekIndex) =>
-                  week.map((cell, dayIndex) => {
-                    if (!cell) {
-                      return <div key={`${weekIndex}-${dayIndex}`} />;
-                    }
-                    return (
+        {tab === "graphical" ? (
+          <>
+            <section>
+              <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+                Activity by day
+              </h4>
+              {loading && !summary ? (
+                <div className='grid grid-cols-7 gap-1.5'>
+                  {Array.from({ length: 35 }).map((_, index) => (
+                    <div key={index} className='h-3.5 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
+                  ))}
+                </div>
+              ) : heatmapWeeks.length > 0 ? (
+                <div className='overflow-x-auto pb-1'>
+                  <div
+                    className='grid gap-1.5'
+                    style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}
+                  >
+                    {heatmapWeeks.flatMap((week, weekIndex) =>
+                      week.map((cell, dayIndex) => {
+                        if (!cell) {
+                          return <div key={`${weekIndex}-${dayIndex}`} />;
+                        }
+                        return (
+                          <div
+                            key={cell.date}
+                            title={`${cell.date} · ${cell.count} actions`}
+                            className='rounded-[3px] border'
+                            style={{
+                              background: heatmapIntensity(cell.count),
+                              borderColor: "rgba(127,127,127,0.08)",
+                            }}
+                          />
+                        );
+                      }),
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+                  No activity in this range yet.
+                </p>
+              )}
+            </section>
+
+            <section>
+              <div className='flex items-end justify-between gap-3 mb-2'>
+                <div>
+                  <h4 className='text-[12px] font-semibold' style={{ color: "var(--text-primary)" }}>
+                    Click heatmap
+                  </h4>
+                  <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                    {summary?.clickHeatmapTotal ?? 0} tracked clicks in this range
+                  </p>
+                </div>
+              </div>
+              {clickGrid.length > 0 ? (
+                <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
+                  {clickGrid.flatMap((row, y) =>
+                    row.map((count, x) => (
                       <div
-                        key={cell.date}
-                        title={`${cell.date} · ${cell.count} actions`}
-                        className='rounded-[3px] border'
+                        key={`${x}-${y}`}
+                        title={`Bucket ${y + 1}, ${x + 1} · ${count} clicks`}
+                        className='aspect-square rounded-[6px] border'
                         style={{
-                          background: heatmapIntensity(cell.count),
+                          background: clickHeatmapIntensity(count, clickGridMax),
                           borderColor: "rgba(127,127,127,0.08)",
                         }}
                       />
-                    );
-                  }),
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-              No activity in this range yet.
-            </p>
-          )}
-        </section>
-
-        <section>
-          <div className='flex items-end justify-between gap-3 mb-2'>
-            <div>
-              <h4 className='text-[12px] font-semibold' style={{ color: "var(--text-primary)" }}>
-                Click heatmap
-              </h4>
-              <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                {summary?.clickHeatmapTotal ?? 0} tracked clicks in this range
-              </p>
-            </div>
-          </div>
-          {clickGrid.length > 0 ? (
-            <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-              {clickGrid.flatMap((row, y) =>
-                row.map((count, x) => (
-                  <div
-                    key={`${x}-${y}`}
-                    title={`Bucket ${y + 1}, ${x + 1} · ${count} clicks`}
-                    className='aspect-square rounded-[6px] border'
-                    style={{
-                      background: clickHeatmapIntensity(count, clickGridMax),
-                      borderColor: "rgba(127,127,127,0.08)",
-                    }}
-                  />
-                )),
-              )}
-            </div>
-          ) : (
-            <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-              No click coordinates collected yet.
-            </p>
-          )}
-        </section>
-
-        <section>
-          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-            Top interactions
-          </h4>
-          <div className='h-[220px] rounded-xl border p-3' style={{ borderColor: "var(--border-color)" }}>
-            <Bar data={barData} options={barOptions} />
-          </div>
-        </section>
-
-        <section>
-          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-            Recent events
-          </h4>
-          <div className='space-y-2'>
-            {(summary?.recentEvents ?? []).map((event) => (
-              <div key={`${event.createdAt}-${event.eventType}-${event.target ?? ""}`} className='rounded-lg border px-3 py-2' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
-                <div className='flex items-start justify-between gap-2'>
-                  <div>
-                    <p className='text-[12px] font-medium' style={{ color: "var(--text-primary)" }}>
-                      {event.target ?? event.eventType}
-                    </p>
-                    <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                      {new Date(event.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                    {event.durationMs != null ? formatDuration(event.durationMs) : event.eventType}
-                  </span>
+                    )),
+                  )}
                 </div>
+              ) : (
+                <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+                  No click coordinates collected yet.
+                </p>
+              )}
+            </section>
+
+            <section>
+              <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+                Top interactions
+              </h4>
+              <div className='h-[220px] rounded-xl border p-3' style={{ borderColor: "var(--border-color)" }}>
+                <Bar data={barData} options={barOptions} />
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        ) : (
+          <section>
+            <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+              Recent events
+            </h4>
+            <div className='space-y-2'>
+              {(summary?.recentEvents ?? []).map((event) => (
+                <div key={`${event.createdAt}-${event.eventType}-${event.target ?? ""}`} className='rounded-lg border px-3 py-2' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+                  <div className='flex items-start justify-between gap-2'>
+                    <div>
+                      <p className='text-[12px] font-medium' style={{ color: "var(--text-primary)" }}>
+                        {event.target ?? event.eventType}
+                      </p>
+                      <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                        {new Date(event.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                      {event.durationMs != null ? formatDuration(event.durationMs) : event.eventType}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
           Generated {summary ? new Date(summary.generatedAt).toLocaleString() : "—"}

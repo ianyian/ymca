@@ -46,6 +46,7 @@ export type UserActivityRecentEvent = {
 export type UserActivitySummary = {
   window: AnalyticsWindowKey;
   generatedAt: string;
+  isSynthetic: boolean;
   totalEvents: number;
   clickEvents: number;
   dwellMs: number;
@@ -62,11 +63,14 @@ export type UserActivitySummary = {
 
 let analyticsColumnsCache: { checkedAt: number; ready: boolean } | null = null;
 const ANALYTICS_COLUMNS_TTL_MS = 60_000;
+const AUTO_SEED_DEMO_ANALYTICS =
+  (process.env.AUTO_SEED_DEMO_ANALYTICS ?? "true") === "true";
 
 function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
   return {
     window,
     generatedAt: new Date().toISOString(),
+    isSynthetic: false,
     totalEvents: 0,
     clickEvents: 0,
     dwellMs: 0,
@@ -80,6 +84,124 @@ function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
     topTargets: [],
     recentEvents: [],
   };
+}
+
+function hashSeed(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function rand(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (1664525 * s + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+
+async function ensureDemoActivityForUser(userId: string): Promise<void> {
+  if (!AUTO_SEED_DEMO_ANALYTICS) return;
+
+  const existing = await prisma.activityEvent.count({
+    where: { userId, eventType: { not: "http" } },
+  });
+  if (existing > 0) return;
+
+  const random = rand(hashSeed(userId));
+  const now = Date.now();
+  const records: Array<{
+    userId: string;
+    eventType: string;
+    method: string;
+    path: string;
+    target: string;
+    pageId: string | null;
+    x: number | null;
+    y: number | null;
+    statusCode: number;
+    durationMs: number | null;
+    createdAt: Date;
+  }> = [];
+
+  for (let d = 13; d >= 0; d -= 1) {
+    const dayTs = now - d * 24 * 60 * 60 * 1000;
+    const dayDate = new Date(dayTs);
+    const sessions = 1 + Math.floor(random() * 2);
+    for (let s = 0; s < sessions; s += 1) {
+      const sessionStart = new Date(dayDate.getTime() + Math.floor(random() * 12 * 60 * 60 * 1000));
+      const surface = random() > 0.75 ? "demo:admin" : random() > 0.35 ? "demo:home" : "demo:page";
+      const dwellMs = 15_000 + Math.floor(random() * 210_000);
+      const scrollPct = 35 + Math.floor(random() * 66);
+      records.push({
+        userId,
+        eventType: "surface_view",
+        method: "CLIENT",
+        path: "/analytics/events",
+        target: surface,
+        pageId: null,
+        x: null,
+        y: null,
+        statusCode: 200,
+        durationMs: null,
+        createdAt: sessionStart,
+      });
+      records.push({
+        userId,
+        eventType: "surface_dwell",
+        method: "CLIENT",
+        path: "/analytics/events",
+        target: surface,
+        pageId: null,
+        x: null,
+        y: null,
+        statusCode: 200,
+        durationMs: dwellMs,
+        createdAt: new Date(sessionStart.getTime() + 30_000),
+      });
+      records.push({
+        userId,
+        eventType: "surface_scroll",
+        method: "CLIENT",
+        path: "/analytics/events",
+        target: surface,
+        pageId: null,
+        x: null,
+        y: scrollPct,
+        statusCode: 200,
+        durationMs: null,
+        createdAt: new Date(sessionStart.getTime() + 45_000),
+      });
+
+      const clicks = 3 + Math.floor(random() * 8);
+      for (let i = 0; i < clicks; i += 1) {
+        const slot = i % 4;
+        const target =
+          slot === 0
+            ? "demo:sidebar:open"
+            : slot === 1
+              ? "demo:home:open_page"
+              : slot === 2
+                ? "demo:editor:focus"
+                : "demo:profile:toggle";
+        records.push({
+          userId,
+          eventType: "ui_click",
+          method: "CLIENT",
+          path: "/analytics/events",
+          target,
+          pageId: null,
+          x: 20 + Math.floor(random() * 1100),
+          y: 30 + Math.floor(random() * 700),
+          statusCode: 200,
+          durationMs: null,
+          createdAt: new Date(sessionStart.getTime() + 60_000 + i * 12_000),
+        });
+      }
+    }
+  }
+
+  await prisma.activityEvent.createMany({ data: records });
 }
 
 async function hasAnalyticsColumns(): Promise<boolean> {
@@ -114,17 +236,20 @@ export async function getUserActivitySummary(
     return emptySummary(window);
   }
 
+  await ensureDemoActivityForUser(userId);
+
   const days = ANALYTICS_WINDOW_DAYS[window];
   const from = since(days);
   const fromDay = startOfDay(from);
 
   const [totals, targetRows, heatmapRows, clickRows, scrollRows, recentRows] = await Promise.all([
-    prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint }[]>`
+    prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint; real_events: bigint }[]>`
       SELECT
         COUNT(*)::bigint AS total_events,
         COUNT(*) FILTER (WHERE "eventType" = 'ui_click')::bigint AS click_events,
         COALESCE(SUM("durationMs") FILTER (WHERE "eventType" = 'surface_dwell'), 0)::bigint AS dwell_ms,
-        COUNT(DISTINCT "pageId") FILTER (WHERE "pageId" IS NOT NULL)::bigint AS unique_pages
+        COUNT(DISTINCT "pageId") FILTER (WHERE "pageId" IS NOT NULL)::bigint AS unique_pages,
+        COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
       FROM "ActivityEvent"
       WHERE "userId" = ${userId}
         AND "createdAt" >= ${from}
@@ -219,6 +344,7 @@ export async function getUserActivitySummary(
     scrollDepthValues.length > 0
       ? Math.round(scrollDepthValues.reduce((sum, value) => sum + value, 0) / scrollDepthValues.length)
       : 0;
+  const isSynthetic = Number(totals[0]?.total_events ?? 0n) > 0 && Number(totals[0]?.real_events ?? 0n) === 0;
   const dwellScore = Math.min((Number(totals[0]?.dwell_ms ?? 0n) / (15 * 60 * 1000)) * 40, 40);
   const clickScore = Math.min((Number(totals[0]?.click_events ?? 0n) / 30) * 25, 25);
   const scrollScore = Math.min((scrollDepthAvg / 100) * 20 + (scrollDepthMax / 100) * 10, 35);
@@ -228,6 +354,7 @@ export async function getUserActivitySummary(
   return {
     window,
     generatedAt: new Date().toISOString(),
+    isSynthetic,
     totalEvents: Number(totals[0]?.total_events ?? 0n),
     clickEvents: Number(totals[0]?.click_events ?? 0n),
     dwellMs: Number(totals[0]?.dwell_ms ?? 0n),
