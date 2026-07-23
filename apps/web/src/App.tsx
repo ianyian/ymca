@@ -1883,7 +1883,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
       <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>Last 14 days</span>
+        <span>Last year</span>
         <span>{summary.totalEvents} actions</span>
       </div>
       <div className='grid gap-2 sm:gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start'>
@@ -4538,7 +4538,7 @@ export function App() {
 
     let alive = true;
     setHomeActivityLoading(true);
-    api<UserActivitySummary>("/me/activity?window=14d")
+    api<UserActivitySummary>("/me/activity?window=365d")
       .then((data) => {
         if (!alive) return;
         setHomeActivitySummary(data);
