@@ -1883,29 +1883,33 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
       <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>Last 30 days</span>
+        <span>Last year</span>
         <span>{summary.totalEvents} actions</span>
       </div>
-      <div className='overflow-x-auto pb-1'>
-        <div className='min-w-max'>
-          <div className='mb-1 flex gap-[12px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
+      <div className='grid gap-2 sm:gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start'>
+        <div className='hidden lg:grid grid-rows-7 pt-[21px] text-[10px]' style={{ color: "var(--text-muted)" }}>
+          {Array.from({ length: 7 }).map((_, index) => {
+            const label = index === 1 ? "Mon" : index === 3 ? "Wed" : index === 5 ? "Fri" : "";
+            return (
+              <div key={index} className='h-[10px] leading-[10px] pr-1 text-right'>
+                {label}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className='min-w-0'>
+          <div className='mb-1 hidden sm:flex gap-[8px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
             {weekLabels.map((label, index) => (
-              <span key={`${label}-${index}`} className='w-[12px] text-center'>
+              <span key={`${label}-${index}`} className='w-[10px] text-center'>
                 {label}
               </span>
             ))}
           </div>
-          <div className='mb-1 grid grid-rows-7 text-[10px]' style={{ color: "var(--text-muted)" }}>
-            {Array.from({ length: 7 }).map((_, index) => {
-              const label = index === 1 ? "Mon" : index === 3 ? "Wed" : index === 5 ? "Fri" : "";
-              return (
-                <div key={index} className='h-[12px] leading-[12px] pr-1 text-right'>
-                  {label}
-                </div>
-              );
-            })}
-          </div>
-          <div className='grid gap-1.5' style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}>
+          <div
+            className='grid gap-[2px] sm:gap-[3px]'
+            style={{ gridAutoFlow: "column", gridAutoColumns: "10px", gridTemplateRows: "repeat(7, 10px)" }}
+          >
             {heatmapWeeks.flatMap((week, weekIndex) =>
               week.map((cell, dayIndex) => {
                 if (!cell) return <div key={`blank-${weekIndex}-${dayIndex}`} />;
@@ -1914,27 +1918,28 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
                   <div
                     key={cell.date}
                     title={formatActivityDayTooltip(cell, highlights)}
-                    className='rounded-[3px] border'
+                    className='rounded-[2px] border'
                     style={{ background: activityHeatmapIntensity(cell.count), borderColor: "rgba(127,127,127,0.08)" }}
                   />
                 );
               }),
             )}
           </div>
-          <div className='mt-2 flex items-center justify-between gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
-            <span>Less</span>
-            <div className='flex items-center gap-1'>
-              {[0, 1, 3, 6, 10].map((count) => (
-                <span
-                  key={count}
-                  className='block h-3 w-3 rounded-[3px] border'
-                  style={{ background: activityHeatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
-                  title={`${count}+ actions`}
-                />
-              ))}
-            </div>
-            <span>More</span>
+        </div>
+
+        <div className='flex items-center justify-between gap-2 text-[10px] lg:flex-col lg:items-end lg:justify-start lg:pt-[22px]' style={{ color: "var(--text-muted)" }}>
+          <span className='lg:mb-1'>Less</span>
+          <div className='flex items-center gap-1 lg:flex-col lg:gap-1'>
+            {[0, 1, 3, 6, 10].map((count) => (
+              <span
+                key={count}
+                className='block h-2.5 w-2.5 rounded-[2px] border'
+                style={{ background: activityHeatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
+                title={`${count}+ actions`}
+              />
+            ))}
           </div>
+          <span className='lg:mt-1'>More</span>
         </div>
       </div>
     </div>
@@ -1982,11 +1987,14 @@ function WelcomeCard({
 
       {tab === "page" ? (
         <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
-          <div className='flex flex-wrap items-start justify-between gap-3 mb-3'>
+          <div className='flex items-center justify-between gap-3 mb-3'>
             <div>
               <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Page</p>
               <h3 className='text-[14px] font-semibold' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
             </div>
+            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
+              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
+            </button>
           </div>
           {activityLoading ? (
             <div className='space-y-2' aria-label='Loading contribution chart'>
@@ -2768,10 +2776,10 @@ function ProfileActivityDrawer({
   subtitle: string;
   isDark: boolean;
 }) {
-  const windows = ["24h", "7d", "30d", "365d"] as const;
-  const tabs = ["graphical", "events"] as const;
+  const windows = ["7d"] as const;
+  const tabs = ["graphical"] as const;
   type AnalyticsTab = (typeof tabs)[number];
-  const [windowIndex, setWindowIndex] = useState(1);
+  const [windowIndex] = useState(0);
   const [tab, setTab] = useState<AnalyticsTab>("graphical");
   const [pinned, setPinned] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2872,7 +2880,7 @@ function ProfileActivityDrawer({
   );
 
   const chartTextColor = isDark ? "#f5f0e8" : "#1f1f1f";
-  const chartMutedColor = isDark ? "rgba(245,240,232,0.68)" : "rgba(80,80,80,0.8)";
+  const chartMutedColor = isDark ? "rgba(245,240,232,0.74)" : "rgba(80,80,80,0.8)";
   const chartGridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(127,127,127,0.12)";
 
   const barOptions = useMemo(
@@ -2882,7 +2890,14 @@ function ProfileActivityDrawer({
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: true },
+        tooltip: {
+          enabled: true,
+          bodyColor: chartTextColor,
+          titleColor: chartTextColor,
+          backgroundColor: isDark ? "rgba(20,20,20,0.96)" : "rgba(255,255,255,0.96)",
+          borderColor: chartGridColor,
+          borderWidth: 1,
+        },
       },
       scales: {
         x: {
@@ -2911,7 +2926,7 @@ function ProfileActivityDrawer({
   return (
     <div
       ref={drawerRef}
-      className='fixed inset-y-0 right-0 z-50 w-[420px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col min-h-0'
+      className='fixed inset-y-0 right-0 z-50 w-[380px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col min-h-0'
       style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
       data-analytics-zone='profile-activity'
     >
@@ -2966,24 +2981,10 @@ function ProfileActivityDrawer({
           >
             Graphical
           </button>
-          <button
-            type='button'
-            onClick={() => setTab("events")}
-            className='px-3 py-1.5 text-[12px] rounded-[6px] border transition-colors'
-            style={{
-              borderColor:
-                tab === "events" ? "var(--accent-color)" : "var(--border-color)",
-              color: tab === "events" ? "var(--accent-color)" : "var(--text-muted)",
-              background:
-                tab === "events" ? "rgba(35,131,226,0.08)" : "transparent",
-            }}
-          >
-            Events
-          </button>
         </div>
       </div>
 
-      <div className='px-4 py-3 border-b space-y-2.5' style={{ borderColor: "var(--border-color)" }}>
+      <div className='px-4 py-3 border-b space-y-2' style={{ borderColor: "var(--border-color)" }}>
         {summary?.isSynthetic && (
           <div
             className='rounded-[8px] border px-2.5 py-2 text-[11px]'
@@ -3001,23 +3002,13 @@ function ProfileActivityDrawer({
             <span>Time range</span>
             <span>{windowKey}</span>
           </div>
-          <input
-            type='range'
-            min='0'
-            max='3'
-            step='1'
-            value={windowIndex}
-            onChange={(e) => setWindowIndex(Number(e.target.value))}
-            className='w-full'
-          />
           <div className='mt-1 flex justify-between text-[9px]' style={{ color: "var(--text-muted)" }}>
-            {windows.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
+            <span>7d only</span>
+            <span>today at right</span>
           </div>
         </div>
 
-        <div className='grid grid-cols-3 gap-1.5'>
+        <div className='grid grid-cols-3 gap-1'>
           <KpiCard compact label='Actions' value={summary?.totalEvents ?? "—"} />
           <KpiCard compact label='Clicks' value={summary?.clickEvents ?? "—"} accent />
           <KpiCard compact label='Time spent' value={summary ? formatDuration(summary.dwellMs) : "—"} />
@@ -3028,7 +3019,7 @@ function ProfileActivityDrawer({
         </div>
       </div>
 
-      <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4'>
+      <div className='flex-1 min-h-0 overflow-y-auto px-4 py-2.5 space-y-3.5'>
         {err && (
           <div className='rounded-lg border px-3 py-2 text-[12px]' style={{ borderColor: "rgba(200,48,48,0.3)", color: "#c03030", background: "rgba(200,48,48,0.06)" }}>
             {err}
@@ -3085,37 +3076,12 @@ function ProfileActivityDrawer({
               <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
                 Top interactions
               </h4>
-              <div className='h-[180px] rounded-xl border p-2.5' style={{ borderColor: "var(--border-color)" }}>
+              <div className='h-[160px] rounded-xl border p-2' style={{ borderColor: "var(--border-color)" }}>
                 <Bar data={barData} options={barOptions} />
               </div>
             </section>
           </>
-        ) : (
-          <section>
-            <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-              Recent events
-            </h4>
-            <div className='space-y-2'>
-              {(summary?.recentEvents ?? []).map((event) => (
-                <div key={`${event.createdAt}-${event.eventType}-${event.target ?? ""}`} className='rounded-lg border px-3 py-2' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
-                  <div className='flex items-start justify-between gap-2'>
-                    <div>
-                      <p className='text-[12px] font-medium' style={{ color: "var(--text-primary)" }}>
-                        {event.target ?? event.eventType}
-                      </p>
-                      <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                        {new Date(event.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                      {event.durationMs != null ? formatDuration(event.durationMs) : event.eventType}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        ) : null}
 
         <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
           Generated {summary ? new Date(summary.generatedAt).toLocaleString() : "—"}
