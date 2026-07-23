@@ -1827,6 +1827,14 @@ function activityHeatmapIntensity(count: number) {
   return "rgba(35,131,226,0.78)";
 }
 
+function activityHeatmapCellStyle(count: number) {
+  return {
+    background: count <= 0 ? "var(--bg-hover)" : activityHeatmapIntensity(count),
+    borderColor: "var(--border-color)",
+    boxShadow: "inset 0 0 0 1px rgba(127,127,127,0.16)",
+  } as const;
+}
+
 function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary }) {
   const cells = summary.heatmap;
   const dayHighlights = useMemo(
@@ -1834,7 +1842,14 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
     [summary.dayHighlights],
   );
   const heatmapWeeks = useMemo(() => {
-    if (cells.length === 0) return [] as Array<Array<UserActivityHeatmapCell | null>>;
+    if (cells.length === 0) {
+      return Array.from({ length: 53 }, (_, weekIndex) =>
+        Array.from({ length: 7 }, (_, dayIndex) => ({
+          date: `empty-${weekIndex}-${dayIndex}`,
+          count: 0,
+        }) as UserActivityHeatmapCell),
+      ) as Array<Array<UserActivityHeatmapCell | null>>;
+    }
     const first = new Date(`${cells[0]!.date}T00:00:00`);
     const last = new Date(`${cells[cells.length - 1]!.date}T00:00:00`);
     const start = new Date(first);
@@ -1862,6 +1877,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
     () =>
       heatmapWeeks.map((week, index) => {
         const firstCell = week.find((cell) => cell != null);
+        if (cells.length === 0) return "";
         if (!firstCell) return "";
         const month = new Date(`${firstCell.date}T00:00:00`).toLocaleDateString([], {
           month: "short",
@@ -1919,7 +1935,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
                     key={cell.date}
                     title={formatActivityDayTooltip(cell, highlights)}
                     className='rounded-[2px] border'
-                    style={{ background: activityHeatmapIntensity(cell.count), borderColor: "rgba(127,127,127,0.08)" }}
+                    style={activityHeatmapCellStyle(cell.count)}
                   />
                 );
               }),
@@ -2863,6 +2879,10 @@ function ProfileActivityDrawer({
     return "rgba(35,131,226,0.78)";
   };
 
+  const heatmapDays = summary?.heatmap?.length
+    ? summary.heatmap.slice(-14)
+    : Array.from({ length: 14 }, (_, index) => ({ date: `empty-${index}`, count: 0 }) as UserActivityHeatmapCell);
+
   const recentEvents = summary?.recentEvents ?? [];
 
   return (
@@ -2982,7 +3002,7 @@ function ProfileActivityDrawer({
                     <div key={index} className='h-3 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
                   ))}
                 </div>
-              ) : summary?.heatmap?.length ? (
+              ) : (
                 <div className='rounded-xl border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
                   <div className='mb-2 flex items-center justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
                     <span>14 days</span>
@@ -2992,19 +3012,22 @@ function ProfileActivityDrawer({
                     className='grid gap-1.5'
                     style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
                   >
-                    {summary.heatmap.slice(-14).map((cell) => {
+                    {heatmapDays.map((cell) => {
                       const highlights = dayHighlights.get(cell.date) ?? [];
                       return (
                         <div key={cell.date} className='space-y-1'>
                           <div className='text-center text-[10px]' style={{ color: "var(--text-muted)" }}>
-                            {new Date(`${cell.date}T00:00:00`).toLocaleDateString([], { weekday: "short" }).slice(0, 1)}
+                            {cell.date.startsWith("empty-")
+                              ? "—"
+                              : new Date(`${cell.date}T00:00:00`).toLocaleDateString([], { weekday: "short" }).slice(0, 1)}
                           </div>
                           <div
                             title={formatActivityDayTooltip(cell, highlights)}
                             className='h-3.5 rounded-[3px] border'
                             style={{
                               background: heatmapIntensity(cell.count),
-                              borderColor: "rgba(127,127,127,0.08)",
+                              borderColor: "var(--border-color)",
+                              boxShadow: "inset 0 0 0 1px rgba(127,127,127,0.16)",
                             }}
                           />
                         </div>
@@ -3012,10 +3035,6 @@ function ProfileActivityDrawer({
                     })}
                   </div>
                 </div>
-              ) : (
-                <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-                  No activity in this range yet.
-                </p>
               )}
             </section>
 
@@ -3055,28 +3074,15 @@ function ProfileActivityDrawer({
                         <div>{new Date(event.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     </div>
-                    <div className='mt-2 flex flex-wrap gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
-                      {event.pageId && <span className='rounded-full border px-2 py-0.5' style={{ borderColor: "var(--border-color)" }}>{event.pageId}</span>}
-                      <span className='rounded-full border px-2 py-0.5' style={{ borderColor: "var(--border-color)" }}>{event.durationMs ? formatDuration(event.durationMs) : "no duration"}</span>
-                    </div>
                   </div>
                 ))
               ) : (
                 <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-                  No recent activities in this range yet.
+                  No recent activity yet.
                 </p>
               )}
             </div>
           </section>
-        )}
-
-        <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-          Generated {summary ? new Date(summary.generatedAt).toLocaleString() : "—"}
-        </p>
-        {summary && recentEvents.length === 0 && (
-          <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-            No interaction history has been captured for this account yet.
-          </p>
         )}
       </div>
     </div>
