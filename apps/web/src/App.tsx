@@ -109,7 +109,7 @@ type UserActivityRecentEvent = {
   durationMs: number | null;
 };
 type UserActivitySummary = {
-  window: "24h" | "7d" | "30d" | "365d";
+  window: "24h" | "7d" | "14d" | "30d" | "365d";
   generatedAt: string;
   isSynthetic: boolean;
   totalEvents: number;
@@ -1883,7 +1883,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
       <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>Last year</span>
+        <span>Last 14 days</span>
         <span>{summary.totalEvents} actions</span>
       </div>
       <div className='grid gap-2 sm:gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start'>
@@ -1927,20 +1927,6 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
           </div>
         </div>
 
-        <div className='flex items-center justify-between gap-2 text-[10px] lg:flex-col lg:items-end lg:justify-start lg:pt-[22px]' style={{ color: "var(--text-muted)" }}>
-          <span className='lg:mb-1'>Less</span>
-          <div className='flex items-center gap-1 lg:flex-col lg:gap-1'>
-            {[0, 1, 3, 6, 10].map((count) => (
-              <span
-                key={count}
-                className='block h-2.5 w-2.5 rounded-[2px] border'
-                style={{ background: activityHeatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
-                title={`${count}+ actions`}
-              />
-            ))}
-          </div>
-          <span className='lg:mt-1'>More</span>
-        </div>
       </div>
     </div>
   );
@@ -2758,7 +2744,7 @@ function ProfileActivityDrawer({
   subtitle: string;
   isDark: boolean;
 }) {
-  const windows = ["7d"] as const;
+  const windows = ["14d"] as const;
   const tabs = ["graphical", "list"] as const;
   type AnalyticsTab = (typeof tabs)[number];
   const [windowIndex] = useState(0);
@@ -2955,26 +2941,14 @@ function ProfileActivityDrawer({
       </div>
 
       <div className='px-4 py-3 border-b space-y-2' style={{ borderColor: "var(--border-color)" }}>
-        {summary?.isSynthetic && (
-          <div
-            className='rounded-[8px] border px-2.5 py-2 text-[11px]'
-            style={{
-              borderColor: "rgba(35,131,226,0.35)",
-              background: "rgba(35,131,226,0.07)",
-              color: "var(--text-muted)",
-            }}
-          >
-            Showing demo analytics for the last 14 days. Real metrics will replace this once usage data is collected.
-          </div>
-        )}
         <div>
           <div className='flex items-center justify-between text-[10px] mb-1' style={{ color: "var(--text-muted)" }}>
             <span>Time range</span>
             <span>{windowKey}</span>
           </div>
           <div className='mt-1 flex justify-between text-[9px]' style={{ color: "var(--text-muted)" }}>
-            <span>7d only</span>
-            <span>today at right</span>
+            <span>14d view</span>
+            <span>today included</span>
           </div>
         </div>
 
@@ -3015,7 +2989,7 @@ function ProfileActivityDrawer({
                     <span>today</span>
                   </div>
                   <div className='grid grid-cols-7 gap-1.5'>
-                    {summary.heatmap.slice(-7).map((cell) => {
+                    {summary.heatmap.slice(-14).map((cell) => {
                       const highlights = dayHighlights.get(cell.date) ?? [];
                       return (
                         <div key={cell.date} className='space-y-1'>
@@ -3033,20 +3007,6 @@ function ProfileActivityDrawer({
                         </div>
                       );
                     })}
-                  </div>
-                  <div className='mt-3 flex items-center justify-between gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
-                    <span>Less</span>
-                    <div className='flex items-center gap-1'>
-                      {[0, 1, 3, 6, 10].map((count) => (
-                        <span
-                          key={count}
-                          className='block h-2.5 w-2.5 rounded-[2px] border'
-                          style={{ background: heatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
-                          title={`${count}+ actions`}
-                        />
-                      ))}
-                    </div>
-                    <span>More</span>
                   </div>
                 </div>
               ) : (
@@ -4575,7 +4535,7 @@ export function App() {
 
     let alive = true;
     setHomeActivityLoading(true);
-    api<UserActivitySummary>("/me/activity?window=365d")
+    api<UserActivitySummary>("/me/activity?window=14d")
       .then((data) => {
         if (!alive) return;
         setHomeActivitySummary(data);

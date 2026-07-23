@@ -57,27 +57,41 @@ export type OverviewMetrics = {
 
 export async function getOverviewMetrics(): Promise<OverviewMetrics> {
   return cached("overview", async () => {
-    const [totalUsers, adminUsers, active24h, totalWorkspaces, totalPages, storage] =
-      await Promise.all([
-        prisma.user.count(),
-        prisma.user.count({ where: { appRole: { key: APP_ROLE_ADMIN } } }),
-        distinctActiveUsers(since(24)),
-        prisma.workspace.count(),
-        prisma.page.count({ where: { deletedAt: null } }),
-        prisma.pageAttachment.aggregate({ _sum: { size: true } }),
-      ]);
+    try {
+      const [totalUsers, adminUsers, active24h, totalWorkspaces, totalPages, storage] =
+        await Promise.all([
+          prisma.user.count(),
+          prisma.user.count({ where: { appRole: { key: APP_ROLE_ADMIN } } }),
+          distinctActiveUsers(since(24)),
+          prisma.workspace.count(),
+          prisma.page.count({ where: { deletedAt: null } }),
+          prisma.pageAttachment.aggregate({ _sum: { size: true } }),
+        ]);
 
-    return {
-      totalUsers,
-      adminUsers,
-      normalUsers: totalUsers - adminUsers,
-      activeUsers24h: active24h,
-      inactiveUsers: Math.max(totalUsers - active24h, 0),
-      totalWorkspaces,
-      totalPages,
-      totalStorageBytes: storage._sum.size ?? 0,
-      generatedAt: new Date().toISOString(),
-    };
+      return {
+        totalUsers,
+        adminUsers,
+        normalUsers: totalUsers - adminUsers,
+        activeUsers24h: active24h,
+        inactiveUsers: Math.max(totalUsers - active24h, 0),
+        totalWorkspaces,
+        totalPages,
+        totalStorageBytes: storage._sum.size ?? 0,
+        generatedAt: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        totalUsers: 0,
+        adminUsers: 0,
+        normalUsers: 0,
+        activeUsers24h: 0,
+        inactiveUsers: 0,
+        totalWorkspaces: 0,
+        totalPages: 0,
+        totalStorageBytes: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
   });
 }
 
@@ -93,20 +107,30 @@ export async function getActivityMetrics(
   window: WindowKey,
 ): Promise<ActivityMetrics> {
   return cached(`activity:${window}`, async () => {
-    const from = since(WINDOW_HOURS[window]);
-    const [activeUsers, apiCalls, newUsers] = await Promise.all([
-      distinctActiveUsers(from),
-      prisma.activityEvent.count({
-        where: { createdAt: { gte: from }, eventType: "http" },
-      }),
-      prisma.user.count({ where: { createdAt: { gte: from } } }),
-    ]);
-    return {
-      window,
-      activeUsers,
-      apiCalls,
-      newUsers,
-      generatedAt: new Date().toISOString(),
-    };
+    try {
+      const from = since(WINDOW_HOURS[window]);
+      const [activeUsers, apiCalls, newUsers] = await Promise.all([
+        distinctActiveUsers(from),
+        prisma.activityEvent.count({
+          where: { createdAt: { gte: from }, eventType: "http" },
+        }),
+        prisma.user.count({ where: { createdAt: { gte: from } } }),
+      ]);
+      return {
+        window,
+        activeUsers,
+        apiCalls,
+        newUsers,
+        generatedAt: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        window,
+        activeUsers: 0,
+        apiCalls: 0,
+        newUsers: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
   });
 }

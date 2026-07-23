@@ -1,16 +1,17 @@
 import { prisma } from "../lib/prisma.js";
 
-export type AnalyticsWindowKey = "24h" | "7d" | "30d" | "365d";
+export type AnalyticsWindowKey = "24h" | "7d" | "14d" | "30d" | "365d";
 
 export const ANALYTICS_WINDOW_DAYS: Record<AnalyticsWindowKey, number> = {
   "24h": 1,
   "7d": 7,
+  "14d": 14,
   "30d": 30,
   "365d": 365,
 };
 
 export function parseAnalyticsWindow(value: unknown): AnalyticsWindowKey {
-  return value === "24h" || value === "7d" || value === "30d" || value === "365d"
+  return value === "24h" || value === "7d" || value === "14d" || value === "30d" || value === "365d"
     ? value
     : "7d";
 }
