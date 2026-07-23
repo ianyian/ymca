@@ -95,6 +95,37 @@ function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
   };
 }
 
+export function shouldRecordAnalyticsForUser(
+  hasMeaningfulProductActivity: boolean,
+  hasExplicitDemoActivity: boolean,
+): boolean {
+  return hasMeaningfulProductActivity || hasExplicitDemoActivity;
+}
+
+async function shouldShowAnalyticsForUser(userId: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<{ hasMeaningfulProductActivity: boolean; hasExplicitDemoActivity: boolean }[]>`
+    SELECT
+      (
+        EXISTS (SELECT 1 FROM "Workspace" WHERE "ownerId" = ${userId}) OR
+        EXISTS (SELECT 1 FROM "WorkspaceMember" WHERE "userId" = ${userId}) OR
+        EXISTS (SELECT 1 FROM "Page" WHERE "creatorId" = ${userId})
+      ) AS "hasMeaningfulProductActivity",
+      EXISTS (
+        SELECT 1
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "eventType" <> 'http'
+          AND COALESCE("target", '') LIKE 'demo:%'
+      ) AS "hasExplicitDemoActivity"
+  `;
+
+  const row = rows[0];
+  return shouldRecordAnalyticsForUser(
+    row?.hasMeaningfulProductActivity ?? false,
+    row?.hasExplicitDemoActivity ?? false,
+  );
+}
+
 function buildSyntheticSummary(
   userId: string,
   window: AnalyticsWindowKey,
@@ -419,6 +450,10 @@ export async function getUserActivitySummary(
   userId: string,
   window: AnalyticsWindowKey,
 ): Promise<UserActivitySummary> {
+  if (!(await shouldShowAnalyticsForUser(userId))) {
+    return emptySummary(window);
+  }
+
   if (!(await hasAnalyticsColumns())) {
     return buildSyntheticSummary(userId, window);
   }
