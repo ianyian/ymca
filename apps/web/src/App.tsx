@@ -100,6 +100,7 @@ type VersionLogEntry = {
 };
 type UserActivityHeatmapCell = { date: string; count: number };
 type UserActivityTarget = { label: string; count: number };
+type UserActivityDayHighlight = { date: string; topTargets: UserActivityTarget[] };
 type UserActivityRecentEvent = {
   createdAt: string;
   eventType: string;
@@ -122,6 +123,7 @@ type UserActivitySummary = {
   clickHeatmap: number[][];
   clickHeatmapTotal: number;
   topTargets: UserActivityTarget[];
+  dayHighlights: UserActivityDayHighlight[];
   recentEvents: UserActivityRecentEvent[];
 };
 type AnalyticsEventPayload = {
@@ -252,6 +254,28 @@ function isAnalyticsInteractiveTarget(node: Element | null): boolean {
 
 function clampAnalyticsLabel(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function formatActivityDayTooltip(
+  cell: UserActivityHeatmapCell,
+  highlights: UserActivityTarget[] = [],
+) {
+  const date = new Date(`${cell.date}T00:00:00`);
+  const lines = [
+    date.toLocaleDateString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }),
+    `${cell.count} actions`,
+  ];
+  if (highlights.length > 0) {
+    lines.push("Top events:");
+    for (const target of highlights.slice(0, 3)) {
+      lines.push(`- ${target.label} (${target.count})`);
+    }
+  }
+  return lines.join("\n");
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1794,92 +1818,195 @@ function flattenTree(nodes: PageNode[]): PageNode[] {
 }
 
 // Compact "getting started" card shown BELOW the Document Hub table.
+function activityHeatmapIntensity(count: number) {
+  if (count <= 0) return "var(--bg-hover)";
+  if (count <= 1) return "rgba(35,131,226,0.18)";
+  if (count <= 3) return "rgba(35,131,226,0.34)";
+  if (count <= 6) return "rgba(35,131,226,0.52)";
+  return "rgba(35,131,226,0.78)";
+}
+
+function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary }) {
+  const cells = summary.heatmap.slice(-30);
+  const dayHighlights = useMemo(
+    () => new Map((summary.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
+    [summary.dayHighlights],
+  );
+  const heatmapWeeks = useMemo(() => {
+    if (cells.length === 0) return [] as Array<Array<UserActivityHeatmapCell | null>>;
+    const first = new Date(`${cells[0]!.date}T00:00:00`);
+    const last = new Date(`${cells[cells.length - 1]!.date}T00:00:00`);
+    const start = new Date(first);
+    start.setDate(start.getDate() - start.getDay());
+    const end = new Date(last);
+    end.setDate(end.getDate() + (6 - end.getDay()));
+    const byDate = new Map(cells.map((cell) => [cell.date, cell.count]));
+    const weeks: Array<Array<UserActivityHeatmapCell | null>> = [];
+    let week: Array<UserActivityHeatmapCell | null> = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (cursor < first || cursor > last) week.push(null);
+      else week.push({ date: key, count: byDate.get(key) ?? 0 });
+      if (week.length === 7) {
+        weeks.push(week);
+        week = [];
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return weeks;
+  }, [cells]);
+
+  const weekLabels = useMemo(
+    () =>
+      heatmapWeeks.map((week) => {
+        const firstCell = week.find((cell) => cell != null);
+        if (!firstCell) return "";
+        return new Date(`${firstCell.date}T00:00:00`).toLocaleDateString([], { month: "short" });
+      }),
+    [heatmapWeeks],
+  );
+
+  return (
+    <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+      <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
+        <span>Last 30 days</span>
+        <span>{summary.totalEvents} actions</span>
+      </div>
+      <div className='overflow-x-auto pb-1'>
+        <div className='min-w-max'>
+          <div className='mb-1 flex gap-[12px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
+            {weekLabels.map((label, index) => (
+              <span key={`${label}-${index}`} className='w-[12px] text-center'>
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className='grid gap-1.5' style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}>
+            {heatmapWeeks.flatMap((week, weekIndex) =>
+              week.map((cell, dayIndex) => {
+                if (!cell) return <div key={`blank-${weekIndex}-${dayIndex}`} />;
+                const highlights = dayHighlights.get(cell.date) ?? [];
+                return (
+                  <div
+                    key={cell.date}
+                    title={formatActivityDayTooltip(cell, highlights)}
+                    className='rounded-[3px] border'
+                    style={{ background: activityHeatmapIntensity(cell.count), borderColor: "rgba(127,127,127,0.08)" }}
+                  />
+                );
+              }),
+            )}
+          </div>
+          <div className='mt-2 flex items-center justify-between gap-2 text-[10px]' style={{ color: "var(--text-muted)" }}>
+            <span>Less</span>
+            <div className='flex items-center gap-1'>
+              {[0, 1, 3, 6, 10].map((count) => (
+                <span
+                  key={count}
+                  className='block h-3 w-3 rounded-[3px] border'
+                  style={{ background: activityHeatmapIntensity(count), borderColor: "rgba(127,127,127,0.08)" }}
+                  title={`${count}+ actions`}
+                />
+              ))}
+            </div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WelcomeCard({
   onNewPage,
   latestUpdateAt,
   onOpenVersionLog,
+  activitySummary,
+  activityLoading,
+  activityError,
 }: {
   onNewPage: () => void;
   latestUpdateAt: string | null;
   onOpenVersionLog: () => void;
+  activitySummary: UserActivitySummary | null;
+  activityLoading: boolean;
+  activityError: string | null;
 }) {
+  const [tab, setTab] = useState<"page" | "guide">("page");
+
   return (
-    <div
-      className='rounded-xl border p-4 mt-8'
-      style={{
-        borderColor: "var(--border-color)",
-        background: "var(--bg-secondary)",
-      }}
-    >
-      <div className='flex items-center justify-between gap-4 mb-2.5'>
+    <div className='rounded-xl border p-4 mt-8' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }} data-analytics-zone='information-center'>
+      <div className='flex flex-wrap items-start justify-between gap-3 mb-3'>
         <div>
-          <h2
-            className='text-[15px] font-bold'
-            style={{ color: "var(--text-primary)" }}
-          >
-            Information Center
-          </h2>
-          <p className='mt-1 text-[12px]' style={{ color: "var(--text-muted)" }}>
-            Open a page and type{" "}
-            <kbd
-              className='px-1 py-0.5 rounded border text-[11px] font-mono'
-              style={{
-                borderColor: "var(--border-color)",
-                background: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              /
-            </kbd>{" "}
-            to insert blocks, or start typing to write.
-          </p>
+          <h2 className='text-[15px] font-bold' style={{ color: "var(--text-primary)" }}>Information Center</h2>
+          <p className='mt-1 text-[12px]' style={{ color: "var(--text-muted)" }}>Page shows your contribution chart. Guide keeps the shortcuts and release notes.</p>
         </div>
-        <button
-          type='button'
-          onClick={onOpenVersionLog}
-          className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap'
-          style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
-          title='Open version log'
-        >
-          {latestUpdateAt
-            ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}`
-            : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
-        </button>
+        <div className='flex items-center gap-1 rounded-full border p-1' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+          {([ ["page", "Page"], ["guide", "Guide"] ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type='button'
+              onClick={() => setTab(key)}
+              className='px-3 py-1.5 text-[12px] rounded-full border transition-colors'
+              style={{ borderColor: tab === key ? "var(--accent-color)" : "transparent", color: tab === key ? "var(--accent-color)" : "var(--text-muted)", background: tab === key ? "rgba(35,131,226,0.08)" : "transparent" }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div
-        className='grid gap-1.5'
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
-      >
-        {SLASH_ITEMS.map((item) => (
-          <div
-            key={item.title}
-            className='flex items-center gap-2 px-2 py-1.5 rounded-[6px]'
-            style={{
-              background: "var(--bg-primary)",
-              border: "1px solid var(--border-color)",
-            }}
-            title={item.subtitle}
-          >
-            <span
-              className='flex items-center justify-center w-6 h-6 rounded-[5px] text-[12px] shrink-0'
-              style={{
-                background: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {item.icon}
-            </span>
-            <span
-              className='text-[12px] font-medium truncate'
-              style={{ color: "var(--text-primary)" }}
-            >
-              <span style={{ color: "var(--accent-color)" }}>/</span>
-              {item.title.toLowerCase()}
-            </span>
+
+      {tab === "page" ? (
+        <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+          <div className='flex flex-wrap items-start justify-between gap-3 mb-3'>
+            <div>
+              <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>Page</p>
+              <h3 className='text-[14px] font-semibold' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
+              <p className='text-[12px] mt-1' style={{ color: "var(--text-muted)" }}>Last 30 days, newest activity at the right edge.</p>
+            </div>
+            <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2 py-1 rounded-full whitespace-nowrap' style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }} title='Open version log'>
+              {latestUpdateAt ? `Updated · ${formatVersionLogTimestamp(latestUpdateAt)}` : `v${APP_VERSION} · ${APP_RELEASE_DATE}`}
+            </button>
           </div>
-        ))}
-      </div>
+          {activityLoading ? (
+            <div className='space-y-2' aria-label='Loading contribution chart'>
+              <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
+                {Array.from({ length: 28 }).map((_, index) => (
+                  <div key={index} className='h-3.5 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
+                ))}
+              </div>
+              <div className='h-3 w-28 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
+            </div>
+          ) : activitySummary ? (
+            <ActivityContributionHeatmap summary={activitySummary} />
+          ) : (
+            <div className='rounded-lg border px-3 py-2 text-[12px]' style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+              {activityError ?? "No contribution data available yet."}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className='space-y-3'>
+          <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+            {SLASH_ITEMS.map((item) => (
+              <div key={item.title} className='flex items-center gap-2 px-2 py-1.5 rounded-[6px]' style={{ background: "var(--bg-primary)", border: "1px solid var(--border-color)" }} title={item.subtitle}>
+                <span className='flex items-center justify-center w-6 h-6 rounded-[5px] text-[12px] shrink-0' style={{ background: "var(--bg-hover)", color: "var(--text-primary)" }}>{item.icon}</span>
+                <div className='min-w-0'>
+                  <div className='text-[12px] font-medium leading-none truncate' style={{ color: "var(--text-primary)" }}>{item.title}</div>
+                  <div className='text-[10px] mt-1 leading-tight truncate' style={{ color: "var(--text-muted)" }}>{item.subtitle}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className='flex flex-wrap gap-2 items-center justify-between rounded-xl border px-3 py-2' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
+            <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>Open a page and type <kbd className='px-1 py-0.5 rounded border text-[11px] font-mono' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}>/</kbd> to insert blocks, or start typing to write.</p>
+            <button type='button' onClick={onNewPage} className='flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-sm font-medium text-white transition-colors' style={{ background: "var(--accent-color)" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")} onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-color)")}>
+              <Ico.Plus /> New page
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1892,6 +2019,9 @@ function DocumentHub({
   onNewPage,
   latestUpdateAt,
   onOpenVersionLog,
+  activitySummary,
+  activityLoading,
+  activityError,
 }: {
   tree: PageNode[];
   isDark: boolean;
@@ -1900,6 +2030,9 @@ function DocumentHub({
   onNewPage: () => void;
   latestUpdateAt: string | null;
   onOpenVersionLog: () => void;
+  activitySummary: UserActivitySummary | null;
+  activityLoading: boolean;
+  activityError: string | null;
 }) {
   const PER_PAGE = 5;
   const [filterTag, setFilterTag] = useState<string | null>(null);
@@ -2207,6 +2340,9 @@ function DocumentHub({
           onNewPage={onNewPage}
           latestUpdateAt={latestUpdateAt}
           onOpenVersionLog={onOpenVersionLog}
+          activitySummary={activitySummary}
+          activityLoading={activityLoading}
+          activityError={activityError}
         />
       )}
     </div>
@@ -2684,14 +2820,19 @@ function ProfileActivityDrawer({
     return weeks;
   }, [summary?.heatmap]);
 
+  const dayHighlights = useMemo(
+    () => new Map((summary?.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
+    [summary?.dayHighlights],
+  );
+
   const barData = useMemo(
     () => ({
-      labels: (summary?.topTargets ?? []).slice(0, 6).map((item) => item.label),
+      labels: (summary?.topTargets ?? []).slice(0, 5).map((item) => item.label),
       datasets: [
         {
           label: "Clicks",
-          data: (summary?.topTargets ?? []).slice(0, 6).map((item) => item.count),
-          backgroundColor: "rgba(35, 131, 226, 0.75)",
+          data: (summary?.topTargets ?? []).slice(0, 5).map((item) => item.count),
+          backgroundColor: "rgba(126, 192, 245, 0.95)",
           borderRadius: 6,
           borderSkipped: false as const,
         },
@@ -2731,18 +2872,7 @@ function ProfileActivityDrawer({
     return "rgba(35,131,226,0.78)";
   };
 
-  const clickHeatmapIntensity = (count: number, max: number) => {
-    if (max <= 0 || count <= 0) return "var(--bg-hover)";
-    const pct = count / max;
-    if (pct < 0.25) return "rgba(35,131,226,0.20)";
-    if (pct < 0.5) return "rgba(35,131,226,0.38)";
-    if (pct < 0.75) return "rgba(35,131,226,0.58)";
-    return "rgba(35,131,226,0.82)";
-  };
-
   const allHeatmapCells = summary?.heatmap ?? [];
-  const clickGrid = summary?.clickHeatmap ?? [];
-  const clickGridMax = clickGrid.flat().reduce((max, value) => Math.max(max, value), 0);
 
   return (
     <div
@@ -2894,10 +3024,11 @@ function ProfileActivityDrawer({
                         if (!cell) {
                           return <div key={`${weekIndex}-${dayIndex}`} />;
                         }
+                        const highlights = dayHighlights.get(cell.date) ?? [];
                         return (
                           <div
                             key={cell.date}
-                            title={`${cell.date} · ${cell.count} actions`}
+                            title={formatActivityDayTooltip(cell, highlights)}
                             className='rounded-[3px] border'
                             style={{
                               background: heatmapIntensity(cell.count),
@@ -2912,40 +3043,6 @@ function ProfileActivityDrawer({
               ) : (
                 <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
                   No activity in this range yet.
-                </p>
-              )}
-            </section>
-
-            <section>
-              <div className='flex items-end justify-between gap-3 mb-2'>
-                <div>
-                  <h4 className='text-[12px] font-semibold' style={{ color: "var(--text-primary)" }}>
-                    Click heatmap
-                  </h4>
-                  <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
-                    {summary?.clickHeatmapTotal ?? 0} tracked clicks in this range
-                  </p>
-                </div>
-              </div>
-              {clickGrid.length > 0 ? (
-                <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-                  {clickGrid.flatMap((row, y) =>
-                    row.map((count, x) => (
-                      <div
-                        key={`${x}-${y}`}
-                        title={`Bucket ${y + 1}, ${x + 1} · ${count} clicks`}
-                        className='aspect-square rounded-[6px] border'
-                        style={{
-                          background: clickHeatmapIntensity(count, clickGridMax),
-                          borderColor: "rgba(127,127,127,0.08)",
-                        }}
-                      />
-                    )),
-                  )}
-                </div>
-              ) : (
-                <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
-                  No click coordinates collected yet.
                 </p>
               )}
             </section>
@@ -4084,6 +4181,9 @@ export function App() {
   const [copied, setCopied] = useState(false);
   const [versionLogEntries, setVersionLogEntries] = useState<VersionLogEntry[]>([]);
   const [versionLogLoading, setVersionLogLoading] = useState(false);
+  const [homeActivitySummary, setHomeActivitySummary] = useState<UserActivitySummary | null>(null);
+  const [homeActivityLoading, setHomeActivityLoading] = useState(false);
+  const [homeActivityError, setHomeActivityError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleAreaRef = useRef<HTMLTextAreaElement>(null);
   const activeSurface = showComa
@@ -4437,6 +4537,37 @@ export function App() {
         setAuthToken(null);
       });
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setHomeActivitySummary(null);
+      setHomeActivityError(null);
+      setHomeActivityLoading(false);
+      return;
+    }
+
+    let alive = true;
+    setHomeActivityLoading(true);
+    api<UserActivitySummary>("/me/activity?window=30d")
+      .then((data) => {
+        if (!alive) return;
+        setHomeActivitySummary(data);
+        setHomeActivityError(null);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setHomeActivitySummary(null);
+        setHomeActivityError(error instanceof Error ? error.message : "Failed to load activity");
+      })
+      .finally(() => {
+        if (!alive) return;
+        setHomeActivityLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5783,6 +5914,9 @@ export function App() {
                   onNewPage={() => void handleNewPage()}
                   latestUpdateAt={latestVersionLogAt}
                   onOpenVersionLog={() => setShowVersionLog(true)}
+                  activitySummary={homeActivitySummary}
+                  activityLoading={homeActivityLoading}
+                  activityError={homeActivityError}
                 />
               )}
 

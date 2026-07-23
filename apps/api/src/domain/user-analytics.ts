@@ -35,6 +35,11 @@ export type UserActivityTarget = {
   count: number;
 };
 
+export type UserActivityDayHighlight = {
+  date: string;
+  topTargets: UserActivityTarget[];
+};
+
 export type UserActivityRecentEvent = {
   createdAt: string;
   eventType: string;
@@ -58,6 +63,7 @@ export type UserActivitySummary = {
   clickHeatmap: number[][];
   clickHeatmapTotal: number;
   topTargets: UserActivityTarget[];
+  dayHighlights: UserActivityDayHighlight[];
   recentEvents: UserActivityRecentEvent[];
 };
 
@@ -83,6 +89,7 @@ function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
     clickHeatmap: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0)),
     clickHeatmapTotal: 0,
     topTargets: [],
+    dayHighlights: [],
     recentEvents: [],
   };
 }
@@ -107,6 +114,7 @@ function buildSyntheticSummary(
     { label: "demo:profile:open", count: 0 },
   ];
 
+  const dayHighlights: UserActivityDayHighlight[] = [];
   const recentEvents: UserActivityRecentEvent[] = [];
   let totalEvents = 0;
   let clickEvents = 0;
@@ -122,7 +130,15 @@ function buildSyntheticSummary(
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const base = weekend ? 1 : 3;
     const intensity = base + Math.floor(random() * 5);
-    heatmap.push({ date: date.toISOString().slice(0, 10), count: intensity });
+    const dayKey = date.toISOString().slice(0, 10);
+    heatmap.push({ date: dayKey, count: intensity });
+    dayHighlights.push({
+      date: dayKey,
+      topTargets: topTargets.slice(0, 3).map((item, index) => ({
+        label: item.label,
+        count: Math.max(1, intensity - index),
+      })),
+    });
     totalEvents += intensity;
   }
 
@@ -211,6 +227,7 @@ function buildSyntheticSummary(
     clickHeatmap,
     clickHeatmapTotal,
     topTargets: topTargets.filter((item) => item.count > 0),
+    dayHighlights,
     recentEvents: recentEvents.slice(0, 16),
   };
 }
@@ -404,7 +421,7 @@ export async function getUserActivitySummary(
   const from = since(days);
   const fromDay = startOfDay(from);
 
-  const [totals, targetRows, heatmapRows, clickRows, scrollRows, recentRows] = await Promise.all([
+  const [totals, targetRows, heatmapRows, dayTargetRows, clickRows, scrollRows, recentRows] = await Promise.all([
     prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint; real_events: bigint }[]>`
       SELECT
         COUNT(*)::bigint AS total_events,
@@ -435,6 +452,18 @@ export async function getUserActivitySummary(
         AND "eventType" <> 'http'
       GROUP BY 1
       ORDER BY 1 ASC
+    `,
+    prisma.$queryRaw<{ day: Date; label: string | null; count: bigint }[]>`
+      SELECT
+        date_trunc('day', "createdAt") AS day,
+        COALESCE("target", "eventType") AS label,
+        COUNT(*)::bigint AS count
+      FROM "ActivityEvent"
+      WHERE "userId" = ${userId}
+        AND "createdAt" >= ${fromDay}
+        AND "eventType" <> 'http'
+      GROUP BY 1, 2
+      ORDER BY 1 ASC, COUNT(*) DESC
     `,
     prisma.$queryRaw<{ x: number | null; y: number | null }[]>`
       SELECT "x", "y"
@@ -471,12 +500,23 @@ export async function getUserActivitySummary(
   const countsByDay = new Map(
     heatmapRows.map((row) => [startOfDay(row.day).toISOString().slice(0, 10), Number(row.count)]),
   );
+  const dayTargetsByDay = new Map<string, UserActivityTarget[]>();
+  for (const row of dayTargetRows) {
+    const key = startOfDay(row.day).toISOString().slice(0, 10);
+    const targets = dayTargetsByDay.get(key) ?? [];
+    if (targets.length < 3) {
+      targets.push({ label: row.label ?? "Unknown", count: Number(row.count) });
+      dayTargetsByDay.set(key, targets);
+    }
+  }
   const heatmap: UserActivityHeatmapCell[] = [];
+  const dayHighlights: UserActivityDayHighlight[] = [];
   for (let i = 0; i < days; i += 1) {
     const date = new Date(fromDay);
     date.setDate(date.getDate() + i);
     const key = date.toISOString().slice(0, 10);
     heatmap.push({ date: key, count: countsByDay.get(key) ?? 0 });
+    dayHighlights.push({ date: key, topTargets: dayTargetsByDay.get(key) ?? [] });
   }
 
   const gridSize = 5;
@@ -530,6 +570,7 @@ export async function getUserActivitySummary(
     topTargets: targetRows
       .map((row) => ({ label: row.label ?? "Unknown", count: Number(row.count) }))
       .filter((row) => row.count > 0),
+    dayHighlights,
     recentEvents: recentRows.map((row) => ({
       createdAt: row.createdAt.toISOString(),
       eventType: row.eventType,
