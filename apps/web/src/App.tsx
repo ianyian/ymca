@@ -1820,11 +1820,11 @@ function flattenTree(nodes: PageNode[]): PageNode[] {
 
 // Compact "getting started" card shown BELOW the Document Hub table.
 function activityHeatmapIntensity(count: number) {
-  if (count <= 0) return "var(--bg-hover)";
-  if (count <= 1) return "rgba(35,131,226,0.18)";
-  if (count <= 3) return "rgba(35,131,226,0.34)";
-  if (count <= 6) return "rgba(35,131,226,0.52)";
-  return "rgba(35,131,226,0.78)";
+  if (count <= 0) return "rgba(35,131,226,0.04)";
+  if (count <= 1) return "rgba(35,131,226,0.12)";
+  if (count <= 3) return "rgba(35,131,226,0.22)";
+  if (count <= 6) return "rgba(35,131,226,0.34)";
+  return "rgba(35,131,226,0.48)";
 }
 
 function activityHeatmapCellStyle(count: number) {
@@ -2872,11 +2872,11 @@ function ProfileActivityDrawer({
   );
 
   const heatmapIntensity = (count: number) => {
-    if (count <= 0) return "var(--bg-hover)";
-    if (count <= 1) return "rgba(35,131,226,0.18)";
-    if (count <= 3) return "rgba(35,131,226,0.34)";
-    if (count <= 6) return "rgba(35,131,226,0.52)";
-    return "rgba(35,131,226,0.78)";
+    if (count <= 0) return "rgba(35,131,226,0.04)";
+    if (count <= 1) return "rgba(35,131,226,0.12)";
+    if (count <= 3) return "rgba(35,131,226,0.22)";
+    if (count <= 6) return "rgba(35,131,226,0.34)";
+    return "rgba(35,131,226,0.48)";
   };
 
   const heatmapDays = summary?.heatmap?.length
