@@ -103,27 +103,32 @@ export function shouldRecordAnalyticsForUser(
 }
 
 async function shouldShowAnalyticsForUser(userId: string): Promise<boolean> {
-  const rows = await prisma.$queryRaw<{ hasMeaningfulProductActivity: boolean; hasExplicitDemoActivity: boolean }[]>`
-    SELECT
-      (
-        EXISTS (SELECT 1 FROM "Workspace" WHERE "ownerId" = ${userId}) OR
-        EXISTS (SELECT 1 FROM "WorkspaceMember" WHERE "userId" = ${userId}) OR
-        EXISTS (SELECT 1 FROM "Page" WHERE "creatorId" = ${userId})
-      ) AS "hasMeaningfulProductActivity",
-      EXISTS (
-        SELECT 1
-        FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
-          AND "eventType" <> 'http'
-          AND COALESCE("target", '') LIKE 'demo:%'
-      ) AS "hasExplicitDemoActivity"
-  `;
+  try {
+    const rows = await prisma.$queryRaw<{ hasMeaningfulProductActivity: boolean; hasExplicitDemoActivity: boolean }[]>`
+      SELECT
+        (
+          EXISTS (SELECT 1 FROM "Workspace" WHERE "ownerId" = ${userId}) OR
+          EXISTS (SELECT 1 FROM "WorkspaceMember" WHERE "userId" = ${userId}) OR
+          EXISTS (SELECT 1 FROM "Page" WHERE "creatorId" = ${userId})
+        ) AS "hasMeaningfulProductActivity",
+        EXISTS (
+          SELECT 1
+          FROM "ActivityEvent"
+          WHERE "userId" = ${userId}
+            AND "eventType" <> 'http'
+            AND COALESCE("target", '') LIKE 'demo:%'
+        ) AS "hasExplicitDemoActivity"
+    `;
 
-  const row = rows[0];
-  return shouldRecordAnalyticsForUser(
-    row?.hasMeaningfulProductActivity ?? false,
-    row?.hasExplicitDemoActivity ?? false,
-  );
+    const row = rows[0];
+    return shouldRecordAnalyticsForUser(
+      row?.hasMeaningfulProductActivity ?? false,
+      row?.hasExplicitDemoActivity ?? false,
+    );
+  } catch (error) {
+    console.error("[user-analytics] failed to evaluate analytics visibility", { userId, error });
+    return false;
+  }
 }
 
 function buildSyntheticSummary(
@@ -450,180 +455,185 @@ export async function getUserActivitySummary(
   userId: string,
   window: AnalyticsWindowKey,
 ): Promise<UserActivitySummary> {
-  if (!(await shouldShowAnalyticsForUser(userId))) {
-    return emptySummary(window);
-  }
-
-  if (!(await hasAnalyticsColumns())) {
-    return buildSyntheticSummary(userId, window);
-  }
-
-  const days = ANALYTICS_WINDOW_DAYS[window];
-  const from = since(days);
-  const fromDay = startOfDay(new Date(from.getTime() + 24 * 60 * 60 * 1000));
-
-  const [totals, targetRows, heatmapRows, dayTargetRows, clickRows, scrollRows, recentRows] = await Promise.all([
-    prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint; real_events: bigint }[]>`
-      SELECT
-        COUNT(*)::bigint AS total_events,
-        COUNT(*) FILTER (WHERE "eventType" = 'ui_click')::bigint AS click_events,
-        COALESCE(SUM("durationMs") FILTER (WHERE "eventType" = 'surface_dwell'), 0)::bigint AS dwell_ms,
-        COUNT(DISTINCT "pageId") FILTER (WHERE "pageId" IS NOT NULL)::bigint AS unique_pages,
-        COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${from}
-        AND "eventType" <> 'http'
-    `,
-    prisma.$queryRaw<{ label: string | null; count: bigint }[]>`
-      SELECT COALESCE("target", "eventType") AS label, COUNT(*)::bigint AS count
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${from}
-        AND "eventType" = 'ui_click'
-      GROUP BY COALESCE("target", "eventType")
-      ORDER BY COUNT(*) DESC
-      LIMIT 8
-    `,
-    prisma.$queryRaw<{ day: Date; count: bigint }[]>`
-      SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${fromDay}
-        AND "eventType" <> 'http'
-      GROUP BY 1
-      ORDER BY 1 ASC
-    `,
-    prisma.$queryRaw<{ day: Date; label: string | null; count: bigint }[]>`
-      SELECT
-        date_trunc('day', "createdAt") AS day,
-        COALESCE("target", "eventType") AS label,
-        COUNT(*)::bigint AS count
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${fromDay}
-        AND "eventType" <> 'http'
-      GROUP BY 1, 2
-      ORDER BY 1 ASC, COUNT(*) DESC
-    `,
-    prisma.$queryRaw<{ x: number | null; y: number | null }[]>`
-      SELECT "x", "y"
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${from}
-        AND "eventType" = 'ui_click'
-        AND "x" IS NOT NULL
-        AND "y" IS NOT NULL
-      ORDER BY "createdAt" DESC
-      LIMIT 1000
-    `,
-    prisma.$queryRaw<{ y: number | null }[]>`
-      SELECT "y"
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${from}
-        AND "eventType" = 'surface_scroll'
-        AND "y" IS NOT NULL
-      ORDER BY "createdAt" DESC
-      LIMIT 1000
-    `,
-    prisma.$queryRaw<{ createdAt: Date; eventType: string; target: string | null; pageId: string | null; durationMs: number | null }[]>`
-      SELECT "createdAt", "eventType", "target", "pageId", "durationMs"
-      FROM "ActivityEvent"
-      WHERE "userId" = ${userId}
-        AND "createdAt" >= ${from}
-        AND "eventType" <> 'http'
-      ORDER BY "createdAt" DESC
-      LIMIT 16
-    `,
-  ]);
-
-  const countsByDay = new Map(
-    heatmapRows.map((row) => [startOfDay(row.day).toISOString().slice(0, 10), Number(row.count)]),
-  );
-  const dayTargetsByDay = new Map<string, UserActivityTarget[]>();
-  for (const row of dayTargetRows) {
-    const key = startOfDay(row.day).toISOString().slice(0, 10);
-    const targets = dayTargetsByDay.get(key) ?? [];
-    if (targets.length < 3) {
-      targets.push({ label: row.label ?? "Unknown", count: Number(row.count) });
-      dayTargetsByDay.set(key, targets);
+  try {
+    if (!(await shouldShowAnalyticsForUser(userId))) {
+      return emptySummary(window);
     }
-  }
-  const heatmap: UserActivityHeatmapCell[] = [];
-  const dayHighlights: UserActivityDayHighlight[] = [];
-  for (let i = 0; i < days; i += 1) {
-    const date = new Date(fromDay);
-    date.setDate(date.getDate() + i);
-    const key = date.toISOString().slice(0, 10);
-    heatmap.push({ date: key, count: countsByDay.get(key) ?? 0 });
-    dayHighlights.push({ date: key, topTargets: dayTargetsByDay.get(key) ?? [] });
-  }
 
-  const gridSize = 5;
-  const clickHeatmap = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => 0));
-  const xs = clickRows.map((row) => row.x).filter((value): value is number => typeof value === "number");
-  const ys = clickRows.map((row) => row.y).filter((value): value is number => typeof value === "number");
-  const minX = xs.length > 0 ? Math.min(...xs) : 0;
-  const maxX = xs.length > 0 ? Math.max(...xs) : 1;
-  const minY = ys.length > 0 ? Math.min(...ys) : 0;
-  const maxY = ys.length > 0 ? Math.max(...ys) : 1;
-  const rangeX = Math.max(maxX - minX, 1);
-  const rangeY = Math.max(maxY - minY, 1);
-  let clickHeatmapTotal = 0;
-  for (const row of clickRows) {
-    if (row.x == null || row.y == null) continue;
-    const xBucket = Math.min(gridSize - 1, Math.max(0, Math.floor(((row.x - minX) / rangeX) * gridSize)));
-    const yBucket = Math.min(gridSize - 1, Math.max(0, Math.floor(((row.y - minY) / rangeY) * gridSize)));
-    clickHeatmap[yBucket]![xBucket]! += 1;
-    clickHeatmapTotal += 1;
-  }
+    if (!(await hasAnalyticsColumns())) {
+      return buildSyntheticSummary(userId, window);
+    }
 
-  const scrollDepthValues = scrollRows
-    .map((row) => row.y)
-    .filter((value): value is number => typeof value === "number");
-  const scrollDepthMax = scrollDepthValues.length > 0 ? Math.max(...scrollDepthValues) : 0;
-  const scrollDepthAvg =
-    scrollDepthValues.length > 0
-      ? Math.round(scrollDepthValues.reduce((sum, value) => sum + value, 0) / scrollDepthValues.length)
-      : 0;
-  const isSynthetic = Number(totals[0]?.total_events ?? 0n) > 0 && Number(totals[0]?.real_events ?? 0n) === 0;
-  const dwellScore = Math.min((Number(totals[0]?.dwell_ms ?? 0n) / (15 * 60 * 1000)) * 40, 40);
-  const clickScore = Math.min((Number(totals[0]?.click_events ?? 0n) / 30) * 25, 25);
-  const scrollScore = Math.min((scrollDepthAvg / 100) * 20 + (scrollDepthMax / 100) * 10, 35);
-  const pageScore = Math.min(Number(totals[0]?.unique_pages ?? 0n) * 5, 10);
-  const attentionScore = Math.round(Math.max(0, Math.min(dwellScore + clickScore + scrollScore + pageScore, 100)));
+    const days = ANALYTICS_WINDOW_DAYS[window];
+    const from = since(days);
+    const fromDay = startOfDay(new Date(from.getTime() + 24 * 60 * 60 * 1000));
 
-  const result = {
-    window,
-    generatedAt: new Date().toISOString(),
-    isSynthetic,
-    totalEvents: Number(totals[0]?.total_events ?? 0n),
-    clickEvents: Number(totals[0]?.click_events ?? 0n),
-    dwellMs: Number(totals[0]?.dwell_ms ?? 0n),
-    scrollDepthMax,
-    scrollDepthAvg,
-    attentionScore,
-    uniquePages: Number(totals[0]?.unique_pages ?? 0n),
-    heatmap,
-    clickHeatmap,
-    clickHeatmapTotal,
-    topTargets: targetRows
-      .map((row) => ({ label: row.label ?? "Unknown", count: Number(row.count) }))
-      .filter((row) => row.count > 0),
-    dayHighlights,
-    recentEvents: recentRows.map((row) => ({
-      createdAt: row.createdAt.toISOString(),
-      eventType: row.eventType,
-      target: row.target,
-      pageId: row.pageId,
-      durationMs: row.durationMs,
-    })),
-  };
+    const [totals, targetRows, heatmapRows, dayTargetRows, clickRows, scrollRows, recentRows] = await Promise.all([
+      prisma.$queryRaw<{ total_events: bigint; click_events: bigint; dwell_ms: bigint; unique_pages: bigint; real_events: bigint }[]>`
+        SELECT
+          COUNT(*)::bigint AS total_events,
+          COUNT(*) FILTER (WHERE "eventType" = 'ui_click')::bigint AS click_events,
+          COALESCE(SUM("durationMs") FILTER (WHERE "eventType" = 'surface_dwell'), 0)::bigint AS dwell_ms,
+          COUNT(DISTINCT "pageId") FILTER (WHERE "pageId" IS NOT NULL)::bigint AS unique_pages,
+          COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${from}
+          AND "eventType" <> 'http'
+      `,
+      prisma.$queryRaw<{ label: string | null; count: bigint }[]>`
+        SELECT COALESCE("target", "eventType") AS label, COUNT(*)::bigint AS count
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${from}
+          AND "eventType" = 'ui_click'
+        GROUP BY COALESCE("target", "eventType")
+        ORDER BY COUNT(*) DESC
+        LIMIT 8
+      `,
+      prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+        SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${fromDay}
+          AND "eventType" <> 'http'
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      prisma.$queryRaw<{ day: Date; label: string | null; count: bigint }[]>`
+        SELECT
+          date_trunc('day', "createdAt") AS day,
+          COALESCE("target", "eventType") AS label,
+          COUNT(*)::bigint AS count
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${fromDay}
+          AND "eventType" <> 'http'
+        GROUP BY 1, 2
+        ORDER BY 1 ASC, COUNT(*) DESC
+      `,
+      prisma.$queryRaw<{ x: number | null; y: number | null }[]>`
+        SELECT "x", "y"
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${from}
+          AND "eventType" = 'ui_click'
+          AND "x" IS NOT NULL
+          AND "y" IS NOT NULL
+        ORDER BY "createdAt" DESC
+        LIMIT 1000
+      `,
+      prisma.$queryRaw<{ y: number | null }[]>`
+        SELECT "y"
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${from}
+          AND "eventType" = 'surface_scroll'
+          AND "y" IS NOT NULL
+        ORDER BY "createdAt" DESC
+        LIMIT 1000
+      `,
+      prisma.$queryRaw<{ createdAt: Date; eventType: string; target: string | null; pageId: string | null; durationMs: number | null }[]>`
+        SELECT "createdAt", "eventType", "target", "pageId", "durationMs"
+        FROM "ActivityEvent"
+        WHERE "userId" = ${userId}
+          AND "createdAt" >= ${from}
+          AND "eventType" <> 'http'
+        ORDER BY "createdAt" DESC
+        LIMIT 16
+      `,
+    ]);
 
-  if (result.totalEvents === 0) {
+    const countsByDay = new Map(
+      heatmapRows.map((row) => [startOfDay(row.day).toISOString().slice(0, 10), Number(row.count)]),
+    );
+    const dayTargetsByDay = new Map<string, UserActivityTarget[]>();
+    for (const row of dayTargetRows) {
+      const key = startOfDay(row.day).toISOString().slice(0, 10);
+      const targets = dayTargetsByDay.get(key) ?? [];
+      if (targets.length < 3) {
+        targets.push({ label: row.label ?? "Unknown", count: Number(row.count) });
+        dayTargetsByDay.set(key, targets);
+      }
+    }
+    const heatmap: UserActivityHeatmapCell[] = [];
+    const dayHighlights: UserActivityDayHighlight[] = [];
+    for (let i = 0; i < days; i += 1) {
+      const date = new Date(fromDay);
+      date.setDate(date.getDate() + i);
+      const key = date.toISOString().slice(0, 10);
+      heatmap.push({ date: key, count: countsByDay.get(key) ?? 0 });
+      dayHighlights.push({ date: key, topTargets: dayTargetsByDay.get(key) ?? [] });
+    }
+
+    const gridSize = 5;
+    const clickHeatmap = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => 0));
+    const xs = clickRows.map((row) => row.x).filter((value): value is number => typeof value === "number");
+    const ys = clickRows.map((row) => row.y).filter((value): value is number => typeof value === "number");
+    const minX = xs.length > 0 ? Math.min(...xs) : 0;
+    const maxX = xs.length > 0 ? Math.max(...xs) : 1;
+    const minY = ys.length > 0 ? Math.min(...ys) : 0;
+    const maxY = ys.length > 0 ? Math.max(...ys) : 1;
+    const rangeX = Math.max(maxX - minX, 1);
+    const rangeY = Math.max(maxY - minY, 1);
+    let clickHeatmapTotal = 0;
+    for (const row of clickRows) {
+      if (row.x == null || row.y == null) continue;
+      const xBucket = Math.min(gridSize - 1, Math.max(0, Math.floor(((row.x - minX) / rangeX) * gridSize)));
+      const yBucket = Math.min(gridSize - 1, Math.max(0, Math.floor(((row.y - minY) / rangeY) * gridSize)));
+      clickHeatmap[yBucket]![xBucket]! += 1;
+      clickHeatmapTotal += 1;
+    }
+
+    const scrollDepthValues = scrollRows
+      .map((row) => row.y)
+      .filter((value): value is number => typeof value === "number");
+    const scrollDepthMax = scrollDepthValues.length > 0 ? Math.max(...scrollDepthValues) : 0;
+    const scrollDepthAvg =
+      scrollDepthValues.length > 0
+        ? Math.round(scrollDepthValues.reduce((sum, value) => sum + value, 0) / scrollDepthValues.length)
+        : 0;
+    const isSynthetic = Number(totals[0]?.total_events ?? 0n) > 0 && Number(totals[0]?.real_events ?? 0n) === 0;
+    const dwellScore = Math.min((Number(totals[0]?.dwell_ms ?? 0n) / (15 * 60 * 1000)) * 40, 40);
+    const clickScore = Math.min((Number(totals[0]?.click_events ?? 0n) / 30) * 25, 25);
+    const scrollScore = Math.min((scrollDepthAvg / 100) * 20 + (scrollDepthMax / 100) * 10, 35);
+    const pageScore = Math.min(Number(totals[0]?.unique_pages ?? 0n) * 5, 10);
+    const attentionScore = Math.round(Math.max(0, Math.min(dwellScore + clickScore + scrollScore + pageScore, 100)));
+
+    const result = {
+      window,
+      generatedAt: new Date().toISOString(),
+      isSynthetic,
+      totalEvents: Number(totals[0]?.total_events ?? 0n),
+      clickEvents: Number(totals[0]?.click_events ?? 0n),
+      dwellMs: Number(totals[0]?.dwell_ms ?? 0n),
+      scrollDepthMax,
+      scrollDepthAvg,
+      attentionScore,
+      uniquePages: Number(totals[0]?.unique_pages ?? 0n),
+      heatmap,
+      clickHeatmap,
+      clickHeatmapTotal,
+      topTargets: targetRows
+        .map((row) => ({ label: row.label ?? "Unknown", count: Number(row.count) }))
+        .filter((row) => row.count > 0),
+      dayHighlights,
+      recentEvents: recentRows.map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        eventType: row.eventType,
+        target: row.target,
+        pageId: row.pageId,
+        durationMs: row.durationMs,
+      })),
+    };
+
+    if (result.totalEvents === 0) {
+      return emptySummary(window);
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[user-analytics] failed to build activity summary", { userId, window, error });
     return emptySummary(window);
   }
-
-  return result;
 }
