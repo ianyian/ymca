@@ -8,8 +8,13 @@ import { prisma } from "./prisma.js";
 
 export type ActivityRecord = {
   userId: string | null;
+  eventType?: string;
   method: string;
   path: string;
+  target?: string | null;
+  pageId?: string | null;
+  x?: number | null;
+  y?: number | null;
   statusCode: number;
   durationMs: number | null;
   createdAt: Date;
@@ -26,7 +31,16 @@ export async function flushActivityBuffer(): Promise<void> {
   const batch = buffer;
   buffer = [];
   try {
-    await prisma.activityEvent.createMany({ data: batch });
+    await prisma.activityEvent.createMany({
+      data: batch.map((record) => ({
+        ...record,
+        eventType: record.eventType ?? "http",
+        target: record.target ?? null,
+        pageId: record.pageId ?? null,
+        x: record.x ?? null,
+        y: record.y ?? null,
+      })),
+    });
   } catch (err) {
     // Never let analytics logging break the app; drop the batch and move on.
     // (Re-queueing risks unbounded growth if the DB is down.)

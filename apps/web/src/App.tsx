@@ -12,6 +12,15 @@ import Highlight from "@tiptap/extension-highlight";
 import UniqueID from "@tiptap/extension-unique-id";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import type { EditorView } from "@tiptap/pm/view";
+import { Bar } from "react-chartjs-2";
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Tooltip,
+} from "chart.js";
 import {
   Callout,
   Column,
@@ -25,6 +34,8 @@ import {
   type PageRefItem,
 } from "./editor-extensions";
 import { AT, LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 // ────────────────────────────────────────────────────────────
 // App version — hardcoded. Bump these two values on an official release.
@@ -86,6 +97,39 @@ type VersionLogEntry = {
   summary: string;
   bullets?: string[];
   publishedAt: string;
+};
+type UserActivityHeatmapCell = { date: string; count: number };
+type UserActivityTarget = { label: string; count: number };
+type UserActivityRecentEvent = {
+  createdAt: string;
+  eventType: string;
+  target: string | null;
+  pageId: string | null;
+  durationMs: number | null;
+};
+type UserActivitySummary = {
+  window: "24h" | "7d" | "30d" | "365d";
+  generatedAt: string;
+  totalEvents: number;
+  clickEvents: number;
+  dwellMs: number;
+  scrollDepthMax: number;
+  scrollDepthAvg: number;
+  attentionScore: number;
+  uniquePages: number;
+  heatmap: UserActivityHeatmapCell[];
+  clickHeatmap: number[][];
+  clickHeatmapTotal: number;
+  topTargets: UserActivityTarget[];
+  recentEvents: UserActivityRecentEvent[];
+};
+type AnalyticsEventPayload = {
+  eventType: string;
+  target?: string | null;
+  pageId?: string | null;
+  x?: number | null;
+  y?: number | null;
+  durationMs?: number | null;
 };
 
 // ────────────────────────────────────────────────────────────
@@ -199,6 +243,14 @@ function formatVersionLogTimestamp(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   })}`;
+}
+
+function isAnalyticsInteractiveTarget(node: Element | null): boolean {
+  return !!node && !!node.closest("button, a, [role='button'], [data-analytics-zone]");
+}
+
+function clampAnalyticsLabel(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1208,7 +1260,7 @@ function ProfileDropdown({
   onLangChange,
   onLogout,
 }: {
-  user: { email: string; displayName: string | null };
+  user: { id: string; email: string; displayName: string | null };
   workspace: { name: string } | null;
   theme: Theme;
   fontSize: FontSize;
@@ -1223,6 +1275,7 @@ function ProfileDropdown({
   const t = useT();
   const [open, setOpen] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
+  const [showActivityInsights, setShowActivityInsights] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1263,6 +1316,7 @@ function ProfileDropdown({
     <div
       className='relative px-2 pt-2 pb-1'
       ref={ref}
+      data-analytics-zone='profile-menu'
       onMouseLeave={() => open && scheduleClose()}
       onMouseEnter={cancelScheduledClose}
     >
@@ -1444,6 +1498,23 @@ function ProfileDropdown({
             <button
               onClick={() => {
                 setOpen(false);
+                setShowActivityInsights(true);
+              }}
+              className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[6px] text-[13px] transition-colors'
+              style={{ color: "var(--text-muted)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--bg-hover)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <Ico.Clock />
+              <span>My activity</span>
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
                 setShowChangePw(true);
               }}
               className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[6px] text-[13px] transition-colors'
@@ -1482,6 +1553,14 @@ function ProfileDropdown({
         <ChangePasswordModal
           csrf={csrf}
           onClose={() => setShowChangePw(false)}
+        />
+      )}
+      {showActivityInsights && (
+        <ProfileActivityDrawer
+          onClose={() => setShowActivityInsights(false)}
+          endpoint='/me/activity'
+          title='Your activity heatmap'
+          subtitle='How you are using the app'
         />
       )}
     </div>
@@ -1850,7 +1929,7 @@ function DocumentHub({
   useEffect(() => setPageNum(0), [filterTag, query]);
 
   return (
-    <div className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[900px] mx-auto w-full'>
+    <div className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[900px] mx-auto w-full' data-analytics-zone='home-dashboard'>
       {/* Header */}
       <div className='flex items-center justify-between mb-6'>
         <h1
@@ -2506,6 +2585,323 @@ function VersionLogDrawer({
             ) : null}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ProfileActivityDrawer({
+  onClose,
+  endpoint,
+  title,
+  subtitle,
+}: {
+  onClose: () => void;
+  endpoint: string;
+  title: string;
+  subtitle: string;
+}) {
+  const windows = ["24h", "7d", "30d", "365d"] as const;
+  const [windowIndex, setWindowIndex] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [summary, setSummary] = useState<UserActivitySummary | null>(null);
+
+  const windowKey = windows[windowIndex];
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    api<UserActivitySummary>(`${endpoint}?window=${windowKey}`)
+      .then((data) => {
+        if (!alive) return;
+        setSummary(data);
+        setErr(null);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setErr(error instanceof Error ? error.message : "Failed to load activity");
+      })
+      .finally(() => {
+        if (!alive) return;
+        setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [endpoint, windowKey]);
+
+  const heatmapWeeks = useMemo(() => {
+    const cells = summary?.heatmap ?? [];
+    if (cells.length === 0) return [] as Array<Array<UserActivityHeatmapCell | null>>;
+    const first = new Date(`${cells[0]!.date}T00:00:00`);
+    const last = new Date(`${cells[cells.length - 1]!.date}T00:00:00`);
+    const start = new Date(first);
+    start.setDate(start.getDate() - start.getDay());
+    const end = new Date(last);
+    end.setDate(end.getDate() + (6 - end.getDay()));
+
+    const byDate = new Map(cells.map((cell) => [cell.date, cell.count]));
+    const weeks: Array<Array<UserActivityHeatmapCell | null>> = [];
+    let week: Array<UserActivityHeatmapCell | null> = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const key = cursor.toISOString().slice(0, 10);
+      week.push({ date: key, count: byDate.get(key) ?? 0 });
+      if (week.length === 7) {
+        weeks.push(week);
+        week = [];
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return weeks;
+  }, [summary?.heatmap]);
+
+  const barData = useMemo(
+    () => ({
+      labels: (summary?.topTargets ?? []).slice(0, 6).map((item) => item.label),
+      datasets: [
+        {
+          label: "Clicks",
+          data: (summary?.topTargets ?? []).slice(0, 6).map((item) => item.count),
+          backgroundColor: "rgba(35, 131, 226, 0.75)",
+          borderRadius: 6,
+          borderSkipped: false as const,
+        },
+      ],
+    }),
+    [summary?.topTargets],
+  );
+
+  const barOptions = useMemo(
+    () => ({
+      indexAxis: "y" as const,
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: true },
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(127,127,127,0.12)" },
+          ticks: { color: "var(--text-muted)", precision: 0 },
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: "var(--text-primary)" },
+        },
+      },
+    }),
+    [],
+  );
+
+  const heatmapIntensity = (count: number) => {
+    if (count <= 0) return "var(--bg-hover)";
+    if (count <= 1) return "rgba(35,131,226,0.18)";
+    if (count <= 3) return "rgba(35,131,226,0.34)";
+    if (count <= 6) return "rgba(35,131,226,0.52)";
+    return "rgba(35,131,226,0.78)";
+  };
+
+  const clickHeatmapIntensity = (count: number, max: number) => {
+    if (max <= 0 || count <= 0) return "var(--bg-hover)";
+    const pct = count / max;
+    if (pct < 0.25) return "rgba(35,131,226,0.20)";
+    if (pct < 0.5) return "rgba(35,131,226,0.38)";
+    if (pct < 0.75) return "rgba(35,131,226,0.58)";
+    return "rgba(35,131,226,0.82)";
+  };
+
+  const allHeatmapCells = summary?.heatmap ?? [];
+  const clickGrid = summary?.clickHeatmap ?? [];
+  const clickGridMax = clickGrid.flat().reduce((max, value) => Math.max(max, value), 0);
+
+  return (
+    <div
+      className='fixed inset-y-0 right-0 z-50 w-[420px] max-w-[calc(100vw-1rem)] border-l shadow-2xl flex flex-col'
+      style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
+      data-analytics-zone='profile-activity'
+    >
+      <div
+        className='flex items-center justify-between px-4 py-3 border-b'
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        <div>
+          <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>
+            Profile analytics
+          </p>
+          <h3 className='text-sm font-semibold' style={{ color: "var(--text-primary)" }}>
+            {title}
+          </h3>
+          <p className='text-[11px] mt-0.5' style={{ color: "var(--text-muted)" }}>
+            {subtitle}
+          </p>
+        </div>
+        <button onClick={onClose} style={{ color: "var(--text-muted)" }}>
+          <Ico.X />
+        </button>
+      </div>
+
+      <div className='px-4 py-3 border-b space-y-3' style={{ borderColor: "var(--border-color)" }}>
+        <div>
+          <div className='flex items-center justify-between text-[11px] mb-2' style={{ color: "var(--text-muted)" }}>
+            <span>Time range</span>
+            <span>{windowKey}</span>
+          </div>
+          <input
+            type='range'
+            min='0'
+            max='3'
+            step='1'
+            value={windowIndex}
+            onChange={(e) => setWindowIndex(Number(e.target.value))}
+            className='w-full'
+          />
+          <div className='mt-1 flex justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
+            {windows.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className='grid grid-cols-2 gap-2'>
+          <KpiCard label='Actions' value={summary?.totalEvents ?? "—"} />
+          <KpiCard label='Clicks' value={summary?.clickEvents ?? "—"} accent />
+          <KpiCard label='Time spent' value={summary ? formatDuration(summary.dwellMs) : "—"} />
+          <KpiCard label='Pages' value={summary?.uniquePages ?? "—"} />
+          <KpiCard label='Scroll max' value={summary ? `${summary.scrollDepthMax}%` : "—"} />
+          <KpiCard label='Scroll avg' value={summary ? `${summary.scrollDepthAvg}%` : "—"} />
+          <KpiCard label='Attention' value={summary?.attentionScore ?? "—"} accent />
+        </div>
+      </div>
+
+      <div className='flex-1 overflow-y-auto px-4 py-4 space-y-5'>
+        {err && (
+          <div className='rounded-lg border px-3 py-2 text-[12px]' style={{ borderColor: "rgba(200,48,48,0.3)", color: "#c03030", background: "rgba(200,48,48,0.06)" }}>
+            {err}
+          </div>
+        )}
+
+        <section>
+          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+            Activity by day
+          </h4>
+          {loading && !summary ? (
+            <div className='grid grid-cols-7 gap-1.5'>
+              {Array.from({ length: 35 }).map((_, index) => (
+                <div key={index} className='h-3.5 rounded animate-pulse' style={{ background: "var(--bg-hover)" }} />
+              ))}
+            </div>
+          ) : heatmapWeeks.length > 0 ? (
+            <div className='overflow-x-auto pb-1'>
+              <div
+                className='grid gap-1.5'
+                style={{ gridAutoFlow: "column", gridAutoColumns: "12px", gridTemplateRows: "repeat(7, 12px)" }}
+              >
+                {heatmapWeeks.flatMap((week, weekIndex) =>
+                  week.map((cell, dayIndex) => {
+                    if (!cell) {
+                      return <div key={`${weekIndex}-${dayIndex}`} />;
+                    }
+                    return (
+                      <div
+                        key={cell.date}
+                        title={`${cell.date} · ${cell.count} actions`}
+                        className='rounded-[3px] border'
+                        style={{
+                          background: heatmapIntensity(cell.count),
+                          borderColor: "rgba(127,127,127,0.08)",
+                        }}
+                      />
+                    );
+                  }),
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+              No activity in this range yet.
+            </p>
+          )}
+        </section>
+
+        <section>
+          <div className='flex items-end justify-between gap-3 mb-2'>
+            <div>
+              <h4 className='text-[12px] font-semibold' style={{ color: "var(--text-primary)" }}>
+                Click heatmap
+              </h4>
+              <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                {summary?.clickHeatmapTotal ?? 0} tracked clicks in this range
+              </p>
+            </div>
+          </div>
+          {clickGrid.length > 0 ? (
+            <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
+              {clickGrid.flatMap((row, y) =>
+                row.map((count, x) => (
+                  <div
+                    key={`${x}-${y}`}
+                    title={`Bucket ${y + 1}, ${x + 1} · ${count} clicks`}
+                    className='aspect-square rounded-[6px] border'
+                    style={{
+                      background: clickHeatmapIntensity(count, clickGridMax),
+                      borderColor: "rgba(127,127,127,0.08)",
+                    }}
+                  />
+                )),
+              )}
+            </div>
+          ) : (
+            <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+              No click coordinates collected yet.
+            </p>
+          )}
+        </section>
+
+        <section>
+          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+            Top interactions
+          </h4>
+          <div className='h-[220px] rounded-xl border p-3' style={{ borderColor: "var(--border-color)" }}>
+            <Bar data={barData} options={barOptions} />
+          </div>
+        </section>
+
+        <section>
+          <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+            Recent events
+          </h4>
+          <div className='space-y-2'>
+            {(summary?.recentEvents ?? []).map((event) => (
+              <div key={`${event.createdAt}-${event.eventType}-${event.target ?? ""}`} className='rounded-lg border px-3 py-2' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+                <div className='flex items-start justify-between gap-2'>
+                  <div>
+                    <p className='text-[12px] font-medium' style={{ color: "var(--text-primary)" }}>
+                      {event.target ?? event.eventType}
+                    </p>
+                    <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                      {new Date(event.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+                    {event.durationMs != null ? formatDuration(event.durationMs) : event.eventType}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <p className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+          Generated {summary ? new Date(summary.generatedAt).toLocaleString() : "—"}
+        </p>
+        {summary && allHeatmapCells.length === 0 && (
+          <p className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+            No interaction history has been captured for this account yet.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -3199,6 +3595,7 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [activityUser, setActivityUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     api<{ roles: AdminRole[] }>("/admin/roles")
@@ -3398,23 +3795,42 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
                     {relativeTime(u.lastSeenAt, t)}
                   </td>
                   <td className='px-3 py-2'>
-                    <select
-                      value={u.roleKey}
-                      disabled={savingId === u.id}
-                      onChange={(e) => void changeRole(u, e.target.value)}
-                      className='px-2 py-1 rounded-[6px] text-[12px] outline-none border'
-                      style={{
-                        background: "var(--bg-primary)",
-                        borderColor: "var(--border-color)",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {roles.map((r) => (
-                        <option key={r.key} value={r.key}>
-                          {t.roles[r.key] ?? r.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className='flex items-center gap-2 flex-wrap'>
+                      <select
+                        value={u.roleKey}
+                        disabled={savingId === u.id}
+                        onChange={(e) => void changeRole(u, e.target.value)}
+                        className='px-2 py-1 rounded-[6px] text-[12px] outline-none border'
+                        style={{
+                          background: "var(--bg-primary)",
+                          borderColor: "var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        {roles.map((r) => (
+                          <option key={r.key} value={r.key}>
+                            {t.roles[r.key] ?? r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type='button'
+                        onClick={() => setActivityUser(u)}
+                        className='px-2 py-1 rounded-[6px] border text-[12px] transition-colors'
+                        style={{
+                          borderColor: "var(--border-color)",
+                          color: "var(--text-muted)",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = "var(--bg-hover)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        View activity
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -3422,6 +3838,14 @@ function UserManagementPanel({ csrf, lang }: { csrf: string; lang: Lang }) {
           </tbody>
         </table>
       </div>
+      {activityUser && (
+        <ProfileActivityDrawer
+          onClose={() => setActivityUser(null)}
+          endpoint={`/admin/users/${activityUser.id}/activity`}
+          title={`${activityUser.displayName || activityUser.email.split("@")[0]}'s activity`}
+          subtitle={activityUser.email}
+        />
+      )}
     </div>
   );
 }
@@ -3430,7 +3854,7 @@ function ConfigurationManager({ csrf, lang }: { csrf: string; lang: Lang }) {
   const t = AT[lang];
   const [tab, setTab] = useState<"monitoring" | "users">("monitoring");
   return (
-    <div className='max-w-[1040px] mx-auto px-5 py-6 sm:px-8 sm:py-10 w-full'>
+    <div className='max-w-[1040px] mx-auto px-5 py-6 sm:px-8 sm:py-10 w-full' data-analytics-zone='admin-dashboard'>
       <div className='mb-1 flex items-center gap-2'>
         <span style={{ color: "var(--accent-color)" }}>
           <Ico.Settings />
@@ -3570,6 +3994,195 @@ export function App() {
   const [versionLogLoading, setVersionLogLoading] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleAreaRef = useRef<HTMLTextAreaElement>(null);
+  const activeSurface = showComa
+    ? "admin"
+    : activePage
+      ? `page:${activePage.id}`
+      : "home";
+  const activePageId = activePage?.id ?? null;
+  const activityStateRef = useRef({
+    surface: activeSurface,
+    pageId: activePageId,
+    enteredAt: Date.now(),
+  });
+  const scrollDepthRef = useRef(0);
+  const scrollDepthLastSentRef = useRef(0);
+  const analyticsQueueRef = useRef<AnalyticsEventPayload[]>([]);
+  const analyticsFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const analyticsFlushingRef = useRef(false);
+
+  const flushAnalyticsQueue = useCallback(async () => {
+    if (!user || analyticsFlushingRef.current) return;
+    const batch = analyticsQueueRef.current;
+    if (batch.length === 0) return;
+    analyticsFlushingRef.current = true;
+    analyticsQueueRef.current = [];
+    if (analyticsFlushTimerRef.current) {
+      clearTimeout(analyticsFlushTimerRef.current);
+      analyticsFlushTimerRef.current = null;
+    }
+    try {
+      await api(
+        "/analytics/events/batch",
+        {
+          method: "POST",
+          body: JSON.stringify({ events: batch }),
+        },
+        csrfRef.current || undefined,
+      );
+    } catch {
+      // best effort only; drop the batch if network is unavailable
+    } finally {
+      analyticsFlushingRef.current = false;
+    }
+  }, [user]);
+
+  const scheduleAnalyticsFlush = useCallback(() => {
+    if (!user) return;
+    if (analyticsFlushTimerRef.current) return;
+    analyticsFlushTimerRef.current = setTimeout(() => {
+      analyticsFlushTimerRef.current = null;
+      void flushAnalyticsQueue();
+    }, 1200);
+  }, [flushAnalyticsQueue, user]);
+
+  const sendAnalyticsEvent = useCallback(
+    (payload: AnalyticsEventPayload) => {
+      if (!user) return;
+      analyticsQueueRef.current.push(payload);
+      if (analyticsQueueRef.current.length >= 10) {
+        void flushAnalyticsQueue();
+        return;
+      }
+      scheduleAnalyticsFlush();
+    },
+    [flushAnalyticsQueue, scheduleAnalyticsFlush, user],
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    const previous = activityStateRef.current;
+    const next = { surface: activeSurface, pageId: activePageId };
+    if (previous.surface !== next.surface || previous.pageId !== next.pageId) {
+      const durationMs = Math.max(0, Date.now() - previous.enteredAt);
+      if (durationMs > 250) {
+        void sendAnalyticsEvent({
+          eventType: "surface_dwell",
+          target: previous.surface,
+          pageId: previous.pageId,
+          durationMs,
+        });
+      }
+      activityStateRef.current = { ...next, enteredAt: Date.now() };
+      void sendAnalyticsEvent({
+        eventType: "surface_view",
+        target: next.surface,
+        pageId: next.pageId,
+      });
+    }
+  }, [activePageId, activeSurface, sendAnalyticsEvent, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") {
+        activityStateRef.current.enteredAt = Date.now();
+        return;
+      }
+      const previous = activityStateRef.current;
+      const durationMs = Math.max(0, Date.now() - previous.enteredAt);
+      if (durationMs > 250) {
+        sendAnalyticsEvent({
+          eventType: "surface_dwell",
+          target: previous.surface,
+          pageId: previous.pageId,
+          durationMs,
+        });
+      }
+      void flushAnalyticsQueue();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      const previous = activityStateRef.current;
+      const durationMs = Math.max(0, Date.now() - previous.enteredAt);
+      if (durationMs > 250) {
+        sendAnalyticsEvent({
+          eventType: "surface_dwell",
+          target: previous.surface,
+          pageId: previous.pageId,
+          durationMs,
+        });
+      }
+      void flushAnalyticsQueue();
+    };
+  }, [sendAnalyticsEvent, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const scrollHost = document.querySelector("[data-scroll-host='main']") as HTMLElement | null;
+    if (!scrollHost) return;
+
+    const emitScrollDepth = () => {
+      const maxScroll = Math.max(scrollHost.scrollHeight - scrollHost.clientHeight, 0);
+      if (maxScroll <= 0) return;
+      const currentDepth = Math.round((scrollHost.scrollTop / maxScroll) * 100);
+      if (currentDepth <= scrollDepthRef.current) return;
+      scrollDepthRef.current = currentDepth;
+      const now = Date.now();
+      if (currentDepth - scrollDepthLastSentRef.current < 10 && now - activityStateRef.current.enteredAt < 2000) {
+        return;
+      }
+      scrollDepthLastSentRef.current = currentDepth;
+      void sendAnalyticsEvent({
+        eventType: "surface_scroll",
+        target: activeSurface,
+        pageId: activePageId,
+        y: currentDepth,
+      });
+    };
+
+    const onScroll = () => {
+      window.requestAnimationFrame(emitScrollDepth);
+    };
+
+    scrollHost.addEventListener("scroll", onScroll, { passive: true });
+    emitScrollDepth();
+    return () => scrollHost.removeEventListener("scroll", onScroll);
+  }, [activePageId, activeSurface, sendAnalyticsEvent, user]);
+
+  const handleAnalyticsClick = useCallback(
+    (event: { target: EventTarget | null; clientX: number; clientY: number }) => {
+      if (!user) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!isAnalyticsInteractiveTarget(target)) return;
+      const interactive = target?.closest(
+        "button, a, [role='button'], [data-analytics-zone]",
+      ) as HTMLElement | null;
+      if (!interactive) return;
+      if (interactive.closest("input, textarea, select, [contenteditable='true']")) return;
+
+      const zone = interactive.closest("[data-analytics-zone]") as HTMLElement | null;
+      const label = clampAnalyticsLabel(
+        interactive.getAttribute("data-analytics-target") ??
+          interactive.getAttribute("aria-label") ??
+          interactive.textContent ??
+          interactive.tagName.toLowerCase(),
+      );
+
+      void sendAnalyticsEvent({
+        eventType: "ui_click",
+        target: zone?.dataset.analyticsZone
+          ? `${zone.dataset.analyticsZone}:${label}`
+          : label,
+        pageId: activePageId,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [activePageId, sendAnalyticsEvent, user],
+  );
 
   useEffect(() => {
     activePageRef.current = activePage;
@@ -4506,6 +5119,8 @@ export function App() {
     <LangContext.Provider value={T[lang]}>
       <div
         className='flex h-screen overflow-hidden'
+        onClickCapture={handleAnalyticsClick as never}
+        data-analytics-zone='app-root'
         style={{
           background: "var(--bg-primary)",
           color: "var(--text-primary)",
@@ -4523,6 +5138,7 @@ export function App() {
         {sidebarOpen && (
           <aside
             className='w-[240px] shrink-0 flex flex-col border-r overflow-hidden max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
+            data-analytics-zone='sidebar'
             style={{
               background: "var(--bg-secondary)",
               borderColor: "var(--border-color)",
@@ -5059,7 +5675,7 @@ export function App() {
 
           {/* Content */}
           <div className='flex flex-1 overflow-hidden'>
-            <div className='flex-1 overflow-y-auto'>
+            <div className='flex-1 overflow-y-auto' data-scroll-host='main'>
               {/* ─── CoMa — Configuration Manager (admin only) ─── */}
               {showComa && isAdmin && (
                 <ConfigurationManager csrf={csrf} lang={lang} />
@@ -5187,6 +5803,7 @@ export function App() {
                     className='notion-editor'
                     onClick={() => editor?.commands.focus()}
                     data-placeholder={T[lang].editorPlaceholder}
+                    data-analytics-zone='editor'
                     ref={(el) => {
                       // Propagate placeholder to first paragraph for CSS attr()
                       if (el) {

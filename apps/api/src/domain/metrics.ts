@@ -96,7 +96,9 @@ export async function getActivityMetrics(
     const from = since(WINDOW_HOURS[window]);
     const [activeUsers, apiCalls, newUsers] = await Promise.all([
       distinctActiveUsers(from),
-      prisma.activityEvent.count({ where: { createdAt: { gte: from } } }),
+      prisma.activityEvent.count({
+        where: { createdAt: { gte: from }, eventType: "http" },
+      }),
       prisma.user.count({ where: { createdAt: { gte: from } } }),
     ]);
     return {

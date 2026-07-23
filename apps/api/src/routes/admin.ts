@@ -7,6 +7,10 @@ import {
   getOverviewMetrics,
   parseWindow,
 } from "../domain/metrics.js";
+import {
+  getUserActivitySummary,
+  parseAnalyticsWindow,
+} from "../domain/user-analytics.js";
 
 const setRoleBodySchema = {
   type: "object",
@@ -189,5 +193,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (!requireAdmin(request, reply)) return;
     const window = parseWindow((request.query as { window?: string }).window);
     return reply.send(await getActivityMetrics(window));
+  });
+
+  app.get("/admin/users/:id/activity", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!user) {
+      return reply.status(404).send({
+        code: "USER_NOT_FOUND",
+        message: "User not found",
+        traceId: request.id,
+      });
+    }
+    const window = parseAnalyticsWindow((request.query as { window?: string }).window);
+    return reply.send(await getUserActivitySummary(id, window));
   });
 }

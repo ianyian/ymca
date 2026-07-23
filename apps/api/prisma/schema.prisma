@@ -70,8 +70,13 @@ model User {
 model ActivityEvent {
   id         BigInt   @id @default(autoincrement())
   userId     String?  @db.Uuid
+  eventType  String   @default("http") @db.VarChar(24)
   method     String   @db.VarChar(8)
   path       String   @db.VarChar(256)
+  target     String?  @db.VarChar(128)
+  pageId     String?  @db.Uuid
+  x          Int?
+  y          Int?
   statusCode Int      @db.SmallInt
   durationMs Int?
   createdAt  DateTime @default(now()) @db.Timestamptz(6)
@@ -79,6 +84,8 @@ model ActivityEvent {
 
   @@index([createdAt])
   @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([userId, eventType, createdAt])
 }
 
 model Session {

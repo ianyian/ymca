@@ -20,6 +20,7 @@ import { registerShareRoutes } from "./routes/share.js";
 import { registerInviteRoutes } from "./routes/invite.js";
 import { registerPublishRoutes } from "./routes/publish.js";
 import { registerPublicPageRoutes } from "./routes/public-page.js";
+import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerRevisionRoutes } from "./routes/revisions.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
@@ -152,6 +153,7 @@ export function createServer() {
   app.register(registerInviteRoutes);
   app.register(registerPublishRoutes);
   app.register(registerPublicPageRoutes);
+  app.register(registerAnalyticsRoutes);
   app.register(registerSearchRoutes);
   app.register(registerRevisionRoutes);
   app.register(registerAttachmentRoutes);
@@ -176,7 +178,9 @@ export function createServer() {
       // the dashboard's own 3s polling doesn't inflate the API-call metric.
       if (
         routePattern === "/health" ||
-        routePattern.startsWith("/admin/metrics")
+        routePattern.startsWith("/admin/metrics") ||
+        routePattern.startsWith("/analytics") ||
+        routePattern.startsWith("/me/activity")
       ) {
         return;
       }
