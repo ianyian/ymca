@@ -60,10 +60,60 @@ export type UserActivitySummary = {
   recentEvents: UserActivityRecentEvent[];
 };
 
+let analyticsColumnsCache: { checkedAt: number; ready: boolean } | null = null;
+const ANALYTICS_COLUMNS_TTL_MS = 60_000;
+
+function emptySummary(window: AnalyticsWindowKey): UserActivitySummary {
+  return {
+    window,
+    generatedAt: new Date().toISOString(),
+    totalEvents: 0,
+    clickEvents: 0,
+    dwellMs: 0,
+    scrollDepthMax: 0,
+    scrollDepthAvg: 0,
+    attentionScore: 0,
+    uniquePages: 0,
+    heatmap: [],
+    clickHeatmap: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0)),
+    clickHeatmapTotal: 0,
+    topTargets: [],
+    recentEvents: [],
+  };
+}
+
+async function hasAnalyticsColumns(): Promise<boolean> {
+  if (analyticsColumnsCache && Date.now() - analyticsColumnsCache.checkedAt < ANALYTICS_COLUMNS_TTL_MS) {
+    return analyticsColumnsCache.ready;
+  }
+
+  const rows = await prisma.$queryRaw<{ column_name: string }[]>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ActivityEvent'
+      AND column_name IN ('eventType', 'target', 'pageId', 'x', 'y')
+  `;
+  const found = new Set(rows.map((r) => r.column_name));
+  const ready =
+    found.has("eventType") &&
+    found.has("target") &&
+    found.has("pageId") &&
+    found.has("x") &&
+    found.has("y");
+
+  analyticsColumnsCache = { checkedAt: Date.now(), ready };
+  return ready;
+}
+
 export async function getUserActivitySummary(
   userId: string,
   window: AnalyticsWindowKey,
 ): Promise<UserActivitySummary> {
+  if (!(await hasAnalyticsColumns())) {
+    return emptySummary(window);
+  }
+
   const days = ANALYTICS_WINDOW_DAYS[window];
   const from = since(days);
   const fromDay = startOfDay(from);
