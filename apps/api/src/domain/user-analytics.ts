@@ -247,8 +247,13 @@ function rand(seed: number) {
   };
 }
 
-async function ensureDemoActivityForUser(userId: string): Promise<void> {
-  if (!AUTO_SEED_DEMO_ANALYTICS) return;
+export type DemoActivitySeedResult = {
+  seededDays: number;
+  seededRecords: number;
+  skipped: boolean;
+};
+
+export async function seedDemoActivityForUser(userId: string): Promise<DemoActivitySeedResult> {
 
   const [stats] = await prisma.$queryRaw<
     { total_events: bigint; real_events: bigint }[]
@@ -262,7 +267,7 @@ async function ensureDemoActivityForUser(userId: string): Promise<void> {
   `;
 
   if (Number(stats?.real_events ?? 0n) > 0) {
-    return;
+    return { seededDays: 0, seededRecords: 0, skipped: true };
   }
 
   const seedFrom = since(MIN_DEMO_HEATMAP_DAYS);
@@ -287,7 +292,7 @@ async function ensureDemoActivityForUser(userId: string): Promise<void> {
   }
 
   if (missingDays.length === 0 && Number(stats?.total_events ?? 0n) > 0) {
-    return;
+    return { seededDays: 0, seededRecords: 0, skipped: true };
   }
 
   const random = rand(hashSeed(userId));
@@ -382,6 +387,8 @@ async function ensureDemoActivityForUser(userId: string): Promise<void> {
   }
 
   await prisma.activityEvent.createMany({ data: records });
+
+  return { seededDays: daysToSeed.length, seededRecords: records.length, skipped: false };
 }
 
 async function hasAnalyticsColumns(): Promise<boolean> {
@@ -415,8 +422,6 @@ export async function getUserActivitySummary(
   if (!(await hasAnalyticsColumns())) {
     return buildSyntheticSummary(userId, window);
   }
-
-  await ensureDemoActivityForUser(userId);
 
   const days = ANALYTICS_WINDOW_DAYS[window];
   const from = since(days);
@@ -582,7 +587,7 @@ export async function getUserActivitySummary(
   };
 
   if (result.totalEvents === 0) {
-    return buildSyntheticSummary(userId, window);
+    return emptySummary(window);
   }
 
   return result;

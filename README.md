@@ -40,6 +40,8 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
   **rate limiting**, and enforced permission checks on every page operation
 - **7 languages** (English, Chinese, Malay, Tamil, German, Hungarian, Spanish)
 - **4 themes** (Light, Dark, Muji, VS Code) and adjustable font size
+- Optional demo analytics seeding for an existing account via an explicit script;
+  brand-new accounts stay empty until they generate real activity or you seed them.
 
 ## 🧩 Core Components
 
@@ -145,6 +147,12 @@ database (local, or a Neon connection string).
 5. Open **http://localhost:5173/ymca/**.
 
 Useful scripts: `pnpm typecheck`, `pnpm build`, `pnpm --filter @ymca/api test`.
+
+To seed demo activity for one existing account, run:
+
+```bash
+pnpm --filter @ymca/api seed:demo-analytics -- --email you@example.com
+```
 
 ## ☁️ Deployment
 
