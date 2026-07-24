@@ -107,14 +107,14 @@ async function shouldShowAnalyticsForUser(userId: string): Promise<boolean> {
     const rows = await prisma.$queryRaw<{ hasMeaningfulProductActivity: boolean; hasExplicitDemoActivity: boolean }[]>`
       SELECT
         (
-          EXISTS (SELECT 1 FROM "Workspace" WHERE "ownerId" = ${userId}) OR
-          EXISTS (SELECT 1 FROM "WorkspaceMember" WHERE "userId" = ${userId}) OR
-          EXISTS (SELECT 1 FROM "Page" WHERE "creatorId" = ${userId})
+          EXISTS (SELECT 1 FROM "Workspace" WHERE "ownerId" = ${userId}::uuid) OR
+          EXISTS (SELECT 1 FROM "WorkspaceMember" WHERE "userId" = ${userId}::uuid) OR
+          EXISTS (SELECT 1 FROM "Page" WHERE "creatorId" = ${userId}::uuid)
         ) AS "hasMeaningfulProductActivity",
         EXISTS (
           SELECT 1
           FROM "ActivityEvent"
-          WHERE "userId" = ${userId}
+          WHERE "userId" = ${userId}::uuid
             AND "eventType" <> 'http'
             AND COALESCE("target", '') LIKE 'demo:%'
         ) AS "hasExplicitDemoActivity"
@@ -298,7 +298,7 @@ export async function seedDemoActivityForUser(userId: string): Promise<DemoActiv
       COUNT(*)::bigint AS total_events,
       COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
     FROM "ActivityEvent"
-    WHERE "userId" = ${userId}
+    WHERE "userId" = ${userId}::uuid
       AND "eventType" <> 'http'
   `;
 
@@ -310,7 +310,7 @@ export async function seedDemoActivityForUser(userId: string): Promise<DemoActiv
   const seededRows = await prisma.$queryRaw<{ day: Date }[]>`
     SELECT date_trunc('day', "createdAt") AS day
     FROM "ActivityEvent"
-    WHERE "userId" = ${userId}
+    WHERE "userId" = ${userId}::uuid
       AND "eventType" <> 'http'
       AND "createdAt" >= ${seedFrom}
     GROUP BY 1
@@ -477,14 +477,14 @@ export async function getUserActivitySummary(
           COUNT(DISTINCT "pageId") FILTER (WHERE "pageId" IS NOT NULL)::bigint AS unique_pages,
           COUNT(*) FILTER (WHERE COALESCE("target", '') NOT LIKE 'demo:%')::bigint AS real_events
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${from}
           AND "eventType" <> 'http'
       `,
       prisma.$queryRaw<{ label: string | null; count: bigint }[]>`
         SELECT COALESCE("target", "eventType") AS label, COUNT(*)::bigint AS count
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${from}
           AND "eventType" = 'ui_click'
         GROUP BY COALESCE("target", "eventType")
@@ -494,7 +494,7 @@ export async function getUserActivitySummary(
       prisma.$queryRaw<{ day: Date; count: bigint }[]>`
         SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${fromDay}
           AND "eventType" <> 'http'
         GROUP BY 1
@@ -506,7 +506,7 @@ export async function getUserActivitySummary(
           COALESCE("target", "eventType") AS label,
           COUNT(*)::bigint AS count
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${fromDay}
           AND "eventType" <> 'http'
         GROUP BY 1, 2
@@ -515,7 +515,7 @@ export async function getUserActivitySummary(
       prisma.$queryRaw<{ x: number | null; y: number | null }[]>`
         SELECT "x", "y"
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${from}
           AND "eventType" = 'ui_click'
           AND "x" IS NOT NULL
@@ -526,7 +526,7 @@ export async function getUserActivitySummary(
       prisma.$queryRaw<{ y: number | null }[]>`
         SELECT "y"
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${from}
           AND "eventType" = 'surface_scroll'
           AND "y" IS NOT NULL
@@ -536,7 +536,7 @@ export async function getUserActivitySummary(
       prisma.$queryRaw<{ createdAt: Date; eventType: string; target: string | null; pageId: string | null; durationMs: number | null }[]>`
         SELECT "createdAt", "eventType", "target", "pageId", "durationMs"
         FROM "ActivityEvent"
-        WHERE "userId" = ${userId}
+        WHERE "userId" = ${userId}::uuid
           AND "createdAt" >= ${from}
           AND "eventType" <> 'http'
         ORDER BY "createdAt" DESC
