@@ -4,6 +4,7 @@ import { requireAdmin } from "../auth/require-admin.js";
 import { APP_ROLE_ADMIN } from "../domain/app-roles.js";
 import {
   getActivityMetrics,
+  getAllUsersHeatmap,
   getOverviewMetrics,
   parseWindow,
 } from "../domain/metrics.js";
@@ -193,6 +194,15 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (!requireAdmin(request, reply)) return;
     const window = parseWindow((request.query as { window?: string }).window);
     return reply.send(await getActivityMetrics(window));
+  });
+
+  // Cross-user click heatmap (admin "all users" view).
+  app.get("/admin/analytics/heatmap", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const window = parseAnalyticsWindow(
+      (request.query as { window?: string }).window,
+    );
+    return reply.send(await getAllUsersHeatmap(window));
   });
 
   app.get("/admin/users/:id/activity", async (request, reply) => {

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { APP_ROLE_ADMIN } from "./app-roles.js";
+import { ANALYTICS_WINDOW_DAYS, type AnalyticsWindowKey } from "./user-analytics.js";
 
 // Metrics for the CoMa monitoring dashboard. All reads go through a tiny TTL
 // cache so the dashboard's ~3s polling (and multiple admins) can't turn into a
@@ -102,6 +103,109 @@ export type ActivityMetrics = {
   newUsers: number;
   generatedAt: string;
 };
+
+// ── Cross-user click heatmap (admin "all users" view) ───────────────────────
+// Aggregates every user's click coordinates into a fixed grid so it's meaningful
+// across different screen sizes. Bucketing happens in SQL against the
+// eventType+createdAt index, so it stays cheap as the table grows.
+const CLICK_COLS = 12;
+const CLICK_ROWS = 8;
+const REF_W = 1440;
+const REF_H = 900;
+
+export type AllUsersHeatmap = {
+  window: AnalyticsWindowKey;
+  generatedAt: string;
+  activeUsers: number;
+  totalClicks: number;
+  gridCols: number;
+  gridRows: number;
+  clickHeatmap: number[][];
+  clickHeatmapMax: number;
+  topTargets: { label: string; count: number }[];
+};
+
+function emptyHeatmap(window: AnalyticsWindowKey): AllUsersHeatmap {
+  return {
+    window,
+    generatedAt: new Date().toISOString(),
+    activeUsers: 0,
+    totalClicks: 0,
+    gridCols: CLICK_COLS,
+    gridRows: CLICK_ROWS,
+    clickHeatmap: Array.from({ length: CLICK_ROWS }, () =>
+      Array.from({ length: CLICK_COLS }, () => 0),
+    ),
+    clickHeatmapMax: 0,
+    topTargets: [],
+  };
+}
+
+export async function getAllUsersHeatmap(
+  window: AnalyticsWindowKey,
+): Promise<AllUsersHeatmap> {
+  return cached(`all-heatmap:${window}`, async () => {
+    try {
+      const from = since(ANALYTICS_WINDOW_DAYS[window] * 24);
+      const colDiv = REF_W / CLICK_COLS;
+      const rowDiv = REF_H / CLICK_ROWS;
+
+      const [gridRows, targetRows, meta] = await Promise.all([
+        prisma.$queryRaw<{ gx: number; gy: number; c: bigint }[]>`
+          SELECT
+            LEAST(${CLICK_COLS - 1}, GREATEST(0, floor("x" / ${colDiv})::int)) AS gx,
+            LEAST(${CLICK_ROWS - 1}, GREATEST(0, floor("y" / ${rowDiv})::int)) AS gy,
+            COUNT(*)::bigint AS c
+          FROM "ActivityEvent"
+          WHERE "eventType" = 'ui_click' AND "createdAt" >= ${from}
+            AND "x" IS NOT NULL AND "y" IS NOT NULL
+          GROUP BY 1, 2
+        `,
+        prisma.$queryRaw<{ label: string | null; count: bigint }[]>`
+          SELECT COALESCE("target", "eventType") AS label, COUNT(*)::bigint AS count
+          FROM "ActivityEvent"
+          WHERE "eventType" = 'ui_click' AND "createdAt" >= ${from}
+          GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 12
+        `,
+        prisma.$queryRaw<{ active_users: bigint; total_clicks: bigint }[]>`
+          SELECT COUNT(DISTINCT "userId")::bigint AS active_users,
+                 COUNT(*)::bigint AS total_clicks
+          FROM "ActivityEvent"
+          WHERE "eventType" = 'ui_click' AND "createdAt" >= ${from}
+        `,
+      ]);
+
+      const grid = Array.from({ length: CLICK_ROWS }, () =>
+        Array.from({ length: CLICK_COLS }, () => 0),
+      );
+      let max = 0;
+      for (const r of gridRows) {
+        const gy = Math.min(CLICK_ROWS - 1, Math.max(0, Number(r.gy)));
+        const gx = Math.min(CLICK_COLS - 1, Math.max(0, Number(r.gx)));
+        const c = Number(r.c);
+        grid[gy]![gx] = c;
+        if (c > max) max = c;
+      }
+
+      return {
+        window,
+        generatedAt: new Date().toISOString(),
+        activeUsers: Number(meta[0]?.active_users ?? 0n),
+        totalClicks: Number(meta[0]?.total_clicks ?? 0n),
+        gridCols: CLICK_COLS,
+        gridRows: CLICK_ROWS,
+        clickHeatmap: grid,
+        clickHeatmapMax: max,
+        topTargets: targetRows
+          .map((r) => ({ label: r.label ?? "Unknown", count: Number(r.count) }))
+          .filter((r) => r.count > 0),
+      };
+    } catch (error) {
+      console.error("[metrics] all-users heatmap failed", error);
+      return emptyHeatmap(window);
+    }
+  });
+}
 
 export async function getActivityMetrics(
   window: WindowKey,

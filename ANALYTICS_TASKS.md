@@ -25,14 +25,14 @@ committed on its own so progress survives an interrupted session.
 - [ ] **3. Code-split editor + admin.** `React.lazy` the TipTap editor and the admin
       (CoMa) dashboard so first paint doesn't ship them. Shrinks the ~767 KB single
       chunk. Verify lazy chunks load + Suspense fallbacks. 🟡
-- [ ] **4. Admin cross-user heatmap (NEW).** Aggregate-across-all-users click heatmap
-      + UX metrics. Data + indexes already support it (EXPLAIN uses
-      `ActivityEvent_eventType_createdAt_idx`). Needs:
-        - domain fn `getAllUsersActivityHeatmap(window)` (grid from x/y, top targets,
-          active users, avg attention) — admin only;
-        - admin route (e.g. `GET /admin/analytics/heatmap?window=`);
-        - admin dashboard UI panel.
-      🟡 larger — build after 1–3.
+- [~] **4. Admin cross-user heatmap (NEW).** Aggregate-across-all-users click heatmap.
+      - [x] domain fn `getAllUsersHeatmap(window)` in `metrics.ts` — SQL-bucketed 12×8
+        grid (fixed 1440×900 ref), top targets, active users, total clicks; cached;
+        index-backed. Validated: 139 clicks / 2 users.
+      - [x] admin route `GET /admin/analytics/heatmap?window=` (admin-only).
+      - [ ] **admin dashboard UI panel** — render the grid + top targets in the CoMa
+        admin view. (Frontend only; resume here after token refresh.)
+      🟡 backend done + pushed; UI pending.
 
 ## Validation per task
 - `pnpm --filter @ymca/api typecheck` + `pnpm --filter @ymca/web typecheck`
