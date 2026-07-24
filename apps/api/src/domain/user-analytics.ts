@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 
-export type AnalyticsWindowKey = "24h" | "7d" | "14d" | "30d" | "365d";
+export type AnalyticsWindowKey = "24h" | "7d" | "14d" | "30d" | "365d" | "1825d";
 
 export const ANALYTICS_WINDOW_DAYS: Record<AnalyticsWindowKey, number> = {
   "24h": 1,
@@ -8,10 +8,12 @@ export const ANALYTICS_WINDOW_DAYS: Record<AnalyticsWindowKey, number> = {
   "14d": 14,
   "30d": 30,
   "365d": 365,
+  // 5 years — powers the landing heatmap's year-by-year filter (last 5 years).
+  "1825d": 1825,
 };
 
 export function parseAnalyticsWindow(value: unknown): AnalyticsWindowKey {
-  return value === "24h" || value === "7d" || value === "14d" || value === "30d" || value === "365d"
+  return value === "24h" || value === "7d" || value === "14d" || value === "30d" || value === "365d" || value === "1825d"
     ? value
     : "7d";
 }

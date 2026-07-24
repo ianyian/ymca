@@ -109,7 +109,7 @@ type UserActivityRecentEvent = {
   durationMs: number | null;
 };
 type UserActivitySummary = {
-  window: "24h" | "7d" | "14d" | "30d" | "365d";
+  window: "24h" | "7d" | "14d" | "30d" | "365d" | "1825d";
   generatedAt: string;
   isSynthetic: boolean;
   totalEvents: number;
@@ -1845,6 +1845,60 @@ function activityHeatmapCellStyle(count: number) {
   } as const;
 }
 
+const HEATMAP_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+// UTC "YYYY-MM-DD" — matches the date keys the API emits (server runs in UTC), so
+// grid lookups line up regardless of the viewer's timezone. (The old builder mixed
+// local-parsed dates with toISOString() keys, which dropped days in UTC+ zones.)
+const utcDayKey = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+
+// Build a GitHub-style week grid (columns = weeks, rows = Sun..Sat) covering the
+// inclusive UTC day range [rangeStart, rangeEnd]. Days outside the range (grid
+// padding) are null; days inside get their count from `byDate` (0 when absent).
+function buildHeatmapWeeks(
+  byDate: Map<string, number>,
+  rangeStart: Date,
+  rangeEnd: Date,
+): { weeks: Array<Array<UserActivityHeatmapCell | null>>; monthLabels: string[]; total: number } {
+  const gridStart = new Date(rangeStart);
+  gridStart.setUTCDate(gridStart.getUTCDate() - gridStart.getUTCDay());
+  const gridEnd = new Date(rangeEnd);
+  gridEnd.setUTCDate(gridEnd.getUTCDate() + (6 - gridEnd.getUTCDay()));
+
+  const weeks: Array<Array<UserActivityHeatmapCell | null>> = [];
+  const monthLabels: string[] = [];
+  let week: Array<UserActivityHeatmapCell | null> = [];
+  let prevMonth = "";
+  let total = 0;
+  const cursor = new Date(gridStart);
+  while (cursor <= gridEnd) {
+    if (cursor >= rangeStart && cursor <= rangeEnd) {
+      const key = utcDayKey(cursor);
+      const count = byDate.get(key) ?? 0;
+      total += count;
+      week.push({ date: key, count });
+    } else {
+      week.push(null);
+    }
+    if (week.length === 7) {
+      const firstCell = week.find((cell) => cell != null) ?? null;
+      let label = "";
+      if (firstCell) {
+        const month = HEATMAP_MONTHS[Number(firstCell.date.slice(5, 7)) - 1] ?? "";
+        if (month !== prevMonth) {
+          label = month;
+          prevMonth = month;
+        }
+      }
+      monthLabels.push(label);
+      weeks.push(week);
+      week = [];
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return { weeks, monthLabels, total };
+}
+
 function ActivityContributionHeatmap({
   summary,
   mobile = false,
@@ -1852,77 +1906,85 @@ function ActivityContributionHeatmap({
   summary: UserActivitySummary;
   mobile?: boolean;
 }) {
-  // On phones a full year (53 columns) overflows the screen, so show the last
-  // ~30 days instead. Desktop keeps the GitHub-style year view.
-  const cells = mobile ? summary.heatmap.slice(-30) : summary.heatmap;
-  const emptyWeeks = mobile ? 5 : 53;
+  // Last 5 calendar years, newest first (e.g. 2026 → 2022). Desktop shows a year
+  // filter bar; the selected year drives which calendar year the grid renders.
+  const years = useMemo(() => {
+    const current = new Date().getUTCFullYear();
+    return Array.from({ length: 5 }, (_, i) => current - i);
+  }, []);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getUTCFullYear());
+
+  const byDate = useMemo(
+    () => new Map(summary.heatmap.map((cell) => [cell.date, cell.count])),
+    [summary.heatmap],
+  );
   const dayHighlights = useMemo(
     () => new Map((summary.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
     [summary.dayHighlights],
   );
-  const heatmapWeeks = useMemo(() => {
-    if (cells.length === 0) {
-      return Array.from({ length: emptyWeeks }, (_, weekIndex) =>
-        Array.from({ length: 7 }, (_, dayIndex) => ({
-          date: `empty-${weekIndex}-${dayIndex}`,
-          count: 0,
-        }) as UserActivityHeatmapCell),
-      ) as Array<Array<UserActivityHeatmapCell | null>>;
-    }
-    const first = new Date(`${cells[0]!.date}T00:00:00`);
-    const last = new Date(`${cells[cells.length - 1]!.date}T00:00:00`);
-    const start = new Date(first);
-    start.setDate(start.getDate() - start.getDay());
-    const end = new Date(last);
-    end.setDate(end.getDate() + (6 - end.getDay()));
-    const byDate = new Map(cells.map((cell) => [cell.date, cell.count]));
-    const weeks: Array<Array<UserActivityHeatmapCell | null>> = [];
-    let week: Array<UserActivityHeatmapCell | null> = [];
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      const key = cursor.toISOString().slice(0, 10);
-      if (cursor < first || cursor > last) week.push(null);
-      else week.push({ date: key, count: byDate.get(key) ?? 0 });
-      if (week.length === 7) {
-        weeks.push(week);
-        week = [];
-      }
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return weeks;
-  }, [cells, emptyWeeks]);
 
-  const weekLabels = useMemo(
+  const { weeks, monthLabels } = useMemo(() => {
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (mobile) {
+      // Phones: last 30 days (~5 columns) so the grid fits without a year filter.
+      const start = new Date(todayUtc);
+      start.setUTCDate(start.getUTCDate() - 29);
+      return buildHeatmapWeeks(byDate, start, todayUtc);
+    }
+    const start = new Date(Date.UTC(selectedYear, 0, 1));
+    const end =
+      selectedYear === todayUtc.getUTCFullYear()
+        ? todayUtc
+        : new Date(Date.UTC(selectedYear, 11, 31));
+    return buildHeatmapWeeks(byDate, start, end);
+  }, [byDate, mobile, selectedYear]);
+
+  const rangeActions = useMemo(
     () =>
-      heatmapWeeks.map((week, index) => {
-        const firstCell = week.find((cell) => cell != null);
-        if (cells.length === 0) return "";
-        if (!firstCell) return "";
-        const month = new Date(`${firstCell.date}T00:00:00`).toLocaleDateString([], {
-          month: "short",
-        });
-        if (index > 0) {
-          const previousCell = heatmapWeeks[index - 1]?.find((cell) => cell != null);
-          const previousMonth = previousCell
-            ? new Date(`${previousCell.date}T00:00:00`).toLocaleDateString([], {
-                month: "short",
-              })
-            : "";
-          if (previousMonth === month) return "";
-        }
-        return month;
-      }),
-    [heatmapWeeks],
+      weeks.reduce(
+        (sum, week) => sum + week.reduce((s, cell) => s + (cell?.count ?? 0), 0),
+        0,
+      ),
+    [weeks],
   );
 
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
       <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>{mobile ? "Last 30 days" : "Last year"}</span>
-        <span>{summary.totalEvents} actions</span>
+        <span>{mobile ? "Last 30 days" : selectedYear}</span>
+        <span>{rangeActions} actions</span>
       </div>
-      <div className='grid gap-2 sm:gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start'>
-        <div className='hidden lg:grid grid-rows-7 pt-[21px] text-[10px]' style={{ color: "var(--text-muted)" }}>
+      <div className='flex gap-3 sm:gap-4 items-start'>
+        {/* Year filter — last 5 years (desktop only; mobile stays compact) */}
+        {!mobile && (
+          <div className='flex flex-col gap-1 shrink-0'>
+            {years.map((year) => {
+              const active = year === selectedYear;
+              return (
+                <button
+                  key={year}
+                  type='button'
+                  onClick={() => setSelectedYear(year)}
+                  className={`px-3 py-1.5 text-[12px] rounded-lg text-left transition-colors tabular-nums ${active ? "" : "hover:bg-[var(--bg-hover)]"}`}
+                  // Only the active year sets a background (accent); inactive years
+                  // stay unset so the CSS hover class can apply. Avoids imperative
+                  // style mutation that could desync from React on theme/year change.
+                  style={
+                    active
+                      ? { background: "var(--accent-color)", color: "#ffffff", fontWeight: 600 }
+                      : { color: "var(--text-muted)", fontWeight: 400 }
+                  }
+                  aria-pressed={active}
+                >
+                  {year}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className='hidden lg:grid grid-rows-7 pt-[21px] text-[10px] shrink-0' style={{ color: "var(--text-muted)" }}>
           {Array.from({ length: 7 }).map((_, index) => {
             const label = index === 1 ? "Mon" : index === 3 ? "Wed" : index === 5 ? "Fri" : "";
             return (
@@ -1933,10 +1995,12 @@ function ActivityContributionHeatmap({
           })}
         </div>
 
-        <div className='min-w-0'>
-          <div className='mb-1 hidden sm:flex gap-[8px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
-            {weekLabels.map((label, index) => (
-              <span key={`${label}-${index}`} className='w-[10px] text-center'>
+        <div className='min-w-0 overflow-x-auto'>
+          {/* One label slot per week column, same 10px width + 3px gap as the
+              grid below, so month names sit above their actual columns. */}
+          <div className='mb-1 hidden sm:flex gap-[3px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
+            {monthLabels.map((label, index) => (
+              <span key={`${label}-${index}`} className='w-[10px] shrink-0 whitespace-nowrap'>
                 {label}
               </span>
             ))}
@@ -1945,7 +2009,7 @@ function ActivityContributionHeatmap({
             className='grid gap-[2px] sm:gap-[3px]'
             style={{ gridAutoFlow: "column", gridAutoColumns: "10px", gridTemplateRows: "repeat(7, 10px)" }}
           >
-            {heatmapWeeks.flatMap((week, weekIndex) =>
+            {weeks.flatMap((week, weekIndex) =>
               week.map((cell, dayIndex) => {
                 if (!cell) return <div key={`blank-${weekIndex}-${dayIndex}`} />;
                 const highlights = dayHighlights.get(cell.date) ?? [];
@@ -1961,7 +2025,6 @@ function ActivityContributionHeatmap({
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -2003,7 +2066,7 @@ function WelcomeCard({
         <button
           type='button'
           onClick={onOpenVersionLog}
-          className='flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full whitespace-nowrap border transition-colors'
+          className='ml-auto flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full whitespace-nowrap border transition-colors'
           style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)", color: "var(--text-muted)" }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-primary)")}
@@ -4783,7 +4846,9 @@ export function App() {
 
     let alive = true;
     setHomeActivityLoading(true);
-    api<UserActivitySummary>("/me/activity?window=365d")
+    // Pull 5 years so the landing heatmap's year filter can switch instantly
+    // (client-side buckets by calendar year). Sparse zero-days gzip away.
+    api<UserActivitySummary>("/me/activity?window=1825d")
       .then((data) => {
         if (!alive) return;
         setHomeActivitySummary(data);
