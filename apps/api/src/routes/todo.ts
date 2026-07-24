@@ -18,6 +18,7 @@ const putTodoSchema = {
           id: { type: "string", minLength: 1, maxLength: 64 },
           text: { type: "string", maxLength: 2000 },
           done: { type: "boolean" },
+          createdAt: { type: ["string", "null"], maxLength: 40 },
         },
         required: ["id", "text", "done"],
         additionalProperties: false,
@@ -28,7 +29,12 @@ const putTodoSchema = {
   additionalProperties: false,
 } as const;
 
-type TodoItem = { id: string; text: string; done: boolean };
+type TodoItem = {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt?: string | null;
+};
 
 export async function registerTodoRoutes(app: FastifyInstance) {
   // Fetch the current user's todo list (empty array if they have none yet).

@@ -1967,7 +1967,7 @@ function WelcomeCard({
 
   return (
     <div className='rounded-xl border p-4 mt-8' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }} data-analytics-zone='information-center'>
-      <div className='flex flex-wrap items-center justify-between gap-3 mb-3'>
+      <div className='flex flex-wrap items-center gap-2 mb-3'>
         <div className='flex items-center gap-1 rounded-full border p-1' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
           {([ ["page", "Page"], ["guide", "Guide"] ] as const).map(([key, label]) => (
             <button
@@ -1981,6 +1981,17 @@ function WelcomeCard({
             </button>
           ))}
         </div>
+        <button
+          type='button'
+          onClick={onOpenVersionLog}
+          className='flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full whitespace-nowrap border transition-colors'
+          style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)", color: "var(--text-muted)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-primary)")}
+          title={latestUpdateAt ? `Recent changes — last update ${formatVersionLogTimestamp(latestUpdateAt)}` : "Recent changes"}
+        >
+          <Ico.Clock /> Log
+        </button>
       </div>
 
       {tab === "page" ? (
@@ -2032,7 +2043,24 @@ function WelcomeCard({
 // Todo — one personal quick-scratchpad per user (checkbox + strikethrough)
 // ────────────────────────────────────────────────────────────
 
-type TodoItemT = { id: string; text: string; done: boolean };
+type TodoItemT = {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt?: string;
+};
+
+function formatTodoTimestamp(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function TodoView({ csrf }: { csrf: string }) {
   const [items, setItems] = useState<TodoItemT[]>([]);
@@ -2071,7 +2099,15 @@ function TodoView({ csrf }: { csrf: string }) {
   const addItem = () => {
     const text = input.trim();
     if (!text) return;
-    update([...items, { id: crypto.randomUUID(), text, done: false }]);
+    update([
+      ...items,
+      {
+        id: crypto.randomUUID(),
+        text,
+        done: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
     setInput("");
   };
 
@@ -2175,6 +2211,15 @@ function TodoView({ csrf }: { csrf: string }) {
                   textDecoration: it.done ? "line-through" : "none",
                 }}
               />
+              {it.createdAt && (
+                <span
+                  className='shrink-0 text-[11px] text-right hidden sm:block'
+                  style={{ color: "var(--text-muted)", opacity: 0.75 }}
+                  title='Created'
+                >
+                  {formatTodoTimestamp(it.createdAt)}
+                </span>
+              )}
               <button
                 onClick={() => update(items.filter((x) => x.id !== it.id))}
                 className='shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity'
@@ -5580,6 +5625,7 @@ export function App() {
                 {
                   label: "To-do",
                   icon: <Ico.Check />,
+                  accent: true,
                   action: () => {
                     setShowTodo(true);
                     setShowComa(false);
@@ -5587,26 +5633,39 @@ export function App() {
                     if (isMobileViewport()) setSidebarOpen(false);
                   },
                 },
-              ].map(({ label, icon, action, kbd }) => (
+              ].map(({ label, icon, action, kbd, accent }) => (
                 <button
                   key={label}
                   onClick={action}
                   className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors text-left'
-                  style={{ color: "var(--text-primary)" }}
+                  style={{
+                    color: accent ? "var(--accent-color)" : "var(--text-primary)",
+                    background: accent ? "rgba(35,131,226,0.07)" : "transparent",
+                  }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--bg-hover)")
+                    (e.currentTarget.style.background = accent
+                      ? "rgba(35,131,226,0.14)"
+                      : "var(--bg-hover)")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "transparent")
+                    (e.currentTarget.style.background = accent
+                      ? "rgba(35,131,226,0.07)"
+                      : "transparent")
                   }
                 >
                   <span
                     className='w-4 flex justify-center'
-                    style={{ color: "var(--text-muted)" }}
+                    style={{
+                      color: accent
+                        ? "var(--accent-color)"
+                        : "var(--text-muted)",
+                    }}
                   >
                     {icon}
                   </span>
-                  <span className='flex-1'>{label}</span>
+                  <span className={accent ? "flex-1 font-medium" : "flex-1"}>
+                    {label}
+                  </span>
                   {kbd && (
                     <kbd
                       className='text-[10px] px-1.5 py-0.5 rounded'
