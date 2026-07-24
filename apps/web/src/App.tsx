@@ -2307,7 +2307,7 @@ function DocumentHub({
                 </div>
               </div>
 
-              <div className='hidden sm:flex flex-wrap gap-1.5 overflow-hidden'>
+              <div className='flex flex-wrap gap-1.5 overflow-hidden mt-1.5 sm:mt-0'>
                 {page.tags.slice(0, 3).map((tag) => (
                   <TagBadge key={tag} tag={tag} isDark={isDark} />
                 ))}
