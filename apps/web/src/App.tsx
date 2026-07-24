@@ -1906,13 +1906,13 @@ function ActivityContributionHeatmap({
   summary: UserActivitySummary;
   mobile?: boolean;
 }) {
-  // Last 5 calendar years, newest first (e.g. 2026 → 2022). Desktop shows a year
-  // filter bar; the selected year drives which calendar year the grid renders.
-  const years = useMemo(() => {
-    const current = new Date().getUTCFullYear();
-    return Array.from({ length: 5 }, (_, i) => current - i);
-  }, []);
-  const [selectedYear, setSelectedYear] = useState(() => new Date().getUTCFullYear());
+  // Rolling 12-month window. offset 0 = the last 12 months ending today (e.g. Jul
+  // 2025 → Jul 2026); each "back" step shifts the whole window one year earlier
+  // (Jul 2024 → Jul 2025, …). Data is fetched for 5 years, so we page back up to 4.
+  const MAX_BACK = 4;
+  const [yearOffset, setYearOffset] = useState(0);
+  // Mobile shows the same 12-month view but without paging controls.
+  const offset = mobile ? 0 : yearOffset;
 
   const byDate = useMemo(
     () => new Map(summary.heatmap.map((cell) => [cell.date, cell.count])),
@@ -1923,22 +1923,16 @@ function ActivityContributionHeatmap({
     [summary.dayHighlights],
   );
 
-  const { weeks, monthLabels } = useMemo(() => {
+  const { weeks, monthLabels, rangeStart, rangeEnd } = useMemo(() => {
     const now = new Date();
-    const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    if (mobile) {
-      // Phones: last 30 days (~5 columns) so the grid fits without a year filter.
-      const start = new Date(todayUtc);
-      start.setUTCDate(start.getUTCDate() - 29);
-      return buildHeatmapWeeks(byDate, start, todayUtc);
-    }
-    const start = new Date(Date.UTC(selectedYear, 0, 1));
-    const end =
-      selectedYear === todayUtc.getUTCFullYear()
-        ? todayUtc
-        : new Date(Date.UTC(selectedYear, 11, 31));
-    return buildHeatmapWeeks(byDate, start, end);
-  }, [byDate, mobile, selectedYear]);
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    end.setUTCFullYear(end.getUTCFullYear() - offset);
+    const start = new Date(end);
+    start.setUTCFullYear(start.getUTCFullYear() - 1);
+    start.setUTCDate(start.getUTCDate() + 1);
+    const built = buildHeatmapWeeks(byDate, start, end);
+    return { ...built, rangeStart: start, rangeEnd: end };
+  }, [byDate, offset]);
 
   const rangeActions = useMemo(
     () =>
@@ -1949,82 +1943,90 @@ function ActivityContributionHeatmap({
     [weeks],
   );
 
+  const rangeLabel = `${HEATMAP_MONTHS[rangeStart.getUTCMonth()]} ${rangeStart.getUTCFullYear()} – ${HEATMAP_MONTHS[rangeEnd.getUTCMonth()]} ${rangeEnd.getUTCFullYear()}`;
+  const numWeeks = weeks.length;
+  const backDisabled = offset >= MAX_BACK;
+  const forwardDisabled = offset <= 0;
+
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
-      <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>{mobile ? "Last 30 days" : selectedYear}</span>
-        <span>{rangeActions} actions</span>
+      <div className='flex items-center justify-between gap-2 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
+        <span className='truncate tabular-nums'>{rangeLabel}</span>
+        <div className='flex items-center gap-2 shrink-0'>
+          <span className='tabular-nums whitespace-nowrap'>{rangeActions} actions</span>
+          {!mobile && (
+            <div className='flex items-center gap-1'>
+              <button
+                type='button'
+                onClick={() => setYearOffset((o) => Math.min(MAX_BACK, o + 1))}
+                disabled={backDisabled}
+                className='w-6 h-6 rounded-full border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-[var(--bg-hover)]'
+                style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}
+                aria-label='Previous 12 months'
+                title='Previous 12 months'
+              >
+                <svg width='11' height='11' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round' viewBox='0 0 24 24'>
+                  <path d='m15 18-6-6 6-6' />
+                </svg>
+              </button>
+              <button
+                type='button'
+                onClick={() => setYearOffset((o) => Math.max(0, o - 1))}
+                disabled={forwardDisabled}
+                className='w-6 h-6 rounded-full border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-[var(--bg-hover)]'
+                style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}
+                aria-label='Next 12 months'
+                title='Next 12 months'
+              >
+                <svg width='11' height='11' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round' viewBox='0 0 24 24'>
+                  <path d='m9 18 6-6-6-6' />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-      <div className='flex gap-3 sm:gap-4 items-start'>
-        {/* Year filter — last 5 years (desktop only; mobile stays compact) */}
-        {!mobile && (
-          <div className='flex flex-col gap-1 shrink-0'>
-            {years.map((year) => {
-              const active = year === selectedYear;
-              return (
-                <button
-                  key={year}
-                  type='button'
-                  onClick={() => setSelectedYear(year)}
-                  className={`px-3 py-1.5 text-[12px] rounded-lg text-left transition-colors tabular-nums ${active ? "" : "hover:bg-[var(--bg-hover)]"}`}
-                  // Only the active year sets a background (accent); inactive years
-                  // stay unset so the CSS hover class can apply. Avoids imperative
-                  // style mutation that could desync from React on theme/year change.
-                  style={
-                    active
-                      ? { background: "var(--accent-color)", color: "#ffffff", fontWeight: 600 }
-                      : { color: "var(--text-muted)", fontWeight: 400 }
-                  }
-                  aria-pressed={active}
-                >
-                  {year}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
-        <div className='hidden lg:grid grid-rows-7 pt-[21px] text-[10px] shrink-0' style={{ color: "var(--text-muted)" }}>
-          {Array.from({ length: 7 }).map((_, index) => {
-            const label = index === 1 ? "Mon" : index === 3 ? "Wed" : index === 5 ? "Fri" : "";
+      {/* Month labels align to the grid columns below (same responsive tracks). */}
+      <div
+        className='mb-1 text-[9px] sm:text-[10px]'
+        style={{ display: "grid", gridTemplateColumns: `repeat(${numWeeks}, minmax(0, 1fr))`, gap: "2px", color: "var(--text-muted)" }}
+      >
+        {monthLabels.map((label, index) => (
+          <span key={`${label}-${index}`} className='whitespace-nowrap leading-none'>
+            {label}
+          </span>
+        ))}
+      </div>
+
+      {/* Responsive grid: columns are minmax(0,1fr) and the box keeps a weeks:7
+          aspect ratio, so a full year fits the container width — no horizontal
+          scroll on desktop or mobile. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${numWeeks}, minmax(0, 1fr))`,
+          gridTemplateRows: "repeat(7, 1fr)",
+          gridAutoFlow: "column",
+          aspectRatio: `${numWeeks} / 7`,
+          gap: "2px",
+          width: "100%",
+        }}
+      >
+        {weeks.flatMap((week, weekIndex) =>
+          week.map((cell, dayIndex) => {
+            if (!cell) return <div key={`blank-${weekIndex}-${dayIndex}`} />;
+            const highlights = dayHighlights.get(cell.date) ?? [];
             return (
-              <div key={index} className='h-[10px] leading-[10px] pr-1 text-right'>
-                {label}
-              </div>
+              <div
+                key={cell.date}
+                title={formatActivityDayTooltip(cell, highlights)}
+                className='rounded-[2px] border'
+                style={activityHeatmapCellStyle(cell.count)}
+              />
             );
-          })}
-        </div>
-
-        <div className='min-w-0 overflow-x-auto'>
-          {/* One label slot per week column, same 10px width + 3px gap as the
-              grid below, so month names sit above their actual columns. */}
-          <div className='mb-1 hidden sm:flex gap-[3px] pl-[1px] text-[10px]' style={{ color: "var(--text-muted)" }}>
-            {monthLabels.map((label, index) => (
-              <span key={`${label}-${index}`} className='w-[10px] shrink-0 whitespace-nowrap'>
-                {label}
-              </span>
-            ))}
-          </div>
-          <div
-            className='grid gap-[2px] sm:gap-[3px]'
-            style={{ gridAutoFlow: "column", gridAutoColumns: "10px", gridTemplateRows: "repeat(7, 10px)" }}
-          >
-            {weeks.flatMap((week, weekIndex) =>
-              week.map((cell, dayIndex) => {
-                if (!cell) return <div key={`blank-${weekIndex}-${dayIndex}`} />;
-                const highlights = dayHighlights.get(cell.date) ?? [];
-                return (
-                  <div
-                    key={cell.date}
-                    title={formatActivityDayTooltip(cell, highlights)}
-                    className='rounded-[2px] border'
-                    style={activityHeatmapCellStyle(cell.count)}
-                  />
-                );
-              }),
-            )}
-          </div>
-        </div>
+          }),
+        )}
       </div>
     </div>
   );
