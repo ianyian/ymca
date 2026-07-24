@@ -1981,9 +1981,6 @@ function WelcomeCard({
             </button>
           ))}
         </div>
-        <button type='button' onClick={onOpenVersionLog} className='text-[11px] font-medium px-2.5 py-1.5 rounded-full whitespace-nowrap border' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)", color: "var(--text-muted)" }} title={latestUpdateAt ? formatVersionLogTimestamp(latestUpdateAt) : "Open version log"}>
-          Log
-        </button>
       </div>
 
       {tab === "page" ? (
@@ -2025,6 +2022,169 @@ function WelcomeCard({
               <Ico.Plus /> New page
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Todo — one personal quick-scratchpad per user (checkbox + strikethrough)
+// ────────────────────────────────────────────────────────────
+
+type TodoItemT = { id: string; text: string; done: boolean };
+
+function TodoView({ csrf }: { csrf: string }) {
+  const [items, setItems] = useState<TodoItemT[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [input, setInput] = useState("");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api<{ items: TodoItemT[] }>("/me/todo", {}, csrf)
+      .then((r) => {
+        if (alive) setItems(Array.isArray(r.items) ? r.items : []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [csrf]);
+
+  // Debounced autosave — the client owns the list, PUT replaces it wholesale.
+  const update = (next: TodoItemT[]) => {
+    setItems(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void api(
+        "/me/todo",
+        { method: "PUT", body: JSON.stringify({ items: next }) },
+        csrf,
+      ).catch(() => {});
+    }, 600);
+  };
+
+  const addItem = () => {
+    const text = input.trim();
+    if (!text) return;
+    update([...items, { id: crypto.randomUUID(), text, done: false }]);
+    setInput("");
+  };
+
+  const remaining = items.filter((i) => !i.done).length;
+
+  return (
+    <div
+      className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[720px] mx-auto w-full'
+      data-scroll-host='main'
+      data-analytics-zone='todo'
+    >
+      <div className='flex items-center justify-between mb-4'>
+        <h1 className='text-2xl font-bold' style={{ color: "var(--text-primary)" }}>
+          To-do
+        </h1>
+        {items.length > 0 && (
+          <span className='text-[12px]' style={{ color: "var(--text-muted)" }}>
+            {remaining} left
+          </span>
+        )}
+      </div>
+
+      <div className='flex gap-2 mb-4'>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addItem();
+          }}
+          placeholder='Add a task and press Enter…'
+          className='flex-1 text-sm px-3 py-2 rounded-[8px] border outline-none'
+          style={{
+            borderColor: "var(--border-color)",
+            background: "var(--bg-secondary)",
+            color: "var(--text-primary)",
+          }}
+        />
+        <button
+          onClick={addItem}
+          className='px-3 py-2 rounded-[8px] text-sm font-medium text-white shrink-0'
+          style={{ background: "var(--accent-color)" }}
+        >
+          Add
+        </button>
+      </div>
+
+      {loading ? (
+        <p className='text-sm' style={{ color: "var(--text-muted)" }}>
+          Loading…
+        </p>
+      ) : items.length === 0 ? (
+        <p
+          className='text-sm text-center py-10'
+          style={{ color: "var(--text-muted)" }}
+        >
+          Nothing yet — add your first task above.
+        </p>
+      ) : (
+        <div className='space-y-1'>
+          {items.map((it) => (
+            <div
+              key={it.id}
+              className='group flex items-center gap-3 px-3 py-2 rounded-[8px]'
+              style={{
+                border: "1px solid var(--border-color)",
+                background: "var(--bg-secondary)",
+              }}
+            >
+              <button
+                onClick={() =>
+                  update(
+                    items.map((x) =>
+                      x.id === it.id ? { ...x, done: !x.done } : x,
+                    ),
+                  )
+                }
+                className='shrink-0 w-5 h-5 rounded-[5px] flex items-center justify-center border transition-colors'
+                style={{
+                  borderColor: it.done
+                    ? "var(--accent-color)"
+                    : "var(--border-color)",
+                  background: it.done ? "var(--accent-color)" : "transparent",
+                  color: "#fff",
+                }}
+                title={it.done ? "Mark not done" : "Mark done"}
+              >
+                {it.done && <Ico.Check />}
+              </button>
+              <input
+                value={it.text}
+                onChange={(e) =>
+                  update(
+                    items.map((x) =>
+                      x.id === it.id ? { ...x, text: e.target.value } : x,
+                    ),
+                  )
+                }
+                className='flex-1 bg-transparent outline-none text-sm min-w-0'
+                style={{
+                  color: it.done ? "var(--text-muted)" : "var(--text-primary)",
+                  textDecoration: it.done ? "line-through" : "none",
+                }}
+              />
+              <button
+                onClick={() => update(items.filter((x) => x.id !== it.id))}
+                className='shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity'
+                style={{ color: "var(--text-muted)" }}
+                title='Delete'
+              >
+                <Ico.Trash />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -4163,6 +4323,7 @@ export function App() {
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [showTrash, setShowTrash] = useState(false);
+  const [showTodo, setShowTodo] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   // CoMa (Configuration Manager) view — admin only. When true, the main content
   // area shows the admin panel instead of the document hub / editor.
@@ -4821,6 +4982,7 @@ export function App() {
     try {
       const r = await api<{ page: PageDetail }>(`/pages/${id}`, {}, csrf);
       setShowComa(false);
+      setShowTodo(false);
       setActivePage(r.page);
       setPageTitle(r.page.title);
       setPublicLink(
@@ -5386,6 +5548,7 @@ export function App() {
                   icon: <Ico.Grid />,
                   action: () => {
                     setShowComa(false);
+                    setShowTodo(false);
                     setActivePage(null);
                     if (isMobileViewport()) setSidebarOpen(false);
                   },
@@ -5400,6 +5563,16 @@ export function App() {
                   label: T[lang].newPage,
                   icon: <Ico.Plus />,
                   action: () => void handleNewPage(),
+                },
+                {
+                  label: "To-do",
+                  icon: <Ico.Check />,
+                  action: () => {
+                    setShowTodo(true);
+                    setShowComa(false);
+                    setActivePage(null);
+                    if (isMobileViewport()) setSidebarOpen(false);
+                  },
                 },
               ].map(({ label, icon, action, kbd }) => (
                 <button
@@ -5486,6 +5659,7 @@ export function App() {
                 <button
                   onClick={() => {
                     setShowComa(true);
+                    setShowTodo(false);
                     setActivePage(null);
                     if (isMobileViewport()) setSidebarOpen(false);
                   }}
@@ -5882,8 +6056,13 @@ export function App() {
                 <ConfigurationManager csrf={csrf} lang={lang} isDark={isDark} />
               )}
 
+              {/* ─── To-do (personal scratchpad) ─── */}
+              {showTodo && !activePage && !showComa && (
+                <TodoView csrf={csrf} />
+              )}
+
               {/* ─── Home / Document Hub ─── */}
-              {!activePage && !showComa && (
+              {!activePage && !showComa && !showTodo && (
                 <DocumentHub
                   tree={tree}
                   isDark={isDark}
