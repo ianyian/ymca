@@ -71,3 +71,44 @@ export async function stopActivityBuffer(): Promise<void> {
   }
   await flushActivityBuffer();
 }
+
+// ── Retention ───────────────────────────────────────────────────────────────
+// Keep raw activity for 6 months (experimental phase — we want to trace real
+// activity), then prune. A single daily deleteMany is plenty at this scale and
+// avoids the table growing unbounded from per-request HTTP logging.
+const RETENTION_DAYS = 180;
+const RETENTION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let retentionTimer: NodeJS.Timeout | null = null;
+
+export async function pruneOldActivity(): Promise<void> {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  try {
+    const { count } = await prisma.activityEvent.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    if (count > 0) {
+      console.log(
+        `[activity-retention] pruned ${count} events older than ${RETENTION_DAYS} days`,
+      );
+    }
+  } catch (err) {
+    // Never let retention break the app; just log and retry next interval.
+    console.error("[activity-retention] prune failed", err);
+  }
+}
+
+export function startActivityRetention(): void {
+  if (retentionTimer) return;
+  void pruneOldActivity(); // run once shortly after boot
+  retentionTimer = setInterval(() => {
+    void pruneOldActivity();
+  }, RETENTION_INTERVAL_MS);
+  retentionTimer.unref?.();
+}
+
+export function stopActivityRetention(): void {
+  if (retentionTimer) {
+    clearInterval(retentionTimer);
+    retentionTimer = null;
+  }
+}

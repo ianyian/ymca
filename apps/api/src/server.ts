@@ -8,6 +8,8 @@ import {
   recordActivity,
   startActivityBuffer,
   stopActivityBuffer,
+  startActivityRetention,
+  stopActivityRetention,
 } from "./lib/activity-buffer.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { resolveAuthFromRequest } from "./auth/session.js";
@@ -166,6 +168,7 @@ export function createServer() {
   // blocks the response. Disabled under test.
   if (process.env.NODE_ENV !== "test") {
     startActivityBuffer();
+    startActivityRetention();
 
     app.addHook("onResponse", async (request, reply) => {
       const method = request.method;
@@ -196,6 +199,7 @@ export function createServer() {
     });
 
     app.addHook("onClose", async () => {
+      stopActivityRetention();
       await stopActivityBuffer();
     });
   }
