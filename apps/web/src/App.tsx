@@ -2197,6 +2197,7 @@ function DocumentHub({
   isLoading,
   onSelectPage,
   onNewPage,
+  onDeletePage,
   latestUpdateAt,
   onOpenVersionLog,
   activitySummary,
@@ -2208,6 +2209,7 @@ function DocumentHub({
   isLoading: boolean;
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
+  onDeletePage: (id: string) => void;
   latestUpdateAt: string | null;
   onOpenVersionLog: () => void;
   activitySummary: UserActivitySummary | null;
@@ -2370,7 +2372,7 @@ function DocumentHub({
       >
         {/* Table header — title, tags, and actions on desktop; title only on mobile */}
         <div
-          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
+          className='grid text-[11px] font-semibold uppercase tracking-wider px-4 py-2.5 border-b grid-cols-[1fr] sm:grid-cols-[1fr_180px_110px]'
           style={{
             background: "var(--bg-secondary)",
             color: "var(--text-muted)",
@@ -2387,7 +2389,7 @@ function DocumentHub({
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className='grid items-center py-2.5 grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
+                className='grid items-center py-2.5 grid-cols-[1fr] sm:grid-cols-[1fr_180px_110px]'
               >
                 <div
                   className='h-4 rounded animate-pulse'
@@ -2430,7 +2432,7 @@ function DocumentHub({
           return (
             <div
               key={page.id}
-              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr] sm:grid-cols-[1fr_180px_70px]'
+              className='grid items-center px-4 py-2.5 cursor-pointer transition-colors border-b last:border-0 group grid-cols-[1fr] sm:grid-cols-[1fr_180px_110px]'
               style={{
                 borderColor: "var(--border-color)",
                 background: "transparent",
@@ -2481,8 +2483,19 @@ function DocumentHub({
                 )}
               </div>
 
-              {/* Open button - visible on row hover */}
-              <div className='hidden sm:flex justify-end'>
+              {/* Row actions - visible on hover */}
+              <div className='hidden sm:flex justify-end items-center gap-1.5'>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeletePage(page.id);
+                  }}
+                  className='opacity-0 group-hover:opacity-100 p-1 rounded-[4px] transition-all'
+                  style={{ color: "var(--text-muted)" }}
+                  title='Move to trash'
+                >
+                  <Ico.Trash />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -5609,45 +5622,9 @@ export function App() {
               ))}
             </div>
 
-            {/* Pages */}
-            <div className='flex-1 overflow-y-auto mt-3 px-1'>
-              <div className='flex items-center justify-between px-2.5 mb-1'>
-                <span
-                  className='text-[10px] font-semibold uppercase tracking-wider'
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Pages
-                </span>
-                <button
-                  onClick={() => void handleNewPage()}
-                  style={{ color: "var(--text-muted)" }}
-                  title='New page'
-                  className='hover:opacity-80 p-0.5 rounded-[3px] transition-opacity'
-                >
-                  <Ico.Plus />
-                </button>
-              </div>
-              {tree.length === 0 && (
-                <p
-                  className='text-[12px] px-2.5 py-3 text-center'
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No pages yet
-                </p>
-              )}
-              {tree.map((node) => (
-                <PageTreeNode
-                  key={node.id}
-                  node={node}
-                  depth={0}
-                  activePageId={activePage?.id ?? null}
-                  isDark={isDark}
-                  onSelect={(id) => void handleSelectPage(id)}
-                  onNewChild={(id) => void handleNewPage(id)}
-                  onDelete={(id) => void handleDeletePage(id)}
-                />
-              ))}
-            </div>
+            {/* The sidebar page list has been removed — the Home / Document Hub
+                grid is the page browser. This spacer keeps the bottom nav pinned. */}
+            <div className='flex-1' />
 
             {/* Bottom */}
             <div
@@ -6069,6 +6046,7 @@ export function App() {
                   isLoading={initialLoad}
                   onSelectPage={(id) => void handleSelectPage(id)}
                   onNewPage={() => void handleNewPage()}
+                  onDeletePage={(id) => void handleDeletePage(id)}
                   latestUpdateAt={latestVersionLogAt}
                   onOpenVersionLog={() => setShowVersionLog(true)}
                   activitySummary={homeActivitySummary}
