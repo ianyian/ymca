@@ -1828,22 +1828,41 @@ function activityHeatmapIntensity(count: number) {
 }
 
 function activityHeatmapCellStyle(count: number) {
+  // Empty days get a barely-there, theme-aware tint (no border/inset ring) so an
+  // inactive grid reads as a subtle heatmap rather than a block of grey boxes.
+  // Days with activity keep the blue ramp plus a crisp edge for definition.
+  if (count <= 0) {
+    return {
+      background: "var(--heatmap-empty)",
+      borderColor: "transparent",
+      boxShadow: "none",
+    } as const;
+  }
   return {
-    background: count <= 0 ? "var(--bg-hover)" : activityHeatmapIntensity(count),
+    background: activityHeatmapIntensity(count),
     borderColor: "var(--border-color)",
     boxShadow: "inset 0 0 0 1px rgba(127,127,127,0.16)",
   } as const;
 }
 
-function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary }) {
-  const cells = summary.heatmap;
+function ActivityContributionHeatmap({
+  summary,
+  mobile = false,
+}: {
+  summary: UserActivitySummary;
+  mobile?: boolean;
+}) {
+  // On phones a full year (53 columns) overflows the screen, so show the last
+  // ~30 days instead. Desktop keeps the GitHub-style year view.
+  const cells = mobile ? summary.heatmap.slice(-30) : summary.heatmap;
+  const emptyWeeks = mobile ? 5 : 53;
   const dayHighlights = useMemo(
     () => new Map((summary.dayHighlights ?? []).map((item) => [item.date, item.topTargets])),
     [summary.dayHighlights],
   );
   const heatmapWeeks = useMemo(() => {
     if (cells.length === 0) {
-      return Array.from({ length: 53 }, (_, weekIndex) =>
+      return Array.from({ length: emptyWeeks }, (_, weekIndex) =>
         Array.from({ length: 7 }, (_, dayIndex) => ({
           date: `empty-${weekIndex}-${dayIndex}`,
           count: 0,
@@ -1871,7 +1890,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
       cursor.setDate(cursor.getDate() + 1);
     }
     return weeks;
-  }, [cells]);
+  }, [cells, emptyWeeks]);
 
   const weekLabels = useMemo(
     () =>
@@ -1899,7 +1918,7 @@ function ActivityContributionHeatmap({ summary }: { summary: UserActivitySummary
   return (
     <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
       <div className='flex items-center justify-between gap-3 mb-3 text-[11px]' style={{ color: "var(--text-muted)" }}>
-        <span>Last year</span>
+        <span>{mobile ? "Last 30 days" : "Last year"}</span>
         <span>{summary.totalEvents} actions</span>
       </div>
       <div className='grid gap-2 sm:gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start'>
@@ -2572,8 +2591,10 @@ function DocumentHub({
         </p>
       )}
 
-      {/* Getting-started card — hidden on mobile to save space + render cost */}
-      {!isMobileViewport() && (
+      {/* Getting-started card — hidden on mobile to save space + render cost.
+          On mobile we still surface a compact last-30-days contribution chart so
+          the heatmap fits the screen without the full guide/log card. */}
+      {!isMobileViewport() ? (
         <WelcomeCard
           onNewPage={onNewPage}
           latestUpdateAt={latestUpdateAt}
@@ -2582,7 +2603,18 @@ function DocumentHub({
           activityLoading={activityLoading}
           activityError={activityError}
         />
-      )}
+      ) : activitySummary && !activityLoading ? (
+        <div
+          className='rounded-xl border p-3 mt-8'
+          style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}
+          data-analytics-zone='information-center'
+        >
+          <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
+            Contribution chart
+          </h3>
+          <ActivityContributionHeatmap summary={activitySummary} mobile />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3089,14 +3121,6 @@ function ProfileActivityDrawer({
     [chartGridColor, chartMutedColor, chartTextColor],
   );
 
-  const heatmapIntensity = (count: number) => {
-    if (count <= 0) return "rgba(35,131,226,0.04)";
-    if (count <= 1) return "rgba(35,131,226,0.12)";
-    if (count <= 3) return "rgba(35,131,226,0.22)";
-    if (count <= 6) return "rgba(35,131,226,0.34)";
-    return "rgba(35,131,226,0.48)";
-  };
-
   const heatmapDays = summary?.heatmap?.length
     ? summary.heatmap.slice(-14)
     : Array.from({ length: 14 }, (_, index) => ({ date: `empty-${index}`, count: 0 }) as UserActivityHeatmapCell);
@@ -3242,11 +3266,7 @@ function ProfileActivityDrawer({
                           <div
                             title={formatActivityDayTooltip(cell, highlights)}
                             className='h-3.5 rounded-[3px] border'
-                            style={{
-                              background: heatmapIntensity(cell.count),
-                              borderColor: "var(--border-color)",
-                              boxShadow: "inset 0 0 0 1px rgba(127,127,127,0.16)",
-                            }}
+                            style={activityHeatmapCellStyle(cell.count)}
                           />
                         </div>
                       );
