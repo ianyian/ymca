@@ -3,19 +3,26 @@ import { requireAuth } from "../auth/require-auth.js";
 import { getUserActivitySummary, parseAnalyticsWindow } from "../domain/user-analytics.js";
 import { recordActivity } from "../lib/activity-buffer.js";
 
+// NOTE: fields that the client may send as `null` MUST allow the "null" type.
+// Fastify/ajv has `coerceTypes` on, so a `null` against a bare `type: "string"`
+// is coerced to "" — which then fails to insert into the uuid `pageId` column
+// and drops the whole batch. Allowing null keeps the value null.
 const analyticsEventSchema = {
   type: "object",
   properties: {
     eventType: { type: "string", minLength: 1, maxLength: 24 },
-    target: { type: "string", maxLength: 128 },
-    pageId: { type: "string", maxLength: 64 },
-    x: { type: "number" },
-    y: { type: "number" },
-    durationMs: { type: "number" },
+    target: { type: ["string", "null"], maxLength: 128 },
+    pageId: { type: ["string", "null"], maxLength: 64 },
+    x: { type: ["number", "null"] },
+    y: { type: ["number", "null"] },
+    durationMs: { type: ["number", "null"] },
   },
   required: ["eventType"],
   additionalProperties: false,
 } as const;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const analyticsBatchSchema = {
   type: "object",
@@ -44,8 +51,13 @@ function toActivityRecord(userId: string, body: {
     eventType: body.eventType,
     method: "CLIENT",
     path: "/analytics/events",
-    target: body.target ?? null,
-    pageId: body.pageId ?? null,
+    target: body.target ? body.target : null,
+    // pageId is a uuid column — accept only well-formed uuids, else null. An
+    // invalid value here would fail the whole createMany batch.
+    pageId:
+      typeof body.pageId === "string" && UUID_RE.test(body.pageId)
+        ? body.pageId
+        : null,
     x: Number.isFinite(body.x ?? NaN) ? Math.round(body.x ?? 0) : null,
     y: Number.isFinite(body.y ?? NaN) ? Math.round(body.y ?? 0) : null,
     statusCode: 200,
