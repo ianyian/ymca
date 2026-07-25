@@ -6,6 +6,8 @@ import {
   getActivityMetrics,
   getAllUsersHeatmap,
   getOverviewMetrics,
+  getUsageAnalytics,
+  parseUsageWindow,
   parseWindow,
 } from "../domain/metrics.js";
 import {
@@ -203,6 +205,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       (request.query as { window?: string }).window,
     );
     return reply.send(await getAllUsersHeatmap(window));
+  });
+
+  // Usage analytics for the admin "Analysis" dashboard.
+  app.get("/admin/analytics/usage", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const window = parseUsageWindow((request.query as { window?: string }).window);
+    return reply.send(await getUsageAnalytics(window));
   });
 
   app.get("/admin/users/:id/activity", async (request, reply) => {

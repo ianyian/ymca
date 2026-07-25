@@ -12,13 +12,16 @@ import Highlight from "@tiptap/extension-highlight";
 import UniqueID from "@tiptap/extension-unique-id";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import type { EditorView } from "@tiptap/pm/view";
-import { Bar } from "react-chartjs-2";
+import { Bar, Line } from "react-chartjs-2";
 import {
   BarElement,
   CategoryScale,
   Chart as ChartJS,
+  Filler,
   Legend,
   LinearScale,
+  LineElement,
+  PointElement,
   Tooltip,
 } from "chart.js";
 import {
@@ -35,7 +38,7 @@ import {
 } from "./editor-extensions";
 import { AT, LangContext, LANGUAGES, T, useT, type Lang } from "./i18n";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Tooltip, Legend);
 
 // ────────────────────────────────────────────────────────────
 // App version — hardcoded. Bump these two values on an official release.
@@ -3934,6 +3937,19 @@ type ActivityMetrics = {
   newUsers: number;
 };
 type MetricWindow = "6h" | "12h" | "24h";
+type UsageWindow = "7d" | "30d" | "90d";
+type UsageAnalytics = {
+  window: UsageWindow;
+  totalEvents: number;
+  activeUsers: number;
+  avgEventsPerUser: number;
+  days: string[];
+  daily: { date: string; events: number; users: number }[];
+  topUsers: { userId: string; label: string; total: number; daily: number[] }[];
+  hourly: number[];
+  weekday: number[];
+  topTargets: { label: string; count: number }[];
+};
 
 function relativeTime(iso: string | null, at: (typeof AT)[Lang]): string {
   if (!iso) return at.never;
@@ -4415,9 +4431,292 @@ function UserManagementPanel({ csrf, lang, isDark }: { csrf: string; lang: Lang;
   );
 }
 
+// Distinct series colors for the top-5-users composite chart.
+const ANALYSIS_SERIES = ["#2383e2", "#e0a13b", "#3bb273", "#c85c5c", "#8b6fc4"];
+
+function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
+  const t = AT[lang];
+  const [window, setWindow] = useState<UsageWindow>("30d");
+  const [data, setData] = useState<UsageAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    api<UsageAnalytics>(`/admin/analytics/usage?window=${window}`)
+      .then((r) => {
+        if (!alive) return;
+        setData(r);
+        setErr(null);
+      })
+      .catch((e) => alive && setErr(e instanceof Error ? e.message : "Error"))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [window]);
+
+  const chartText = isDark ? "#e6e6e5" : "#37352f";
+  const chartMuted = isDark ? "rgba(230,230,229,0.6)" : "rgba(80,80,80,0.72)";
+  const chartGrid = isDark ? "rgba(255,255,255,0.08)" : "rgba(127,127,127,0.12)";
+
+  const dayLabels = useMemo(
+    () =>
+      (data?.days ?? []).map((d) => {
+        const dt = new Date(`${d}T00:00:00Z`);
+        return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`;
+      }),
+    [data?.days],
+  );
+
+  const baseOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index" as const, intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: chartMuted, boxWidth: 10, font: { size: 10 } },
+        },
+        tooltip: {
+          backgroundColor: isDark ? "rgba(20,20,20,0.96)" : "rgba(255,255,255,0.96)",
+          titleColor: chartText,
+          bodyColor: chartText,
+          borderColor: chartGrid,
+          borderWidth: 1,
+        },
+      },
+      scales: {
+        x: { grid: { color: chartGrid }, ticks: { color: chartMuted, font: { size: 9 }, maxRotation: 0, autoSkip: true } },
+        y: { grid: { color: chartGrid }, ticks: { color: chartMuted, font: { size: 9 }, precision: 0 }, beginAtZero: true },
+      },
+    }),
+    [chartText, chartMuted, chartGrid, isDark],
+  );
+
+  // Daily usage: events area + active-users line on a secondary axis.
+  const trendData = useMemo(
+    () => ({
+      labels: dayLabels,
+      datasets: [
+        {
+          label: t.totalEvents,
+          data: (data?.daily ?? []).map((d) => d.events),
+          borderColor: "#2383e2",
+          backgroundColor: "rgba(35,131,226,0.18)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+          yAxisID: "y",
+        },
+        {
+          label: t.activeUsers,
+          data: (data?.daily ?? []).map((d) => d.users),
+          borderColor: "#3bb273",
+          backgroundColor: "#3bb273",
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [dayLabels, data?.daily, t.totalEvents, t.activeUsers],
+  );
+  const trendOptions = useMemo(
+    () => ({
+      ...baseOptions,
+      scales: {
+        ...baseOptions.scales,
+        y1: {
+          position: "right" as const,
+          grid: { drawOnChartArea: false },
+          ticks: { color: chartMuted, font: { size: 9 }, precision: 0 },
+          beginAtZero: true,
+        },
+      },
+    }),
+    [baseOptions, chartMuted],
+  );
+
+  // Top 5 users — stacked area (composite of each user's daily usage).
+  const topUsersData = useMemo(
+    () => ({
+      labels: dayLabels,
+      datasets: (data?.topUsers ?? []).map((u, i) => {
+        const color = ANALYSIS_SERIES[i % ANALYSIS_SERIES.length]!;
+        return {
+          label: u.label,
+          data: u.daily,
+          borderColor: color,
+          backgroundColor: `${color}44`,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        };
+      }),
+    }),
+    [dayLabels, data?.topUsers],
+  );
+  const stackedOptions = useMemo(
+    () => ({
+      ...baseOptions,
+      scales: {
+        x: { ...baseOptions.scales.x, stacked: true },
+        y: { ...baseOptions.scales.y, stacked: true },
+      },
+    }),
+    [baseOptions],
+  );
+
+  const hourData = useMemo(
+    () => ({
+      labels: Array.from({ length: 24 }, (_, h) => `${h}`),
+      datasets: [
+        {
+          label: t.totalEvents,
+          data: data?.hourly ?? [],
+          backgroundColor: "rgba(35,131,226,0.7)",
+          borderRadius: 3,
+        },
+      ],
+    }),
+    [data?.hourly, t.totalEvents],
+  );
+
+  // Postgres DOW is 0=Sun..6=Sat; present Mon-first.
+  const weekdayData = useMemo(() => {
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    return {
+      labels,
+      datasets: [
+        {
+          label: t.totalEvents,
+          data: order.map((i) => data?.weekday?.[i] ?? 0),
+          backgroundColor: "rgba(59,178,115,0.7)",
+          borderRadius: 3,
+        },
+      ],
+    };
+  }, [data?.weekday, t.totalEvents]);
+
+  const targetData = useMemo(
+    () => ({
+      labels: (data?.topTargets ?? []).map((x) => x.label),
+      datasets: [
+        {
+          label: t.totalEvents,
+          data: (data?.topTargets ?? []).map((x) => x.count),
+          backgroundColor: "rgba(224,161,59,0.75)",
+          borderRadius: 3,
+        },
+      ],
+    }),
+    [data?.topTargets, t.totalEvents],
+  );
+  const horizontalOptions = useMemo(
+    () => ({
+      ...baseOptions,
+      indexAxis: "y" as const,
+      plugins: { ...baseOptions.plugins, legend: { display: false } },
+    }),
+    [baseOptions],
+  );
+  const barOptions = useMemo(
+    () => ({ ...baseOptions, plugins: { ...baseOptions.plugins, legend: { display: false } } }),
+    [baseOptions],
+  );
+
+  return (
+    <div className='space-y-6'>
+      {err && (
+        <div className='text-[12px] px-3 py-2 rounded-[6px]' style={{ background: "var(--bg-hover)", color: "#c03030" }}>
+          {err}
+        </div>
+      )}
+
+      {/* Window selector */}
+      <div className='flex items-center gap-1'>
+        {(["7d", "30d", "90d"] as const).map((w) => (
+          <button
+            key={w}
+            onClick={() => setWindow(w)}
+            className='px-3 py-1.5 text-[12px] rounded-[6px] border transition-colors'
+            style={{
+              borderColor: window === w ? "var(--accent-color)" : "var(--border-color)",
+              color: window === w ? "var(--accent-color)" : "var(--text-muted)",
+              background: window === w ? "rgba(35,131,226,0.08)" : "transparent",
+            }}
+          >
+            {w}
+          </button>
+        ))}
+        {loading && (
+          <span className='text-[11px] ml-2' style={{ color: "var(--text-muted)" }}>
+            {t.loading}
+          </span>
+        )}
+      </div>
+
+      {/* KPIs */}
+      <div className='grid gap-3 grid-cols-3'>
+        <KpiCard label={t.totalEvents} value={data?.totalEvents ?? "—"} accent />
+        <KpiCard label={t.activeUsers} value={data?.activeUsers ?? "—"} />
+        <KpiCard label={t.avgPerUser} value={data?.avgEventsPerUser ?? "—"} />
+      </div>
+
+      {/* Daily usage trend */}
+      <section>
+        <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.usageTrend}</h3>
+        <div className='h-[220px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+          <Line data={trendData} options={trendOptions} />
+        </div>
+      </section>
+
+      {/* Top 5 users (composite) */}
+      <section>
+        <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.topUsersUsage}</h3>
+        <div className='h-[240px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+          <Line data={topUsersData} options={stackedOptions} />
+        </div>
+      </section>
+
+      {/* When: hour-of-day + weekday */}
+      <div className='grid gap-4 md:grid-cols-2'>
+        <section>
+          <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.peakHours}</h3>
+          <div className='h-[200px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+            <Bar data={hourData} options={barOptions} />
+          </div>
+        </section>
+        <section>
+          <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.byWeekday}</h3>
+          <div className='h-[200px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+            <Bar data={weekdayData} options={barOptions} />
+          </div>
+        </section>
+      </div>
+
+      {/* Focus areas */}
+      <section>
+        <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.focusAreas}</h3>
+        <div className='h-[260px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
+          <Bar data={targetData} options={horizontalOptions} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang; isDark: boolean }) {
   const t = AT[lang];
-  const [tab, setTab] = useState<"monitoring" | "users">("monitoring");
+  const [tab, setTab] = useState<"monitoring" | "analysis" | "users">("monitoring");
   return (
     <div className='max-w-[1040px] mx-auto px-5 py-6 sm:px-8 sm:py-10 w-full' data-analytics-zone='admin-dashboard'>
       <div className='mb-1 flex items-center gap-2'>
@@ -4442,6 +4741,7 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
         {(
           [
             ["monitoring", t.monitoring],
+            ["analysis", t.analysis],
             ["users", t.userManagement],
           ] as const
         ).map(([key, label]) => (
@@ -4461,6 +4761,8 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
 
       {tab === "monitoring" ? (
         <MonitoringPanel lang={lang} />
+      ) : tab === "analysis" ? (
+        <AnalysisPanel lang={lang} isDark={isDark} />
       ) : (
         <UserManagementPanel csrf={csrf} lang={lang} isDark={isDark} />
       )}

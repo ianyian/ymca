@@ -181,6 +181,7 @@ export type MockState = {
 
   // Attachments — public-page route lists them for the published-page download section
   pageAttachmentFindManyResult: { id: string; originalName: string; size: number }[];
+  pageStarFindManyResult: { pageId: string }[];
 
   // Phase 3: $queryRaw search results
   searchQueryResult: Array<{ id: string; title: string; icon: string | null; workspaceId: string; deletedAt: Date | null }>;
@@ -211,6 +212,7 @@ export const mockState: MockState = {
   pageRevisionFindManyResult: [FIXTURES.revision],
   pageRevisionFindUniqueResult: FIXTURES.revision,
   pageAttachmentFindManyResult: [],
+  pageStarFindManyResult: [],
   searchQueryResult: [],
 };
 
@@ -239,6 +241,7 @@ export function resetMockState(overrides: Partial<MockState> = {}): void {
   mockState.pageRevisionFindManyResult = [FIXTURES.revision];
   mockState.pageRevisionFindUniqueResult = FIXTURES.revision;
   mockState.pageAttachmentFindManyResult = [];
+  mockState.pageStarFindManyResult = [];
   mockState.searchQueryResult = [];
 
   Object.assign(mockState, overrides);
@@ -356,6 +359,12 @@ export const mockPrisma = {
 
   pageAttachment: {
     findMany: async (_args: unknown) => mockState.pageAttachmentFindManyResult,
+  },
+
+  pageStar: {
+    findMany: async (_args: unknown) => mockState.pageStarFindManyResult,
+    upsert: async (_args: unknown) => ({ id: 'star-id' }),
+    deleteMany: async (_args: unknown) => ({ count: 0 }),
   },
 
   pagePermission: {
