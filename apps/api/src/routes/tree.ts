@@ -47,8 +47,16 @@ export async function registerTreeRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'asc' },
       });
 
+      // Which of these pages the current user has starred (Gmail-style favourite).
+      const stars = await prisma.pageStar.findMany({
+        where: { userId: user.id, pageId: { in: pages.map((p) => p.id) } },
+        select: { pageId: true },
+      });
+      const starredIds = new Set(stars.map((s) => s.pageId));
+
       const serialized = pages.map((p) => ({
         ...p,
+        isStarred: starredIds.has(p.id),
         updatedAt: p.updatedAt.toISOString(),
       }));
 

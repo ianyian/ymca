@@ -24,6 +24,7 @@ import { registerPublishRoutes } from "./routes/publish.js";
 import { registerPublicPageRoutes } from "./routes/public-page.js";
 import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerTodoRoutes } from "./routes/todo.js";
+import { registerStarRoutes } from "./routes/star.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerRevisionRoutes } from "./routes/revisions.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
@@ -158,6 +159,7 @@ export function createServer() {
   app.register(registerPublicPageRoutes);
   app.register(registerAnalyticsRoutes);
   app.register(registerTodoRoutes);
+  app.register(registerStarRoutes);
   app.register(registerSearchRoutes);
   app.register(registerRevisionRoutes);
   app.register(registerAttachmentRoutes);

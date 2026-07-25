@@ -59,8 +59,25 @@ model User {
   passwordResets  PasswordResetToken[]
   activityEvents  ActivityEvent[]
   todo            UserTodo?
+  pageStars       PageStar[]
 
   @@index([appRoleId])
+}
+
+/// A user's starred/favourite pages (Gmail-style star). Per-user, so a shared
+/// page can be starred by one member without affecting others. Rows are removed
+/// when either the user or the page is deleted.
+model PageStar {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  pageId    String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pageId])
+  @@index([userId])
+  @@index([pageId])
 }
 
 /// One personal quick-todo list per user (single row). `items` is a JSON array of
@@ -171,6 +188,7 @@ model Page {
   revisions     PageRevision[]
   permissions   PagePermission[]
   attachments   PageAttachment[]
+  stars         PageStar[]
 
   @@index([parentPageId])
   @@index([workspaceId, deletedAt])

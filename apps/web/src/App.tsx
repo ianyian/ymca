@@ -69,6 +69,7 @@ type PageNode = {
   parentPageId: string | null;
   deletedAt: string | null;
   updatedAt: string;
+  isStarred?: boolean;
   children: PageNode[];
 };
 type PageDetail = {
@@ -308,6 +309,22 @@ const Ico = {
       viewBox='0 0 24 24'
     >
       <path d='M12 5v14M5 12h14' />
+    </svg>
+  ),
+  // Star: filled gold when starred, otherwise an outline "frame" (no fill),
+  // matching the Gmail-style star toggle.
+  Star: ({ filled }: { filled?: boolean }) => (
+    <svg
+      width='15'
+      height='15'
+      viewBox='0 0 24 24'
+      fill={filled ? "#f5c518" : "none"}
+      stroke={filled ? "#e6a700" : "currentColor"}
+      strokeWidth='2'
+      strokeLinecap='round'
+      strokeLinejoin='round'
+    >
+      <path d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z' />
     </svg>
   ),
   ChevR: () => (
@@ -2328,6 +2345,7 @@ function DocumentHub({
   onSelectPage,
   onNewPage,
   onDeletePage,
+  onToggleStar,
   latestUpdateAt,
   onOpenVersionLog,
   activitySummary,
@@ -2340,6 +2358,7 @@ function DocumentHub({
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
   onDeletePage: (id: string) => void;
+  onToggleStar: (id: string, starred: boolean) => void;
   latestUpdateAt: string | null;
   onOpenVersionLog: () => void;
   activitySummary: UserActivitySummary | null;
@@ -2618,6 +2637,20 @@ function DocumentHub({
 
               {/* Row actions - visible on hover */}
               <div className='hidden sm:flex justify-end items-center gap-1.5'>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleStar(page.id, !page.isStarred);
+                  }}
+                  className={`p-1 rounded-[4px] transition-all ${
+                    page.isStarred ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                  style={{ color: "var(--text-muted)" }}
+                  title={page.isStarred ? t.unstar : t.star}
+                  aria-pressed={!!page.isStarred}
+                >
+                  <Ico.Star filled={!!page.isStarred} />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -4988,6 +5021,30 @@ export function App() {
     void loadTree();
   }, [loadTree]);
 
+  // Gmail-style page star. Optimistically flips isStarred on the matching tree
+  // node, then persists; on failure we reload the tree to fall back to truth.
+  const toggleStar = useCallback(
+    async (pageId: string, starred: boolean) => {
+      const patch = (nodes: PageNode[]): PageNode[] =>
+        nodes.map((n) => ({
+          ...n,
+          isStarred: n.id === pageId ? starred : n.isStarred,
+          children: patch(n.children),
+        }));
+      setTree((prev) => patch(prev));
+      try {
+        await api(
+          `/pages/${pageId}/star`,
+          { method: "PUT", body: JSON.stringify({ starred }) },
+          csrf,
+        );
+      } catch {
+        void loadTree();
+      }
+    },
+    [csrf, loadTree],
+  );
+
   // Fires exactly once per interactive login: the first time initialLoad
   // settles to false after handleAuth recorded a start time.
   useEffect(() => {
@@ -5763,9 +5820,53 @@ export function App() {
               ))}
             </div>
 
-            {/* The sidebar page list has been removed — the Home / Document Hub
-                grid is the page browser. This spacer keeps the bottom nav pinned. */}
-            <div className='flex-1' />
+            {/* Starred pages (Gmail-style favourites). Only rendered when the
+                user has starred something; otherwise a spacer pins the bottom nav.
+                The full page list lives in the Home / Document Hub grid. */}
+            {(() => {
+              const starredPages = flattenTree(tree).filter((p) => p.isStarred);
+              if (starredPages.length === 0) return <div className='flex-1' />;
+              return (
+                <div className='flex-1 min-h-0 overflow-y-auto mt-3'>
+                  <div
+                    className='px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5'
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <Ico.Star filled />
+                    {T[lang].starred}
+                  </div>
+                  <div className='px-1 space-y-px'>
+                    {starredPages.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          void handleSelectPage(p.id);
+                          if (isMobileViewport()) setSidebarOpen(false);
+                        }}
+                        className='group/star w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[4px] text-[13px] cursor-pointer transition-colors hover:bg-[var(--bg-hover)]'
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        <span className='w-4 flex justify-center shrink-0' style={{ color: "var(--text-muted)" }}>
+                          {p.icon ? <span className='text-sm'>{p.icon}</span> : <Ico.Page />}
+                        </span>
+                        <span className='flex-1 truncate'>{p.title || T[lang].untitled}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleStar(p.id, false);
+                          }}
+                          className='shrink-0 p-0.5 rounded opacity-70 hover:opacity-100 transition-opacity'
+                          title={T[lang].unstar}
+                          aria-label={T[lang].unstar}
+                        >
+                          <Ico.Star filled />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Bottom */}
             <div
@@ -5976,6 +6077,25 @@ export function App() {
                           ? T[lang].saveError
                           : ""}
                   </span>
+
+                  {/* Star (favourite) — reflects/toggles this page's star */}
+                  {(() => {
+                    const starred = !!flattenTree(tree).find((n) => n.id === activePage.id)?.isStarred;
+                    return (
+                      <button
+                        onClick={() => void toggleStar(activePage.id, !starred)}
+                        className='flex items-center p-1.5 rounded-[4px] transition-colors'
+                        style={{ color: "var(--text-muted)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        title={starred ? T[lang].unstar : T[lang].star}
+                        aria-label={starred ? T[lang].unstar : T[lang].star}
+                        aria-pressed={starred}
+                      >
+                        <Ico.Star filled={starred} />
+                      </button>
+                    );
+                  })()}
 
                   {/* History */}
                   <button
@@ -6188,6 +6308,7 @@ export function App() {
                   onSelectPage={(id) => void handleSelectPage(id)}
                   onNewPage={() => void handleNewPage()}
                   onDeletePage={(id) => void handleDeletePage(id)}
+                  onToggleStar={(id, starred) => void toggleStar(id, starred)}
                   latestUpdateAt={latestVersionLogAt}
                   onOpenVersionLog={() => setShowVersionLog(true)}
                   activitySummary={homeActivitySummary}

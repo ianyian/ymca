@@ -61,8 +61,8 @@ type Strings = {
   // Misc
   open: string; cancel: string; remove: string;
   removeIcon: string; searchEmoji: string; delete: string;
-  // Sidebar (todo)
-  todo: string;
+  // Sidebar (todo + starred)
+  todo: string; starred: string; star: string; unstar: string;
   // Document Hub grid
   colTitle: string; colTag: string; allDocs: string; searchDocs: string;
   prev: string; next: string; pageIndicator: string; pagesTotal: string;
@@ -125,7 +125,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Too many attempts. Please try again in {s} seconds.",
     open: "Open", cancel: "Cancel", remove: "Remove",
     removeIcon: "Remove icon", searchEmoji: "Search emoji...",
-    todo: "To-do",
+    todo: "To-do", starred: "Starred", star: "Star", unstar: "Unstar",
     colTitle: "Title", colTag: "Tag", allDocs: "All docs", searchDocs: "Search documents by name…",
     prev: "Prev", next: "Next", pageIndicator: "Page {n} of {total}", pagesTotal: "{n} pages total",
     tabPage: "Page", tabGuide: "Guide", log: "Log", contributionChart: "Contribution chart",
@@ -181,7 +181,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "尝试次数过多，请在 {s} 秒后重试。",
     open: "打开", cancel: "取消", remove: "移除",
     removeIcon: "移除图标", searchEmoji: "搜索表情...",
-    todo: "待办",
+    todo: "待办", starred: "收藏", star: "收藏", unstar: "取消收藏",
     colTitle: "标题", colTag: "标签", allDocs: "全部文档", searchDocs: "按名称搜索文档…",
     prev: "上一页", next: "下一页", pageIndicator: "第 {n} 页，共 {total} 页", pagesTotal: "共 {n} 个页面",
     tabPage: "页面", tabGuide: "指南", log: "日志", contributionChart: "贡献图",
@@ -239,7 +239,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Terlalu banyak percubaan. Sila cuba lagi dalam {s} saat.",
     open: "Buka", cancel: "Batal", remove: "Buang",
     removeIcon: "Buang ikon", searchEmoji: "Cari emoji...",
-    todo: "Senarai tugas",
+    todo: "Senarai tugas", starred: "Berbintang", star: "Bintang", unstar: "Nyahbintang",
     colTitle: "Tajuk", colTag: "Tag", allDocs: "Semua dokumen", searchDocs: "Cari dokumen mengikut nama…",
     prev: "Sebelum", next: "Seterusnya", pageIndicator: "Halaman {n} daripada {total}", pagesTotal: "{n} halaman keseluruhan",
     tabPage: "Halaman", tabGuide: "Panduan", log: "Log", contributionChart: "Carta sumbangan",
@@ -297,7 +297,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "பல முயற்சிகள். {s} விநாடிகளில் மீண்டும் முயற்சிக்கவும்.",
     open: "திற", cancel: "ரத்து செய்", remove: "அகற்று",
     removeIcon: "சின்னம் அகற்று", searchEmoji: "எமோஜி தேடு...",
-    todo: "செய்பணிகள்",
+    todo: "செய்பணிகள்", starred: "நட்சத்திரமிட்டவை", star: "நட்சத்திரம்", unstar: "நட்சத்திரம் நீக்கு",
     colTitle: "தலைப்பு", colTag: "குறிச்சொல்", allDocs: "அனைத்து ஆவணங்கள்", searchDocs: "பெயரால் ஆவணங்களைத் தேடு…",
     prev: "முந்தைய", next: "அடுத்து", pageIndicator: "பக்கம் {n} / {total}", pagesTotal: "மொத்தம் {n} பக்கங்கள்",
     tabPage: "பக்கம்", tabGuide: "வழிகாட்டி", log: "பதிவு", contributionChart: "பங்களிப்பு விளக்கப்படம்",
@@ -355,7 +355,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Zu viele Versuche. Bitte versuchen Sie es in {s} Sekunden erneut.",
     open: "Öffnen", cancel: "Abbrechen", remove: "Entfernen",
     removeIcon: "Symbol entfernen", searchEmoji: "Emoji suchen...",
-    todo: "Aufgaben",
+    todo: "Aufgaben", starred: "Markiert", star: "Markieren", unstar: "Markierung entfernen",
     colTitle: "Titel", colTag: "Tag", allDocs: "Alle Dokumente", searchDocs: "Dokumente nach Name suchen…",
     prev: "Zurück", next: "Weiter", pageIndicator: "Seite {n} von {total}", pagesTotal: "{n} Seiten gesamt",
     tabPage: "Seite", tabGuide: "Anleitung", log: "Protokoll", contributionChart: "Beitragsdiagramm",
@@ -413,7 +413,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Túl sok próbálkozás. Kérjük, próbálja újra {s} másodperc múlva.",
     open: "Megnyitás", cancel: "Mégse", remove: "Eltávolítás",
     removeIcon: "Ikon eltávolítása", searchEmoji: "Emoji keresése...",
-    todo: "Teendők",
+    todo: "Teendők", starred: "Csillagozott", star: "Csillagoz", unstar: "Csillag eltávolítása",
     colTitle: "Cím", colTag: "Címke", allDocs: "Összes dokumentum", searchDocs: "Dokumentumok keresése név szerint…",
     prev: "Előző", next: "Következő", pageIndicator: "{n}. oldal / {total}", pagesTotal: "Összesen {n} oldal",
     tabPage: "Oldal", tabGuide: "Útmutató", log: "Napló", contributionChart: "Hozzájárulási diagram",
@@ -471,7 +471,7 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Demasiados intentos. Vuelve a intentarlo en {s} segundos.",
     open: "Abrir", cancel: "Cancelar", remove: "Quitar",
     removeIcon: "Quitar ícono", searchEmoji: "Buscar emoji...",
-    todo: "Tareas",
+    todo: "Tareas", starred: "Destacados", star: "Destacar", unstar: "Quitar destacado",
     colTitle: "Título", colTag: "Etiqueta", allDocs: "Todos los documentos", searchDocs: "Buscar documentos por nombre…",
     prev: "Anterior", next: "Siguiente", pageIndicator: "Página {n} de {total}", pagesTotal: "{n} páginas en total",
     tabPage: "Página", tabGuide: "Guía", log: "Registro", contributionChart: "Gráfico de contribuciones",
