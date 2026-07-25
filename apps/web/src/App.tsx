@@ -1535,7 +1535,7 @@ function ProfileDropdown({
               }
             >
               <Ico.Clock />
-              <span>My activity</span>
+              <span>{t.myActivity}</span>
             </button>
             <button
               onClick={() => {
@@ -1584,8 +1584,8 @@ function ProfileDropdown({
         <ProfileActivityDrawer
           onClose={() => setShowActivityInsights(false)}
           endpoint='/me/activity'
-          title='Your activity heatmap'
-          subtitle='How you are using the app'
+          title={t.activityHeatmapTitle}
+          subtitle={t.activityHeatmapSubtitle}
           isDark={isDark}
         />
       )}
@@ -2047,13 +2047,14 @@ function WelcomeCard({
   activityLoading: boolean;
   activityError: string | null;
 }) {
+  const t = useT();
   const [tab, setTab] = useState<"page" | "guide">("page");
 
   return (
     <div className='rounded-xl border p-4 mt-8' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }} data-analytics-zone='information-center'>
       <div className='flex flex-wrap items-center gap-2 mb-3'>
         <div className='flex items-center gap-1 rounded-full border p-1' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
-          {([ ["page", "Page"], ["guide", "Guide"] ] as const).map(([key, label]) => (
+          {([ ["page", t.tabPage], ["guide", t.tabGuide] ] as const).map(([key, label]) => (
             <button
               key={key}
               type='button'
@@ -2074,13 +2075,13 @@ function WelcomeCard({
           onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-primary)")}
           title={latestUpdateAt ? `Recent changes — last update ${formatVersionLogTimestamp(latestUpdateAt)}` : "Recent changes"}
         >
-          <Ico.Clock /> Log
+          <Ico.Clock /> {t.log}
         </button>
       </div>
 
       {tab === "page" ? (
         <div className='rounded-xl border p-3 sm:p-4' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
-          <h3 className='text-[14px] font-semibold mb-3' style={{ color: "var(--text-primary)" }}>Contribution chart</h3>
+          <h3 className='text-[14px] font-semibold mb-3' style={{ color: "var(--text-primary)" }}>{t.contributionChart}</h3>
           {activityLoading ? (
             <div className='space-y-2' aria-label='Loading contribution chart'>
               <div className='grid gap-1.5' style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
@@ -2345,6 +2346,7 @@ function DocumentHub({
   activityLoading: boolean;
   activityError: string | null;
 }) {
+  const t = useT();
   const PER_PAGE = 5;
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -2381,7 +2383,7 @@ function DocumentHub({
           className='text-2xl sm:text-3xl font-bold'
           style={{ color: "var(--text-primary)" }}
         >
-          Document Hub
+          {t.documentHub}
         </h1>
         <button
           onClick={onNewPage}
@@ -2394,7 +2396,7 @@ function DocumentHub({
             (e.currentTarget.style.background = "var(--accent-color)")
           }
         >
-          <Ico.Plus /> New page
+          <Ico.Plus /> {t.newPage}
         </button>
       </div>
 
@@ -2412,7 +2414,7 @@ function DocumentHub({
                 : "var(--border-color)",
             }}
           >
-            All docs
+            {t.allDocs}
           </button>
           {allTags.map((tag) => {
             const { bg, fg } = tagColor(tag, isDark);
@@ -2449,7 +2451,7 @@ function DocumentHub({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder='Search documents by name…'
+            placeholder={t.searchDocs}
             className='w-full text-base sm:text-sm pl-8 pr-3 py-1.5 rounded-[8px] border outline-none'
             style={{
               borderColor: "var(--border-color)",
@@ -2469,13 +2471,15 @@ function DocumentHub({
                 color: "var(--text-muted)",
               }}
             >
-              ‹ Prev
+              ‹ {t.prev}
             </button>
             <span
               className='text-[12px] px-1 whitespace-nowrap'
               style={{ color: "var(--text-muted)" }}
             >
-              Page {safePage + 1} of {totalPages}
+              {t.pageIndicator
+                .replace("{n}", String(safePage + 1))
+                .replace("{total}", String(totalPages))}
             </span>
             <button
               onClick={() =>
@@ -2488,7 +2492,7 @@ function DocumentHub({
                 color: "var(--text-muted)",
               }}
             >
-              Next ›
+              {t.next} ›
             </button>
           </div>
         )}
@@ -2508,8 +2512,8 @@ function DocumentHub({
             borderColor: "var(--border-color)",
           }}
         >
-          <span>Title</span>
-          <span className='hidden sm:block'>Tag</span>
+          <span>{t.colTitle}</span>
+          <span className='hidden sm:block'>{t.colTag}</span>
           <span className='hidden sm:block'></span>
         </div>
 
@@ -2587,7 +2591,7 @@ function DocumentHub({
                     className='text-sm truncate font-medium'
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {page.title || "Untitled"}
+                    {page.title || t.untitled}
                   </span>
                 </div>
                 <div
@@ -2647,12 +2651,11 @@ function DocumentHub({
 
       {filtered.length > 0 && (
         <p className='text-[11px] mt-3' style={{ color: "var(--text-muted)" }}>
-          {filtered.length} {filtered.length === 1 ? "page" : "pages"}
           {filterTag
-            ? ` tagged "${filterTag}"`
+            ? `${filtered.length} · ${filterTag}`
             : q
-              ? ` matching "${query.trim()}"`
-              : " total"}
+              ? `${filtered.length} · "${query.trim()}"`
+              : t.pagesTotal.replace("{n}", String(filtered.length))}
         </p>
       )}
 
@@ -2675,7 +2678,7 @@ function DocumentHub({
           data-analytics-zone='information-center'
         >
           <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-            Contribution chart
+            {t.contributionChart}
           </h3>
           <ActivityContributionHeatmap summary={activitySummary} mobile />
         </div>
@@ -3075,6 +3078,7 @@ function ProfileActivityDrawer({
   subtitle: string;
   isDark: boolean;
 }) {
+  const t = useT();
   const windows = ["14d"] as const;
   const tabs = ["graphical", "list"] as const;
   type AnalyticsTab = (typeof tabs)[number];
@@ -3205,7 +3209,7 @@ function ProfileActivityDrawer({
       >
         <div>
           <p className='text-[11px] uppercase tracking-wider' style={{ color: "var(--text-muted)" }}>
-            Profile analytics
+            {t.profileAnalytics}
           </p>
           <h3 className='text-sm font-semibold' style={{ color: "var(--text-primary)" }}>
             {title}
@@ -3248,7 +3252,7 @@ function ProfileActivityDrawer({
                 tab === "graphical" ? "rgba(35,131,226,0.08)" : "transparent",
             }}
           >
-            Graphical
+            {t.graphical}
           </button>
           <button
             type='button'
@@ -3262,7 +3266,7 @@ function ProfileActivityDrawer({
                 tab === "list" ? "rgba(35,131,226,0.08)" : "transparent",
             }}
           >
-            List
+            {t.listView}
           </button>
         </div>
       </div>
@@ -3270,12 +3274,12 @@ function ProfileActivityDrawer({
       <div className='px-4 py-3 border-b space-y-2' style={{ borderColor: "var(--border-color)" }}>
         <div>
           <div className='flex items-center justify-between text-[10px] mb-1' style={{ color: "var(--text-muted)" }}>
-            <span>Time range</span>
+            <span>{t.timeRange}</span>
             <span>{windowKey}</span>
           </div>
           <div className='mt-1 flex justify-between text-[9px]' style={{ color: "var(--text-muted)" }}>
-            <span>14d view</span>
-            <span>today included</span>
+            <span>{t.daysView}</span>
+            <span>{t.todayIncluded}</span>
           </div>
         </div>
 
@@ -3301,7 +3305,7 @@ function ProfileActivityDrawer({
           <>
             <section>
               <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-                Activity by day
+                {t.activityByDay}
               </h4>
               {loading && !summary ? (
                 <div className='grid grid-cols-7 gap-1'>
@@ -3312,8 +3316,8 @@ function ProfileActivityDrawer({
               ) : (
                 <div className='rounded-xl border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}>
                   <div className='mb-2 flex items-center justify-between text-[10px]' style={{ color: "var(--text-muted)" }}>
-                    <span>14 days</span>
-                    <span>today</span>
+                    <span>{t.daysLabel14}</span>
+                    <span>{t.today}</span>
                   </div>
                   <div
                     className='grid gap-1.5'
@@ -3343,7 +3347,7 @@ function ProfileActivityDrawer({
 
             <section>
               <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-                Top interactions
+                {t.topInteractions}
               </h4>
               <div className='h-[160px] rounded-xl border p-2' style={{ borderColor: "var(--border-color)" }}>
                 <Bar data={barData} options={barOptions} />
@@ -3353,7 +3357,7 @@ function ProfileActivityDrawer({
         ) : (
           <section>
             <h4 className='text-[12px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>
-              Recent activities
+              {t.recentActivities}
             </h4>
             <div className='space-y-2'>
               {loading && !summary ? (
@@ -5710,9 +5714,8 @@ export function App() {
                   action: () => void handleNewPage(),
                 },
                 {
-                  label: "To-do",
+                  label: T[lang].todo,
                   icon: <Ico.Check />,
-                  accent: true,
                   action: () => {
                     setShowTodo(true);
                     setShowComa(false);
@@ -5720,37 +5723,29 @@ export function App() {
                     if (isMobileViewport()) setSidebarOpen(false);
                   },
                 },
-              ].map(({ label, icon, action, kbd, accent }) => (
+              ].map(({ label, icon, action, kbd }) => (
                 <button
                   key={label}
                   onClick={action}
                   className='w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-[13px] transition-colors text-left'
                   style={{
-                    color: accent ? "var(--accent-color)" : "var(--text-primary)",
-                    background: accent ? "rgba(35,131,226,0.07)" : "transparent",
+                    color: "var(--text-primary)",
+                    background: "transparent",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = accent
-                      ? "rgba(35,131,226,0.14)"
-                      : "var(--bg-hover)")
+                    (e.currentTarget.style.background = "var(--bg-hover)")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = accent
-                      ? "rgba(35,131,226,0.07)"
-                      : "transparent")
+                    (e.currentTarget.style.background = "transparent")
                   }
                 >
                   <span
                     className='w-4 flex justify-center'
-                    style={{
-                      color: accent
-                        ? "var(--accent-color)"
-                        : "var(--text-muted)",
-                    }}
+                    style={{ color: "var(--text-muted)" }}
                   >
                     {icon}
                   </span>
-                  <span className={accent ? "flex-1 font-medium" : "flex-1"}>
+                  <span className='flex-1'>
                     {label}
                   </span>
                   {kbd && (
@@ -5974,11 +5969,11 @@ export function App() {
                   >
                     {saveStatus === "saved" && <Ico.Check />}
                     {saveStatus === "saving"
-                      ? "Saving..."
+                      ? T[lang].saving
                       : saveStatus === "saved"
-                        ? "Saved"
+                        ? T[lang].saved
                         : saveStatus === "error"
-                          ? "Error"
+                          ? T[lang].saveError
                           : ""}
                   </span>
 

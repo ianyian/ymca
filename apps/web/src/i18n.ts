@@ -61,6 +61,18 @@ type Strings = {
   // Misc
   open: string; cancel: string; remove: string;
   removeIcon: string; searchEmoji: string; delete: string;
+  // Sidebar (todo)
+  todo: string;
+  // Document Hub grid
+  colTitle: string; colTag: string; allDocs: string; searchDocs: string;
+  prev: string; next: string; pageIndicator: string; pagesTotal: string;
+  // Landing "getting started" card
+  tabPage: string; tabGuide: string; log: string; contributionChart: string;
+  // Profile analytics drawer (KPI value labels stay untranslated on purpose)
+  myActivity: string; activityHeatmapTitle: string; activityHeatmapSubtitle: string;
+  profileAnalytics: string; timeRange: string; daysView: string; todayIncluded: string;
+  activityByDay: string; daysLabel14: string; today: string;
+  topInteractions: string; recentActivities: string; graphical: string; listView: string;
 };
 
 export const T: Record<Lang, Strings> = {
@@ -113,6 +125,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Too many attempts. Please try again in {s} seconds.",
     open: "Open", cancel: "Cancel", remove: "Remove",
     removeIcon: "Remove icon", searchEmoji: "Search emoji...",
+    todo: "To-do",
+    colTitle: "Title", colTag: "Tag", allDocs: "All docs", searchDocs: "Search documents by name…",
+    prev: "Prev", next: "Next", pageIndicator: "Page {n} of {total}", pagesTotal: "{n} pages total",
+    tabPage: "Page", tabGuide: "Guide", log: "Log", contributionChart: "Contribution chart",
+    myActivity: "My activity", activityHeatmapTitle: "Your activity heatmap", activityHeatmapSubtitle: "How you are using the app",
+    profileAnalytics: "Profile analytics", timeRange: "Time range", daysView: "14d view", todayIncluded: "today included",
+    activityByDay: "Activity by day", daysLabel14: "14 days", today: "today",
+    topInteractions: "Top interactions", recentActivities: "Recent activities", graphical: "Graphical", listView: "List",
   },
   zh: {
     welcomeBack: "欢迎回来", createAccount: "创建账户",
@@ -161,6 +181,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "尝试次数过多，请在 {s} 秒后重试。",
     open: "打开", cancel: "取消", remove: "移除",
     removeIcon: "移除图标", searchEmoji: "搜索表情...",
+    todo: "待办",
+    colTitle: "标题", colTag: "标签", allDocs: "全部文档", searchDocs: "按名称搜索文档…",
+    prev: "上一页", next: "下一页", pageIndicator: "第 {n} 页，共 {total} 页", pagesTotal: "共 {n} 个页面",
+    tabPage: "页面", tabGuide: "指南", log: "日志", contributionChart: "贡献图",
+    myActivity: "我的活动", activityHeatmapTitle: "你的活动热图", activityHeatmapSubtitle: "你的应用使用情况",
+    profileAnalytics: "个人分析", timeRange: "时间范围", daysView: "14天视图", todayIncluded: "包含今天",
+    activityByDay: "每日活动", daysLabel14: "14 天", today: "今天",
+    topInteractions: "热门互动", recentActivities: "近期活动", graphical: "图表", listView: "列表",
   },
   ms: {
     welcomeBack: "Selamat kembali", createAccount: "Buat akaun",
@@ -211,6 +239,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Terlalu banyak percubaan. Sila cuba lagi dalam {s} saat.",
     open: "Buka", cancel: "Batal", remove: "Buang",
     removeIcon: "Buang ikon", searchEmoji: "Cari emoji...",
+    todo: "Senarai tugas",
+    colTitle: "Tajuk", colTag: "Tag", allDocs: "Semua dokumen", searchDocs: "Cari dokumen mengikut nama…",
+    prev: "Sebelum", next: "Seterusnya", pageIndicator: "Halaman {n} daripada {total}", pagesTotal: "{n} halaman keseluruhan",
+    tabPage: "Halaman", tabGuide: "Panduan", log: "Log", contributionChart: "Carta sumbangan",
+    myActivity: "Aktiviti saya", activityHeatmapTitle: "Peta haba aktiviti anda", activityHeatmapSubtitle: "Cara anda menggunakan apl",
+    profileAnalytics: "Analitik profil", timeRange: "Julat masa", daysView: "Paparan 14h", todayIncluded: "termasuk hari ini",
+    activityByDay: "Aktiviti mengikut hari", daysLabel14: "14 hari", today: "hari ini",
+    topInteractions: "Interaksi teratas", recentActivities: "Aktiviti terkini", graphical: "Grafik", listView: "Senarai",
   },
   ta: {
     welcomeBack: "மீண்டும் வரவேற்கிறோம்", createAccount: "கணக்கு உருவாக்கு",
@@ -261,6 +297,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "பல முயற்சிகள். {s} விநாடிகளில் மீண்டும் முயற்சிக்கவும்.",
     open: "திற", cancel: "ரத்து செய்", remove: "அகற்று",
     removeIcon: "சின்னம் அகற்று", searchEmoji: "எமோஜி தேடு...",
+    todo: "செய்பணிகள்",
+    colTitle: "தலைப்பு", colTag: "குறிச்சொல்", allDocs: "அனைத்து ஆவணங்கள்", searchDocs: "பெயரால் ஆவணங்களைத் தேடு…",
+    prev: "முந்தைய", next: "அடுத்து", pageIndicator: "பக்கம் {n} / {total}", pagesTotal: "மொத்தம் {n} பக்கங்கள்",
+    tabPage: "பக்கம்", tabGuide: "வழிகாட்டி", log: "பதிவு", contributionChart: "பங்களிப்பு விளக்கப்படம்",
+    myActivity: "எனது செயல்பாடு", activityHeatmapTitle: "உங்கள் செயல்பாட்டு வெப்ப வரைபடம்", activityHeatmapSubtitle: "நீங்கள் செயலியை எவ்வாறு பயன்படுத்துகிறீர்கள்",
+    profileAnalytics: "சுயவிவர பகுப்பாய்வு", timeRange: "கால வரம்பு", daysView: "14நா காட்சி", todayIncluded: "இன்று உட்பட",
+    activityByDay: "நாள்வாரி செயல்பாடு", daysLabel14: "14 நாட்கள்", today: "இன்று",
+    topInteractions: "முதன்மை தொடர்புகள்", recentActivities: "சமீபத்திய செயல்பாடுகள்", graphical: "வரைபடம்", listView: "பட்டியல்",
   },
   de: {
     welcomeBack: "Willkommen zurück", createAccount: "Konto erstellen",
@@ -311,6 +355,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Zu viele Versuche. Bitte versuchen Sie es in {s} Sekunden erneut.",
     open: "Öffnen", cancel: "Abbrechen", remove: "Entfernen",
     removeIcon: "Symbol entfernen", searchEmoji: "Emoji suchen...",
+    todo: "Aufgaben",
+    colTitle: "Titel", colTag: "Tag", allDocs: "Alle Dokumente", searchDocs: "Dokumente nach Name suchen…",
+    prev: "Zurück", next: "Weiter", pageIndicator: "Seite {n} von {total}", pagesTotal: "{n} Seiten gesamt",
+    tabPage: "Seite", tabGuide: "Anleitung", log: "Protokoll", contributionChart: "Beitragsdiagramm",
+    myActivity: "Meine Aktivität", activityHeatmapTitle: "Ihre Aktivitäts-Heatmap", activityHeatmapSubtitle: "Wie Sie die App nutzen",
+    profileAnalytics: "Profil-Analyse", timeRange: "Zeitraum", daysView: "14-Tage-Ansicht", todayIncluded: "heute inklusive",
+    activityByDay: "Aktivität pro Tag", daysLabel14: "14 Tage", today: "heute",
+    topInteractions: "Top-Interaktionen", recentActivities: "Letzte Aktivitäten", graphical: "Grafisch", listView: "Liste",
   },
   hu: {
     welcomeBack: "Üdvözöljük újra", createAccount: "Fiók létrehozása",
@@ -361,6 +413,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Túl sok próbálkozás. Kérjük, próbálja újra {s} másodperc múlva.",
     open: "Megnyitás", cancel: "Mégse", remove: "Eltávolítás",
     removeIcon: "Ikon eltávolítása", searchEmoji: "Emoji keresése...",
+    todo: "Teendők",
+    colTitle: "Cím", colTag: "Címke", allDocs: "Összes dokumentum", searchDocs: "Dokumentumok keresése név szerint…",
+    prev: "Előző", next: "Következő", pageIndicator: "{n}. oldal / {total}", pagesTotal: "Összesen {n} oldal",
+    tabPage: "Oldal", tabGuide: "Útmutató", log: "Napló", contributionChart: "Hozzájárulási diagram",
+    myActivity: "Tevékenységem", activityHeatmapTitle: "Tevékenységi hőtérképed", activityHeatmapSubtitle: "Hogyan használod az alkalmazást",
+    profileAnalytics: "Profil-elemzés", timeRange: "Időtartomány", daysView: "14 napos nézet", todayIncluded: "mával együtt",
+    activityByDay: "Napi tevékenység", daysLabel14: "14 nap", today: "ma",
+    topInteractions: "Legfontosabb interakciók", recentActivities: "Legutóbbi tevékenységek", graphical: "Grafikus", listView: "Lista",
   },
   es: {
     welcomeBack: "Bienvenido de nuevo", createAccount: "Crear cuenta",
@@ -411,6 +471,14 @@ export const T: Record<Lang, Strings> = {
     errRateLimited: "Demasiados intentos. Vuelve a intentarlo en {s} segundos.",
     open: "Abrir", cancel: "Cancelar", remove: "Quitar",
     removeIcon: "Quitar ícono", searchEmoji: "Buscar emoji...",
+    todo: "Tareas",
+    colTitle: "Título", colTag: "Etiqueta", allDocs: "Todos los documentos", searchDocs: "Buscar documentos por nombre…",
+    prev: "Anterior", next: "Siguiente", pageIndicator: "Página {n} de {total}", pagesTotal: "{n} páginas en total",
+    tabPage: "Página", tabGuide: "Guía", log: "Registro", contributionChart: "Gráfico de contribuciones",
+    myActivity: "Mi actividad", activityHeatmapTitle: "Tu mapa de calor de actividad", activityHeatmapSubtitle: "Cómo usas la aplicación",
+    profileAnalytics: "Analíticas de perfil", timeRange: "Intervalo de tiempo", daysView: "Vista de 14 d", todayIncluded: "hoy incluido",
+    activityByDay: "Actividad por día", daysLabel14: "14 días", today: "hoy",
+    topInteractions: "Interacciones principales", recentActivities: "Actividades recientes", graphical: "Gráfico", listView: "Lista",
   },
 };
 
