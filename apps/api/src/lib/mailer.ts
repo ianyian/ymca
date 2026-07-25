@@ -1,88 +1,26 @@
-import net from "node:net";
+import nodemailer from "nodemailer";
 import { getEnv } from "../config/env.js";
 
-/** Very small SMTP client — no dependencies required. */
-async function sendSmtp(opts: {
-  host: string;
-  port: number;
-  user?: string;
-  pass?: string;
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-}): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const sock = net.createConnection(opts.port, opts.host);
-    const lines: string[] = [];
-    let step = 0;
+// A single lazily-created transport, reused across requests. nodemailer handles
+// the parts a hand-rolled SMTP client gets wrong: STARTTLS on 587, implicit TLS
+// on 465, multiline greetings, AUTH negotiation, and header/body encoding.
+let transport: nodemailer.Transporter | null = null;
 
-    function send(line: string) {
-      sock.write(line + "\r\n");
-    }
+function getTransport(): nodemailer.Transporter | null {
+  const env = getEnv();
+  if (!env.SMTP_HOST) return null;
+  if (transport) return transport;
 
-    const body = [
-      `From: ${opts.from}`,
-      `To: ${opts.to}`,
-      `Subject: ${opts.subject}`,
-      `MIME-Version: 1.0`,
-      `Content-Type: text/html; charset=utf-8`,
-      ``,
-      opts.html,
-    ].join("\r\n");
-
-    sock.setEncoding("utf8");
-    sock.on("data", (chunk: string) => {
-      lines.push(chunk);
-      const code = parseInt(chunk.slice(0, 3));
-      if (step === 0 && code === 220) {
-        step = 1;
-        send(`EHLO ymca`);
-      } else if (step === 1 && code === 250) {
-        if (opts.user) {
-          step = 2;
-          send(`AUTH LOGIN`);
-        } else {
-          step = 3;
-          send(`MAIL FROM:<${opts.from}>`);
-        }
-      } else if (step === 2 && code === 334) {
-        step = 2.5;
-        send(Buffer.from(opts.user ?? "").toString("base64"));
-      } else if (step === 2.5 && code === 334) {
-        step = 3;
-        send(Buffer.from(opts.pass ?? "").toString("base64"));
-      } else if (step === 3 && code === 235) {
-        step = 4;
-        send(`MAIL FROM:<${opts.from}>`);
-      } else if (step === 4 && code === 250) {
-        step = 5;
-        send(`RCPT TO:<${opts.to}>`);
-      } else if (step === 5 && code === 250) {
-        step = 6;
-        send(`DATA`);
-      } else if (step === 6 && code === 354) {
-        step = 7;
-        sock.write(body + "\r\n.\r\n");
-      } else if (step === 7 && code === 250) {
-        step = 8;
-        send(`QUIT`);
-      } else if (step === 8 && code === 221) {
-        sock.destroy();
-        resolve();
-      } else if (code >= 400) {
-        sock.destroy();
-        reject(new Error(`SMTP error ${code}: ${chunk.trim()}`));
-      }
-    });
-
-    sock.on("error", reject);
-    sock.on("timeout", () => {
-      sock.destroy();
-      reject(new Error("SMTP timeout"));
-    });
-    sock.setTimeout(10_000);
+  transport = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    // Port 465 uses implicit TLS; 587/25 start plaintext and upgrade via STARTTLS.
+    secure: env.SMTP_PORT === 465,
+    ...(env.SMTP_USER
+      ? { auth: { user: env.SMTP_USER, pass: env.SMTP_PASS } }
+      : {}),
   });
+  return transport;
 }
 
 export async function sendPasswordResetEmail(opts: {
@@ -116,24 +54,21 @@ export async function sendPasswordResetEmail(opts: {
 </body>
 </html>`;
 
-  // If SMTP is configured, send real email
-  if (env.SMTP_HOST) {
-    await sendSmtp({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-      from: env.SMTP_FROM,
-      to: opts.to,
-      subject: "Reset your YMCA Workspace password",
-      html,
-    });
-    return { sent: true };
+  const mailer = getTransport();
+
+  // No SMTP configured → dev mode: log the link and return it so the UI can show it.
+  if (!mailer) {
+    console.log(
+      `\n[DEV] Password reset link for ${opts.to}:\n  ${opts.resetUrl}\n`,
+    );
+    return { sent: false, devLink: opts.resetUrl };
   }
 
-  // Dev mode — log link to console and return it in response
-  console.log(
-    `\n[DEV] Password reset link for ${opts.to}:\n  ${opts.resetUrl}\n`,
-  );
-  return { sent: false, devLink: opts.resetUrl };
+  await mailer.sendMail({
+    from: env.SMTP_FROM,
+    to: opts.to,
+    subject: "Reset your YMCA Workspace password",
+    html,
+  });
+  return { sent: true };
 }

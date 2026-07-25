@@ -101,4 +101,28 @@ describe('GET /search', () => {
     assert.equal(body.results[0]!.id, FIXTURES.page.id);
     assert.equal(body.query, 'test');
   });
+
+  it('returns a body snippet when content search is enabled', async () => {
+    setAuthSession();
+    const matchPage = {
+      id: FIXTURES.page.id,
+      title: 'Notes',
+      icon: null,
+      workspaceId: WORKSPACE_ID,
+      deletedAt: null,
+      contentText: 'the quick brown fox jumps over the lazy dog',
+    };
+    mockState.pageFindManyResult = [matchPage as never];
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/search?q=brown&workspaceId=${WORKSPACE_ID}&content=1`,
+      headers: { cookie: COOKIE },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body) as { results: Array<{ id: string; snippet: string | null }> };
+    assert.equal(body.results.length, 1);
+    assert.equal(body.results[0]!.id, FIXTURES.page.id);
+    assert.ok(body.results[0]!.snippet && body.results[0]!.snippet.includes('brown'));
+  });
 });

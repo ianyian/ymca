@@ -2724,6 +2724,30 @@ function DocumentHub({
 // Search Modal
 // ────────────────────────────────────────────────────────────
 
+// Renders `text` with any of the query's whitespace-separated tokens highlighted
+// in yellow (case-insensitive). Used for both the title and the body snippet in
+// search results. Dark text on the yellow mark keeps it readable in every theme.
+function Highlighted({ text, query }: { text: string; query: string }) {
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0 || !text) return <>{text}</>;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const splitRe = new RegExp(`(${tokens.map(esc).join("|")})`, "gi");
+  const testRe = new RegExp(`^(${tokens.map(esc).join("|")})$`, "i");
+  return (
+    <>
+      {text.split(splitRe).map((part, i) =>
+        part && testRe.test(part) ? (
+          <mark key={i} style={{ background: "#ffe680", color: "#3a2f00", borderRadius: 2, padding: "0 1px" }}>
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function SearchModal({
   workspaceId,
   csrf,
@@ -2739,7 +2763,7 @@ function SearchModal({
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<
-    { id: string; title: string; tags?: string[] }[]
+    { id: string; title: string; tags?: string[]; snippet?: string | null }[]
   >([]);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
@@ -2756,9 +2780,10 @@ function SearchModal({
       setBusy(true);
       try {
         const r = await api<{
-          results: { id: string; title: string; tags?: string[] }[];
+          results: { id: string; title: string; tags?: string[]; snippet?: string | null }[];
         }>(
-          `/search?q=${encodeURIComponent(q)}&workspaceId=${workspaceId}`,
+          // content=1 → also search page body text and return snippets
+          `/search?q=${encodeURIComponent(q)}&workspaceId=${workspaceId}&content=1`,
           {},
           csrf,
         );
@@ -2800,7 +2825,7 @@ function SearchModal({
             onKeyDown={(e) => e.key === "Escape" && onClose()}
             className='flex-1 text-sm bg-transparent outline-none'
             style={{ color: "var(--text-primary)" }}
-            placeholder='Search pages...'
+            placeholder='Search titles & content...'
           />
           <kbd
             className='text-[10px] px-1.5 py-0.5 rounded'
@@ -2844,7 +2869,7 @@ function SearchModal({
                 onSelect(r.id);
                 onClose();
               }}
-              className='w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors'
+              className='w-full flex flex-col gap-1 px-4 py-2.5 text-left transition-colors'
               style={{ color: "var(--text-primary)" }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.background = "var(--bg-hover)")
@@ -2853,15 +2878,30 @@ function SearchModal({
                 (e.currentTarget.style.background = "transparent")
               }
             >
-              <span style={{ color: "var(--text-muted)" }}>
-                <Ico.Page />
-              </span>
-              <span className='flex-1 truncate'>{r.title || "Untitled"}</span>
-              <div className='flex gap-1'>
-                {r.tags?.slice(0, 2).map((tag) => (
-                  <TagBadge key={tag} tag={tag} isDark={isDark} />
-                ))}
+              <div className='flex items-center gap-3 w-full'>
+                <span style={{ color: "var(--text-muted)" }}>
+                  <Ico.Page />
+                </span>
+                <span className='flex-1 truncate text-sm'>
+                  <Highlighted text={r.title || "Untitled"} query={q} />
+                </span>
+                <div className='flex gap-1 items-center shrink-0'>
+                  {r.tags?.slice(0, 2).map((tag) => (
+                    <TagBadge key={tag} tag={tag} isDark={isDark} />
+                  ))}
+                  <span style={{ color: "var(--text-muted)" }} title='Open page'>
+                    <Ico.ExternalLink />
+                  </span>
+                </div>
               </div>
+              {r.snippet && (
+                <p
+                  className='text-[12px] leading-snug pl-[27px] line-clamp-2'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <Highlighted text={r.snippet} query={q} />
+                </p>
+              )}
             </button>
           ))}
         </div>

@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../auth/require-auth.js";
 import { resolvePageAccess } from "../lib/page-access.js";
 import { canEdit, canView } from "../domain/permissions.js";
+import { extractPlainText } from "../domain/page-text.js";
 import {
   getNextVersion,
   hasVersionConflict,
@@ -286,6 +287,8 @@ export async function registerPageRoutes(app: FastifyInstance) {
             where: { id: page.id },
             data: {
               content: contentJson,
+              // Keep the denormalised search text in sync with the content.
+              contentText: extractPlainText(body.content),
               version: nextVersion,
             },
           });

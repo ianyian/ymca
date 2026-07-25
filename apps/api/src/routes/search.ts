@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../auth/require-auth.js';
+import { buildSnippet } from '../domain/page-text.js';
 
 export async function registerSearchRoutes(app: FastifyInstance) {
   app.get(
@@ -12,6 +13,9 @@ export async function registerSearchRoutes(app: FastifyInstance) {
           properties: {
             q: { type: 'string', minLength: 1, maxLength: 200 },
             workspaceId: { type: 'string', format: 'uuid' },
+            // When "1"/"true", also search page *body* text and return snippets.
+            // Left off by default so the @-mention picker stays title-only.
+            content: { type: 'string' },
           },
           required: ['q', 'workspaceId'],
         },
@@ -21,7 +25,12 @@ export async function registerSearchRoutes(app: FastifyInstance) {
       const user = requireAuth(request, reply);
       if (!user) return;
 
-      const { q, workspaceId } = request.query as { q: string; workspaceId: string };
+      const { q, workspaceId, content } = request.query as {
+        q: string;
+        workspaceId: string;
+        content?: string;
+      };
+      const searchBody = content === '1' || content === 'true';
 
       const membership = await prisma.workspaceMember.findUnique({
         where: { workspaceId_userId: { workspaceId, userId: user.id } },
@@ -45,15 +54,33 @@ export async function registerSearchRoutes(app: FastifyInstance) {
         return reply.send({ results: [], query: q });
       }
 
+      // Each token must appear in the title — or, when body search is on, in the
+      // title OR the denormalised content text. This lets a query match on body
+      // content even when the title doesn't contain the words.
+      const tokenClause = (tok: string) =>
+        searchBody
+          ? {
+              OR: [
+                { title: { contains: tok, mode: "insensitive" as const } },
+                { contentText: { contains: tok, mode: "insensitive" as const } },
+              ],
+            }
+          : { title: { contains: tok, mode: "insensitive" as const } };
+
       const pages = await prisma.page.findMany({
         where: {
           workspaceId,
           deletedAt: null,
-          AND: tokens.map((tok) => ({
-            title: { contains: tok, mode: "insensitive" as const },
-          })),
+          AND: tokens.map(tokenClause),
         },
-        select: { id: true, title: true, icon: true, workspaceId: true, deletedAt: true },
+        select: {
+          id: true,
+          title: true,
+          icon: true,
+          workspaceId: true,
+          deletedAt: true,
+          ...(searchBody ? { contentText: true } : {}),
+        },
         orderBy: { updatedAt: "desc" },
         take: 50,
       });
@@ -69,7 +96,13 @@ export async function registerSearchRoutes(app: FastifyInstance) {
         })
         .sort((a, b) => a.starts - b.starts || a.len - b.len)
         .slice(0, 20)
-        .map((r) => r.p);
+        .map(({ p }) => {
+          if (!searchBody) return p;
+          const { contentText, ...rest } = p as typeof p & { contentText?: string };
+          // Snippet from body text; null when the match was title-only.
+          const snippet = buildSnippet(contentText ?? "", tokens);
+          return { ...rest, snippet };
+        });
 
       return reply.send({ results: ranked, query: q });
     },
