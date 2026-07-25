@@ -34,33 +34,44 @@ export async function registerSearchRoutes(app: FastifyInstance) {
         });
       }
 
-      // Use PostgreSQL full-text search — gracefully falls back to ilike in test/mock environments
-      let pages: { id: string; title: string; icon: string | null; workspaceId: string; deletedAt: Date | null }[];
-
-      try {
-        pages = await prisma.$queryRaw<typeof pages>`
-          SELECT id, title, icon, "workspaceId", "deletedAt"
-          FROM "Page"
-          WHERE "workspaceId" = ${workspaceId}::uuid
-            AND "deletedAt" IS NULL
-            AND to_tsvector('english', title) @@ plainto_tsquery('english', ${q})
-          ORDER BY ts_rank(to_tsvector('english', title), plainto_tsquery('english', ${q})) DESC
-          LIMIT 20
-        `;
-      } catch {
-        // Fallback for non-PostgreSQL environments (mocks / unit tests)
-        pages = await prisma.page.findMany({
-          where: {
-            workspaceId,
-            deletedAt: null,
-            title: { contains: q },
-          },
-          select: { id: true, title: true, icon: true, workspaceId: true, deletedAt: true },
-          take: 20,
-        });
+      // Case-insensitive substring search so typing partial words works as a
+      // type-ahead (e.g. "publ" finds "Publish Theme Test"). Previously this used
+      // full-text search, which only matched whole word stems — so partial input
+      // returned nothing and the box felt broken. Each whitespace-separated token
+      // must appear somewhere in the title (AND), letting multi-word queries match
+      // in any order ("test theme" → "Publish Theme Test").
+      const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+      if (tokens.length === 0) {
+        return reply.send({ results: [], query: q });
       }
 
-      return reply.send({ results: pages, query: q });
+      const pages = await prisma.page.findMany({
+        where: {
+          workspaceId,
+          deletedAt: null,
+          AND: tokens.map((tok) => ({
+            title: { contains: tok, mode: "insensitive" as const },
+          })),
+        },
+        select: { id: true, title: true, icon: true, workspaceId: true, deletedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 50,
+      });
+
+      // Rank titles that *start with* the query ahead of mid-word matches, then
+      // prefer shorter (closer) titles. Keeps the most relevant hits on top.
+      const needle = q.trim().toLowerCase();
+      const ranked = pages
+        .map((p) => {
+          const title = p.title.toLowerCase();
+          const starts = title.startsWith(needle) ? 0 : 1;
+          return { p, starts, len: p.title.length };
+        })
+        .sort((a, b) => a.starts - b.starts || a.len - b.len)
+        .slice(0, 20)
+        .map((r) => r.p);
+
+      return reply.send({ results: ranked, query: q });
     },
   );
 }

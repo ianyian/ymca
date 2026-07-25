@@ -5,13 +5,14 @@ with a rich block editor, organise with tags, collaborate inside workspaces with
 role-based access, publish pages to the web, and keep a full revision history.
 
 The web app also includes a landing-page contribution heatmap, a profile activity
-panel, and an admin configuration console for monitoring and workspace control.
+panel, starred/favourite pages, a personal to-do list, and an admin configuration
+console for monitoring and workspace control.
 
 It is built as a TypeScript monorepo — a React web app, a Fastify API, and a
 PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 (API), and **Neon** (database).
 
-> Current version: **v0.1** (released 2026-07-11)
+> Current version: **v0.1** — last updated 2026-07-25
 
 ---
 
@@ -32,12 +33,24 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 - **Publish to web** — a public read-only link with selectable themes
 - **Revision history** with restore (pruned to the latest 50 per page)
 - **Trash** (soft delete) and restore
-- **Full-text search** and colored **tags** with filtering
-- Landing-page **contribution heatmap** and profile **activity analytics**
+- **Instant type-ahead search** — case-insensitive partial and multi-word title
+  matching (each word matches in any order), with prefix hits ranked first
+- **Star / favourite** any page (Gmail-style) — starred pages get a dedicated
+  **Starred** section in the sidebar; per-user, so a shared page can be starred
+  by one member without affecting others
+- A personal **quick To-do** list per user
+- Colored **tags** with filtering
+- Landing-page **contribution heatmap** — a rolling 12-month view with
+  year-by-year prev/next paging — and a profile **activity analytics** drawer
 
 **Platform**
-- Cookie-based sessions with **CSRF protection**, **bcrypt** password hashing,
-  **rate limiting**, and enforced permission checks on every page operation
+- **Bearer-token + cookie** sessions with **CSRF protection**, **bcrypt** password
+  hashing, **rate limiting**, and enforced permission checks on every page operation
+- **Password reset by email** (forgot / reset link, 1-hour expiry) and in-app
+  **change password**
+- Background **interaction analytics** (clicks, scroll depth, dwell time) buffered
+  server-side (180-day retention), powering the per-user and cross-user (admin)
+  heatmaps without impacting the UI
 - **7 languages** (English, Chinese, Malay, Tamil, German, Hungarian, Spanish)
 - **4 themes** (Light, Dark, Muji, VS Code) and adjustable font size
 - Optional demo analytics seeding for an existing account via an explicit script;
@@ -50,7 +63,7 @@ PostgreSQL database — and is deployed with **GitHub Pages** (web), **Render**
 | `App` | Main web shell for sign-in, workspace navigation, page editing, search, publishing, revisions, trash, and profile settings. | `apps/web/src/App.tsx` |
 | `Activity analytics` | Landing contribution heatmap, profile activity drawer, and admin monitoring metrics. | `apps/web/src/App.tsx`, `apps/api/src/domain/user-analytics.ts`, `apps/api/src/domain/metrics.ts` |
 | `editor-extensions` | Custom TipTap nodes and extensions for callouts, columns, page references, slash commands, and page lookup suggestions. | `apps/web/src/editor-extensions.ts` |
-| `i18n` | Language labels and translated UI strings for the editor, auth flow, sidebar, publishing, trash, and errors. | `apps/web/src/i18n.ts` |
+| `i18n` | Language labels and translated UI strings for the editor, auth flow, sidebar, document hub, profile analytics, stars, to-do, publishing, trash, and errors. | `apps/web/src/i18n.ts` |
 | `shared-types` | Shared TypeScript primitives used by the web app and API to keep data contracts aligned. | `packages/shared-types/src/index.ts` |
 
 These components cover the main public-facing usage areas: editing content, browsing page trees, linking pages, managing workspaces, publishing pages, and switching languages or appearance.
@@ -115,11 +128,14 @@ ENHANCEMENT_CHECKLIST.md roadmap / improvement backlog
 
 ## 🗄️ Data model (overview)
 
-`User` · `Session` · `Workspace` · `WorkspaceMember` · `Page` · `PageRevision` ·
-`PagePermission` · `InviteToken` · `PasswordResetToken` · `PageAttachment`.
+`User` · `AppRole` · `Session` · `Workspace` · `WorkspaceMember` · `Page` ·
+`PageRevision` · `PagePermission` · `InviteToken` · `PasswordResetToken` ·
+`PageAttachment` · `UserTodo` · `PageStar` · `ActivityEvent`.
 
 Pages are self-referential (a page can have a parent page → the nested tree),
 content is stored as JSONB, and soft deletes (`deletedAt`) power the trash.
+`PageStar` is a per-user favourite join table; `UserTodo` holds each user's quick
+to-do list; `ActivityEvent` is the append-only interaction/analytics log.
 Full schema: [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma).
 
 ---

@@ -86,7 +86,9 @@ describe('GET /search', () => {
   it('returns matching pages from search', async () => {
     setAuthSession();
     const matchPage = { id: FIXTURES.page.id, title: 'Test Page', icon: null, workspaceId: WORKSPACE_ID, deletedAt: null };
-    mockState.searchQueryResult = [matchPage];
+    // Search now uses prisma.page.findMany (case-insensitive substring) rather
+    // than a raw full-text query, so drive the findMany mock.
+    mockState.pageFindManyResult = [matchPage as never];
 
     const res = await app.inject({
       method: 'GET',
