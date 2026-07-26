@@ -1365,10 +1365,16 @@ function ProfileDropdown({
   csrf,
   lang,
   txMonitor,
+  animals,
+  typingSparkle,
+  typingCombo,
   onThemeChange,
   onFontChange,
   onLangChange,
   onTxMonitorChange,
+  onAnimalsChange,
+  onTypingSparkleChange,
+  onTypingComboChange,
   onLogout,
 }: {
   user: { id: string; email: string; displayName: string | null };
@@ -1379,10 +1385,16 @@ function ProfileDropdown({
   csrf: string;
   lang: Lang;
   txMonitor: boolean;
+  animals: AnimalKey[];
+  typingSparkle: boolean;
+  typingCombo: boolean;
   onThemeChange: (t: Theme) => void;
   onFontChange: (f: FontSize) => void;
   onLangChange: (l: Lang) => void;
   onTxMonitorChange: (v: boolean) => void;
+  onAnimalsChange: (v: AnimalKey[]) => void;
+  onTypingSparkleChange: (v: boolean) => void;
+  onTypingComboChange: (v: boolean) => void;
   onLogout: () => void;
 }) {
   const t = useT();
@@ -1620,6 +1632,71 @@ function ProfileDropdown({
                     className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all'
                     style={{ left: txMonitor ? "18px" : "2px" }}
                   />
+                </button>
+              </label>
+
+              {/* Fun: critters + typing effects */}
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
+                  {t.funAnimals}
+                </span>
+                <div className='flex items-center gap-1'>
+                  {ANIMAL_KEYS.map((a) => {
+                    const on = animals.includes(a);
+                    return (
+                      <button
+                        key={a}
+                        type='button'
+                        aria-pressed={on}
+                        onClick={() =>
+                          onAnimalsChange(on ? animals.filter((x) => x !== a) : [...animals, a])
+                        }
+                        className='w-7 h-7 rounded-[6px] border flex items-center justify-center transition-all'
+                        style={{
+                          borderColor: on ? "var(--accent-color)" : "var(--border-color)",
+                          background: on ? "rgba(35,131,226,0.08)" : "transparent",
+                          opacity: on ? 1 : 0.45,
+                        }}
+                        title={a}
+                      >
+                        <span className='scale-[0.7] flex'>
+                          <AnimalSprite kind={a} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className='flex items-center justify-between gap-2 cursor-pointer'>
+                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
+                  {t.funSparkles}
+                </span>
+                <button
+                  type='button'
+                  role='switch'
+                  aria-checked={typingSparkle}
+                  onClick={() => onTypingSparkleChange(!typingSparkle)}
+                  className='relative w-9 h-5 rounded-full transition-colors shrink-0'
+                  style={{ background: typingSparkle ? "var(--accent-color)" : "var(--bg-active)" }}
+                >
+                  <span className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all' style={{ left: typingSparkle ? "18px" : "2px" }} />
+                </button>
+              </label>
+
+              <label className='flex items-center justify-between gap-2 cursor-pointer'>
+                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
+                  {t.funCombo}
+                </span>
+                <button
+                  type='button'
+                  role='switch'
+                  aria-checked={typingCombo}
+                  onClick={() => onTypingComboChange(!typingCombo)}
+                  className='relative w-9 h-5 rounded-full transition-colors shrink-0'
+                  style={{ background: typingCombo ? "var(--accent-color)" : "var(--bg-active)" }}
+                >
+                  <span className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all' style={{ left: typingCombo ? "18px" : "2px" }} />
                 </button>
               </label>
             </div>
@@ -4976,6 +5053,192 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
 // Live "transaction monitor" — a Task-Manager-style rolling chart of how many
 // actions were captured (for stats upload) in each of the last 15 seconds, plus
 // a light bulb that pulses green on every successful API transaction.
+// ── Fun: orange "lego"-style critters that waddle across the top bar ─────────
+const ANIMAL_KEYS = ["penguin", "elephant", "crab"] as const;
+type AnimalKey = (typeof ANIMAL_KEYS)[number];
+
+function AnimalSprite({ kind }: { kind: AnimalKey }) {
+  if (kind === "penguin") {
+    return (
+      <svg viewBox='0 0 22 22' width='24' height='24'>
+        <rect x='6' y='18' width='4' height='3' rx='1' fill='#ff9e3d' />
+        <rect x='12' y='18' width='4' height='3' rx='1' fill='#ff9e3d' />
+        <rect x='4' y='3' width='14' height='16' rx='7' fill='#d9691a' />
+        <rect x='7' y='7' width='9' height='11' rx='4.5' fill='#ffc79a' />
+        <rect x='3' y='7' width='4' height='9' rx='2' fill='#b95d17' />
+        <path d='M17 9 l4 2 -4 2 z' fill='#ff9e3d' />
+        <circle cx='14.5' cy='8.5' r='1.3' fill='#3a1c06' />
+      </svg>
+    );
+  }
+  if (kind === "elephant") {
+    return (
+      <svg viewBox='0 0 24 22' width='26' height='24'>
+        <rect x='5' y='14' width='3' height='6' rx='1' fill='#b95d17' />
+        <rect x='9' y='14' width='3' height='6' rx='1' fill='#b95d17' />
+        <rect x='13' y='14' width='3' height='6' rx='1' fill='#b95d17' />
+        <rect x='3' y='5' width='15' height='11' rx='5' fill='#e0721c' />
+        <circle cx='17' cy='9' r='6' fill='#ec7a24' />
+        <circle cx='14.5' cy='8' r='3' fill='#c25c14' />
+        <path d='M22 8 q4 1 3 6 q-1 3 -3 1' stroke='#ec7a24' strokeWidth='3' fill='none' strokeLinecap='round' />
+        <circle cx='19' cy='8' r='1.2' fill='#3a1c06' />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox='0 0 24 18' width='26' height='20'>
+      <path d='M6 11 l-4 3 M8 13 l-3 4 M16 13 l3 4 M18 11 l4 3' stroke='#c25c14' strokeWidth='1.8' strokeLinecap='round' fill='none' />
+      <circle cx='4' cy='7' r='3.2' fill='#e0721c' />
+      <circle cx='20' cy='7' r='3.2' fill='#e0721c' />
+      <rect x='6' y='6' width='12' height='8' rx='4' fill='#ec7a24' />
+      <rect x='9' y='2.5' width='1.6' height='4' fill='#c25c14' />
+      <rect x='13' y='2.5' width='1.6' height='4' fill='#c25c14' />
+      <circle cx='9.8' cy='2.5' r='1.4' fill='#3a1c06' />
+      <circle cx='13.8' cy='2.5' r='1.4' fill='#3a1c06' />
+    </svg>
+  );
+}
+
+const CRITTER_CFG: Record<AnimalKey, { dur: number; delay: number }> = {
+  penguin: { dur: 11, delay: 0 },
+  elephant: { dur: 15, delay: -4 },
+  crab: { dur: 8, delay: -2 },
+};
+
+function TopBarCritters({ animals }: { animals: AnimalKey[] }) {
+  if (animals.length === 0) return null;
+  return (
+    <div className='relative flex-1 h-full min-w-0 hidden sm:block' aria-hidden='true'>
+      {animals.map((a) => (
+        <div
+          key={a}
+          className='critter'
+          style={{ ["--dur" as string]: `${CRITTER_CFG[a].dur}s`, ["--delay" as string]: `${CRITTER_CFG[a].delay}s` } as React.CSSProperties}
+        >
+          <div className='critter-face'>
+            <div className='critter-bob'>
+              <AnimalSprite kind={a} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Fun: typing sparkles + combo counter (no screen shake) ──────────────────
+function getCaretPoint(): { x: number; y: number } | null {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    const rects = range.getClientRects();
+    const r = rects.length ? rects[rects.length - 1] : range.getBoundingClientRect();
+    if (r && (r.width || r.height || r.x || r.y)) return { x: r.right, y: r.top + r.height / 2 };
+  }
+  const el = document.activeElement as HTMLElement | null;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + Math.min(r.width - 10, 60), y: r.top + r.height / 2 };
+  }
+  return null;
+}
+
+function TypingFx({ sparkle, combo }: { sparkle: boolean; combo: boolean }) {
+  const [particles, setParticles] = useState<
+    { id: number; x: number; y: number; dx: number; dy: number; color: string }[]
+  >([]);
+  const [comboCount, setComboCount] = useState(0);
+  const [comboVisible, setComboVisible] = useState(false);
+  const comboRef = useRef(0);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idRef = useRef(0);
+  const lastSpawn = useRef(0);
+
+  useEffect(() => {
+    if (!sparkle && !combo) return;
+    function onKey(e: KeyboardEvent) {
+      const el = document.activeElement as HTMLElement | null;
+      const editable =
+        !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+      if (!editable) return;
+      const isChar = e.key.length === 1 || e.key === "Backspace" || e.key === "Enter";
+      if (!isChar || e.ctrlKey || e.metaKey) return;
+
+      if (sparkle) {
+        const now = Date.now();
+        if (now - lastSpawn.current > 35) {
+          lastSpawn.current = now;
+          const pt = getCaretPoint();
+          if (pt) {
+            const colors = ["#f5721e", "#ff9e3d", "#ffb066", "#ffd08a"];
+            const news = Array.from({ length: 4 }, () => {
+              const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+              const dist = 14 + Math.random() * 22;
+              return {
+                id: idRef.current++,
+                x: pt.x,
+                y: pt.y,
+                dx: Math.cos(ang) * dist,
+                dy: Math.sin(ang) * dist,
+                color: colors[Math.floor(Math.random() * colors.length)]!,
+              };
+            });
+            setParticles((p) => [...p.slice(-36), ...news]);
+            const ids = new Set(news.map((n) => n.id));
+            setTimeout(() => setParticles((p) => p.filter((q) => !ids.has(q.id))), 620);
+          }
+        }
+      }
+
+      if (combo) {
+        comboRef.current += 1;
+        setComboCount(comboRef.current);
+        if (comboRef.current >= 10) setComboVisible(true);
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => {
+          comboRef.current = 0;
+          setComboVisible(false);
+        }, 1200);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sparkle, combo]);
+
+  return (
+    <>
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className='sparkle'
+          style={{
+            left: p.x,
+            top: p.y,
+            background: p.color,
+            boxShadow: `0 0 6px 1px ${p.color}`,
+            ["--dx" as string]: `${p.dx}px`,
+            ["--dy" as string]: `${p.dy}px`,
+          } as React.CSSProperties}
+        />
+      ))}
+      {comboVisible && (
+        <div
+          key={comboCount}
+          className='fixed bottom-5 right-6 z-[70] pointer-events-none select-none text-right'
+          style={{ animation: "combo-pop 0.14s ease-out" }}
+        >
+          <div style={{ color: "#f5721e", fontWeight: 800, fontSize: "13px", letterSpacing: "0.14em", textShadow: "0 1px 6px rgba(245,114,30,0.35)" }}>
+            COMBO
+          </div>
+          <div style={{ color: "#f5721e", fontWeight: 900, fontSize: "40px", lineHeight: 1, textShadow: "0 2px 12px rgba(245,114,30,0.45)" }}>
+            ×{comboCount}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function TransactionMonitor() {
   const t = useT();
   const POINTS = 15;
@@ -5099,6 +5362,18 @@ export function App() {
   const [txMonitor, setTxMonitor] = useState(
     () => localStorage.getItem("ymca_txmonitor") !== "off",
   );
+  // Fun: animated top-bar critters (penguin by default) + typing effects.
+  const [animals, setAnimals] = useState<AnimalKey[]>(() => {
+    const raw = localStorage.getItem("ymca_animals");
+    if (raw == null) return ["penguin"];
+    return raw.split(",").filter((a): a is AnimalKey => (ANIMAL_KEYS as readonly string[]).includes(a));
+  });
+  const [typingSparkle, setTypingSparkle] = useState(
+    () => localStorage.getItem("ymca_sparkle") !== "off",
+  );
+  const [typingCombo, setTypingCombo] = useState(
+    () => localStorage.getItem("ymca_combo") !== "off",
+  );
   const isDark = theme === "dark";
 
   // Check for reset-password token in URL — show reset page before any other render
@@ -5117,6 +5392,16 @@ export function App() {
   useEffect(() => {
     localStorage.setItem("ymca_txmonitor", txMonitor ? "on" : "off");
   }, [txMonitor]);
+
+  useEffect(() => {
+    localStorage.setItem("ymca_animals", animals.join(","));
+  }, [animals]);
+  useEffect(() => {
+    localStorage.setItem("ymca_sparkle", typingSparkle ? "on" : "off");
+  }, [typingSparkle]);
+  useEffect(() => {
+    localStorage.setItem("ymca_combo", typingCombo ? "on" : "off");
+  }, [typingCombo]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-fontsize", fontSize);
@@ -6434,10 +6719,16 @@ export function App() {
               csrf={csrf}
               lang={lang}
               txMonitor={txMonitor}
+              animals={animals}
+              typingSparkle={typingSparkle}
+              typingCombo={typingCombo}
               onThemeChange={setTheme}
               onFontChange={setFontSize}
               onLangChange={handleLangChange}
               onTxMonitorChange={setTxMonitor}
+              onAnimalsChange={setAnimals}
+              onTypingSparkleChange={setTypingSparkle}
+              onTypingComboChange={setTypingCombo}
               onLogout={handleLogout}
             />
 
@@ -6741,6 +7032,9 @@ export function App() {
                 </div>
               )}
             </div>
+
+            {/* Fun: animated critters waddling across the middle of the top bar */}
+            <TopBarCritters animals={animals} />
 
             {/* Right actions */}
             <div className='flex items-center gap-1'>
@@ -7188,6 +7482,9 @@ export function App() {
 
         {/* Toast */}
         {toast && <Toast msg={toast} onDismiss={() => setToast("")} />}
+
+        {/* Fun: typing sparkles + combo counter */}
+        <TypingFx sparkle={typingSparkle} combo={typingCombo} />
       </div>
     </LangContext.Provider>
   );
