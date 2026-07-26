@@ -194,13 +194,16 @@ function drainCapturedActions(): { perTick: number; total: number } {
   _capturedActions = 0;
   return { perTick, total: _totalCapturedActions };
 }
-const _apiSuccessListeners = new Set<() => void>();
-function onApiSuccess(fn: () => void): () => void {
+// Listeners get the request path + method so the monitor can flag specific kinds
+// of traffic (e.g. page-content autosaves) with their own colour.
+type ApiSuccessListener = (path: string, method: string) => void;
+const _apiSuccessListeners = new Set<ApiSuccessListener>();
+function onApiSuccess(fn: ApiSuccessListener): () => void {
   _apiSuccessListeners.add(fn);
   return () => _apiSuccessListeners.delete(fn);
 }
-function emitApiSuccess() {
-  _apiSuccessListeners.forEach((fn) => fn());
+function emitApiSuccess(path: string, method: string) {
+  _apiSuccessListeners.forEach((fn) => fn(path, method));
 }
 
 async function api<T = unknown>(
@@ -263,7 +266,7 @@ async function api<T = unknown>(
   // Count every successful API call as a transaction (drives the chart) and
   // pulse the transaction-monitor light bulb.
   recordCapturedAction();
-  emitApiSuccess();
+  emitApiSuccess(path, (init.method ?? "GET").toUpperCase());
   if (res.status === 204) return null as T;
   return res.json() as Promise<T>;
 }
@@ -4979,7 +4982,9 @@ function TransactionMonitor() {
   const [values, setValues] = useState<number[]>(() => Array(POINTS).fill(0));
   const [total, setTotal] = useState(0);
   const [bulbOn, setBulbOn] = useState(false);
+  const [saveBulbOn, setSaveBulbOn] = useState(false);
   const bulbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveBulbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // One block per second: sample the captured-action counter, then reset it.
   useEffect(() => {
@@ -4991,13 +4996,19 @@ function TransactionMonitor() {
     return () => clearInterval(id);
   }, []);
 
-  // Pulse the bulb on each successful API call.
+  // Pulse the green bulb on every API call; the orange bulb specifically flags a
+  // page-content autosave (PUT …/content) so it's clear that "another API" ran.
   useEffect(
     () =>
-      onApiSuccess(() => {
+      onApiSuccess((path, method) => {
         setBulbOn(true);
         if (bulbTimer.current) clearTimeout(bulbTimer.current);
         bulbTimer.current = setTimeout(() => setBulbOn(false), 220);
+        if (method === "PUT" && /\/pages\/[^/]+\/content$/.test(path)) {
+          setSaveBulbOn(true);
+          if (saveBulbTimer.current) clearTimeout(saveBulbTimer.current);
+          saveBulbTimer.current = setTimeout(() => setSaveBulbOn(false), 320);
+        }
       }),
     [],
   );
@@ -5013,7 +5024,6 @@ function TransactionMonitor() {
   });
   const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p}`).join(" ");
   const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
-  const GREEN = "#39d353";
 
   return (
     <div className='px-2 pt-1.5'>
@@ -5027,8 +5037,16 @@ function TransactionMonitor() {
             className='inline-block w-2 h-2 rounded-full transition-all duration-150'
             title='API transaction'
             style={{
-              background: bulbOn ? GREEN : "rgba(57,211,83,0.28)",
-              boxShadow: bulbOn ? `0 0 6px 1px ${GREEN}` : "none",
+              background: bulbOn ? "var(--tx-line)" : "var(--tx-grid)",
+              boxShadow: bulbOn ? "0 0 6px 1px var(--tx-line)" : "none",
+            }}
+          />
+          <span
+            className='inline-block w-2 h-2 rounded-full transition-all duration-150'
+            title='Page save'
+            style={{
+              background: saveBulbOn ? "#f5721e" : "rgba(245,114,30,0.28)",
+              boxShadow: saveBulbOn ? "0 0 6px 1px #f5721e" : "none",
             }}
           />
         </span>
@@ -5038,7 +5056,7 @@ function TransactionMonitor() {
       </div>
       <div
         className='rounded-[6px] overflow-hidden'
-        style={{ background: "#0a0a0a", border: "1px solid var(--border-color)" }}
+        style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}
       >
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -5048,13 +5066,13 @@ function TransactionMonitor() {
           style={{ display: "block" }}
         >
           {[0.25, 0.5, 0.75].map((f) => (
-            <line key={`h${f}`} x1='0' x2={W} y1={H * f} y2={H * f} stroke='rgba(57,211,83,0.13)' strokeWidth='0.5' />
+            <line key={`h${f}`} x1='0' x2={W} y1={H * f} y2={H * f} style={{ stroke: "var(--tx-grid)" }} strokeWidth='0.5' />
           ))}
           {[0.25, 0.5, 0.75].map((f) => (
-            <line key={`v${f}`} y1='0' y2={H} x1={W * f} x2={W * f} stroke='rgba(57,211,83,0.13)' strokeWidth='0.5' />
+            <line key={`v${f}`} y1='0' y2={H} x1={W * f} x2={W * f} style={{ stroke: "var(--tx-grid)" }} strokeWidth='0.5' />
           ))}
-          <path d={areaPath} fill='rgba(57,211,83,0.25)' />
-          <path d={linePath} fill='none' stroke={GREEN} strokeWidth='1.3' strokeLinejoin='round' strokeLinecap='round' />
+          <path d={areaPath} style={{ fill: "var(--tx-fill)" }} />
+          <path d={linePath} fill='none' style={{ stroke: "var(--tx-line)" }} strokeWidth='1.5' strokeLinejoin='round' strokeLinecap='round' />
         </svg>
       </div>
       <div className='flex justify-between px-1 mt-0.5'>

@@ -28,6 +28,7 @@
   /* Heatmap "no activity" cell: barely-there tint, ~95% transparent, a hair
      off the card background so an empty grid still reads as a heatmap. */
   --heatmap-empty: rgba(55,53,47,0.06);
+  --tx-line: #15a349; --tx-fill: rgba(21,163,73,0.18); --tx-grid: rgba(21,163,73,0.13);
 }
 
 [data-theme="dark"] {
@@ -47,6 +48,7 @@
   /* Subtle light lift on the near-black surface (dark is easy to make cells
      invisible, so nudge it up a touch). */
   --heatmap-empty: rgba(255,255,255,0.05);
+  --tx-line: #39d353; --tx-fill: rgba(57,211,83,0.22); --tx-grid: rgba(57,211,83,0.14);
 }
 
 [data-theme="muji"] {
@@ -66,6 +68,7 @@
   --font-family:   "Georgia", "Times New Roman", serif;
   /* Warm earth tint to match muji's cream palette. */
   --heatmap-empty: rgba(61,53,48,0.07);
+  --tx-line: #3f9142; --tx-fill: rgba(63,145,66,0.20); --tx-grid: rgba(63,145,66,0.14);
 }
 
 [data-theme="vscode"] {
@@ -84,6 +87,7 @@
   --blockquote-border: #3e3e42;
   --font-family:   "Consolas", "Courier New", monospace;
   --heatmap-empty: rgba(255,255,255,0.045);
+  --tx-line: #4ec94e; --tx-fill: rgba(78,201,78,0.20); --tx-grid: rgba(78,201,78,0.14);
 }
 
 /* Font sizes */
