@@ -73,6 +73,7 @@ type Strings = {
   profileAnalytics: string; timeRange: string; daysView: string; todayIncluded: string;
   activityByDay: string; daysLabel14: string; today: string;
   topInteractions: string; recentActivities: string; graphical: string; listView: string;
+  transactionMonitor: string;
 };
 
 export const T: Record<Lang, Strings> = {
@@ -132,7 +133,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "My activity", activityHeatmapTitle: "Your activity heatmap", activityHeatmapSubtitle: "How you are using the app",
     profileAnalytics: "Profile analytics", timeRange: "Time range", daysView: "14d view", todayIncluded: "today included",
     activityByDay: "Activity by day", daysLabel14: "14 days", today: "today",
-    topInteractions: "Top interactions", recentActivities: "Recent activities", graphical: "Graphical", listView: "List",
+    topInteractions: "Top interactions", recentActivities: "Recent activities", graphical: "Graphical", listView: "List", transactionMonitor: "Transaction monitor",
   },
   zh: {
     welcomeBack: "欢迎回来", createAccount: "创建账户",
@@ -188,7 +189,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "我的活动", activityHeatmapTitle: "你的活动热图", activityHeatmapSubtitle: "你的应用使用情况",
     profileAnalytics: "个人分析", timeRange: "时间范围", daysView: "14天视图", todayIncluded: "包含今天",
     activityByDay: "每日活动", daysLabel14: "14 天", today: "今天",
-    topInteractions: "热门互动", recentActivities: "近期活动", graphical: "图表", listView: "列表",
+    topInteractions: "热门互动", recentActivities: "近期活动", graphical: "图表", listView: "列表", transactionMonitor: "交易监视器",
   },
   ms: {
     welcomeBack: "Selamat kembali", createAccount: "Buat akaun",
@@ -246,7 +247,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "Aktiviti saya", activityHeatmapTitle: "Peta haba aktiviti anda", activityHeatmapSubtitle: "Cara anda menggunakan apl",
     profileAnalytics: "Analitik profil", timeRange: "Julat masa", daysView: "Paparan 14h", todayIncluded: "termasuk hari ini",
     activityByDay: "Aktiviti mengikut hari", daysLabel14: "14 hari", today: "hari ini",
-    topInteractions: "Interaksi teratas", recentActivities: "Aktiviti terkini", graphical: "Grafik", listView: "Senarai",
+    topInteractions: "Interaksi teratas", recentActivities: "Aktiviti terkini", graphical: "Grafik", listView: "Senarai", transactionMonitor: "Pemantau transaksi",
   },
   ta: {
     welcomeBack: "மீண்டும் வரவேற்கிறோம்", createAccount: "கணக்கு உருவாக்கு",
@@ -304,7 +305,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "எனது செயல்பாடு", activityHeatmapTitle: "உங்கள் செயல்பாட்டு வெப்ப வரைபடம்", activityHeatmapSubtitle: "நீங்கள் செயலியை எவ்வாறு பயன்படுத்துகிறீர்கள்",
     profileAnalytics: "சுயவிவர பகுப்பாய்வு", timeRange: "கால வரம்பு", daysView: "14நா காட்சி", todayIncluded: "இன்று உட்பட",
     activityByDay: "நாள்வாரி செயல்பாடு", daysLabel14: "14 நாட்கள்", today: "இன்று",
-    topInteractions: "முதன்மை தொடர்புகள்", recentActivities: "சமீபத்திய செயல்பாடுகள்", graphical: "வரைபடம்", listView: "பட்டியல்",
+    topInteractions: "முதன்மை தொடர்புகள்", recentActivities: "சமீபத்திய செயல்பாடுகள்", graphical: "வரைபடம்", listView: "பட்டியல்", transactionMonitor: "பரிவர்த்தனை கண்காணிப்பு",
   },
   de: {
     welcomeBack: "Willkommen zurück", createAccount: "Konto erstellen",
@@ -362,7 +363,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "Meine Aktivität", activityHeatmapTitle: "Ihre Aktivitäts-Heatmap", activityHeatmapSubtitle: "Wie Sie die App nutzen",
     profileAnalytics: "Profil-Analyse", timeRange: "Zeitraum", daysView: "14-Tage-Ansicht", todayIncluded: "heute inklusive",
     activityByDay: "Aktivität pro Tag", daysLabel14: "14 Tage", today: "heute",
-    topInteractions: "Top-Interaktionen", recentActivities: "Letzte Aktivitäten", graphical: "Grafisch", listView: "Liste",
+    topInteractions: "Top-Interaktionen", recentActivities: "Letzte Aktivitäten", graphical: "Grafisch", listView: "Liste", transactionMonitor: "Transaktionsmonitor",
   },
   hu: {
     welcomeBack: "Üdvözöljük újra", createAccount: "Fiók létrehozása",
@@ -420,7 +421,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "Tevékenységem", activityHeatmapTitle: "Tevékenységi hőtérképed", activityHeatmapSubtitle: "Hogyan használod az alkalmazást",
     profileAnalytics: "Profil-elemzés", timeRange: "Időtartomány", daysView: "14 napos nézet", todayIncluded: "mával együtt",
     activityByDay: "Napi tevékenység", daysLabel14: "14 nap", today: "ma",
-    topInteractions: "Legfontosabb interakciók", recentActivities: "Legutóbbi tevékenységek", graphical: "Grafikus", listView: "Lista",
+    topInteractions: "Legfontosabb interakciók", recentActivities: "Legutóbbi tevékenységek", graphical: "Grafikus", listView: "Lista", transactionMonitor: "Tranzakciófigyelő",
   },
   es: {
     welcomeBack: "Bienvenido de nuevo", createAccount: "Crear cuenta",
@@ -478,7 +479,7 @@ export const T: Record<Lang, Strings> = {
     myActivity: "Mi actividad", activityHeatmapTitle: "Tu mapa de calor de actividad", activityHeatmapSubtitle: "Cómo usas la aplicación",
     profileAnalytics: "Analíticas de perfil", timeRange: "Intervalo de tiempo", daysView: "Vista de 14 d", todayIncluded: "hoy incluido",
     activityByDay: "Actividad por día", daysLabel14: "14 días", today: "hoy",
-    topInteractions: "Interacciones principales", recentActivities: "Actividades recientes", graphical: "Gráfico", listView: "Lista",
+    topInteractions: "Interacciones principales", recentActivities: "Actividades recientes", graphical: "Gráfico", listView: "Lista", transactionMonitor: "Monitor de transacciones",
   },
 };
 

@@ -179,6 +179,30 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   _onUnauthorized = fn;
 }
 
+// ── Transaction-monitor instrumentation ─────────────────────────────────────
+// `_capturedActions` counts every analytics action captured (for the live
+// per-second chart); `_apiSuccessListeners` pulse the "transaction" light bulb
+// whenever an API request completes successfully.
+let _capturedActions = 0;
+let _totalCapturedActions = 0;
+function recordCapturedAction() {
+  _capturedActions += 1;
+  _totalCapturedActions += 1;
+}
+function drainCapturedActions(): { perTick: number; total: number } {
+  const perTick = _capturedActions;
+  _capturedActions = 0;
+  return { perTick, total: _totalCapturedActions };
+}
+const _apiSuccessListeners = new Set<() => void>();
+function onApiSuccess(fn: () => void): () => void {
+  _apiSuccessListeners.add(fn);
+  return () => _apiSuccessListeners.delete(fn);
+}
+function emitApiSuccess() {
+  _apiSuccessListeners.forEach((fn) => fn());
+}
+
 async function api<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -235,6 +259,8 @@ async function api<T = unknown>(
     if (res.status >= 500) throw new Error(T[_currentLang].err500);
     throw new Error(b?.message ?? `Error ${res.status}`);
   }
+  // Pulse the transaction-monitor light bulb on each successful API call.
+  emitApiSuccess();
   if (res.status === 204) return null as T;
   return res.json() as Promise<T>;
 }
@@ -1332,9 +1358,11 @@ function ProfileDropdown({
   isDark,
   csrf,
   lang,
+  txMonitor,
   onThemeChange,
   onFontChange,
   onLangChange,
+  onTxMonitorChange,
   onLogout,
 }: {
   user: { id: string; email: string; displayName: string | null };
@@ -1344,9 +1372,11 @@ function ProfileDropdown({
   isDark: boolean;
   csrf: string;
   lang: Lang;
+  txMonitor: boolean;
   onThemeChange: (t: Theme) => void;
   onFontChange: (f: FontSize) => void;
   onLangChange: (l: Lang) => void;
+  onTxMonitorChange: (v: boolean) => void;
   onLogout: () => void;
 }) {
   const t = useT();
@@ -1563,6 +1593,28 @@ function ProfileDropdown({
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className='flex items-center justify-between gap-2 cursor-pointer'>
+                <span
+                  className='text-[11px] font-semibold shrink-0'
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t.transactionMonitor}
+                </span>
+                <button
+                  type='button'
+                  role='switch'
+                  aria-checked={txMonitor}
+                  onClick={() => onTxMonitorChange(!txMonitor)}
+                  className='relative w-9 h-5 rounded-full transition-colors shrink-0'
+                  style={{ background: txMonitor ? "var(--accent-color)" : "var(--bg-active)" }}
+                >
+                  <span
+                    className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all'
+                    style={{ left: txMonitor ? "18px" : "2px" }}
+                  />
+                </button>
               </label>
             </div>
           </div>
@@ -4895,6 +4947,103 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
 // Main App
 // ────────────────────────────────────────────────────────────
 
+// Live "transaction monitor" — a Task-Manager-style rolling chart of how many
+// actions were captured (for stats upload) in each of the last 15 seconds, plus
+// a light bulb that pulses green on every successful API transaction.
+function TransactionMonitor() {
+  const t = useT();
+  const POINTS = 15;
+  const [values, setValues] = useState<number[]>(() => Array(POINTS).fill(0));
+  const [total, setTotal] = useState(0);
+  const [bulbOn, setBulbOn] = useState(false);
+  const bulbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // One block per second: sample the captured-action counter, then reset it.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const { perTick, total } = drainCapturedActions();
+      setValues((prev) => [...prev.slice(1), perTick]);
+      setTotal(total);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Pulse the bulb on each successful API call.
+  useEffect(
+    () =>
+      onApiSuccess(() => {
+        setBulbOn(true);
+        if (bulbTimer.current) clearTimeout(bulbTimer.current);
+        bulbTimer.current = setTimeout(() => setBulbOn(false), 220);
+      }),
+    [],
+  );
+
+  const W = 168;
+  const H = 46;
+  const max = Math.max(4, ...values);
+  const stepX = W / (POINTS - 1);
+  const pts = values.map((v, i) => {
+    const x = i * stepX;
+    const y = H - 2 - (v / max) * (H - 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p}`).join(" ");
+  const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
+  const GREEN = "#39d353";
+
+  return (
+    <div className='px-2 pt-1.5'>
+      <div className='flex items-center justify-between mb-1 px-1'>
+        <span
+          className='text-[10px] font-medium uppercase tracking-wider flex items-center gap-1.5'
+          style={{ color: "var(--text-muted)" }}
+        >
+          {t.transactionMonitor}
+          <span
+            className='inline-block w-2 h-2 rounded-full transition-all duration-150'
+            title='API transaction'
+            style={{
+              background: bulbOn ? GREEN : "rgba(57,211,83,0.28)",
+              boxShadow: bulbOn ? `0 0 6px 1px ${GREEN}` : "none",
+            }}
+          />
+        </span>
+        <span className='text-[10px] tabular-nums' style={{ color: "var(--text-muted)" }}>
+          {total.toLocaleString()}
+        </span>
+      </div>
+      <div
+        className='rounded-[6px] overflow-hidden'
+        style={{ background: "#0a0a0a", border: "1px solid var(--border-color)" }}
+      >
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width='100%'
+          height={H}
+          preserveAspectRatio='none'
+          style={{ display: "block" }}
+        >
+          {[0.25, 0.5, 0.75].map((f) => (
+            <line key={`h${f}`} x1='0' x2={W} y1={H * f} y2={H * f} stroke='rgba(57,211,83,0.13)' strokeWidth='0.5' />
+          ))}
+          {[0.25, 0.5, 0.75].map((f) => (
+            <line key={`v${f}`} y1='0' y2={H} x1={W * f} x2={W * f} stroke='rgba(57,211,83,0.13)' strokeWidth='0.5' />
+          ))}
+          <path d={areaPath} fill='rgba(57,211,83,0.25)' />
+          <path d={linePath} fill='none' stroke={GREEN} strokeWidth='1.3' strokeLinejoin='round' strokeLinecap='round' />
+        </svg>
+      </div>
+      <div className='flex justify-between px-1 mt-0.5'>
+        <span className='text-[9px]' style={{ color: "var(--text-muted)" }}>15s</span>
+        <span className='text-[9px] tabular-nums' style={{ color: "var(--text-muted)" }}>
+          {values[POINTS - 1]}/s
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("ymca_theme") as Theme) ?? "muji",
@@ -4904,6 +5053,10 @@ export function App() {
   );
   const [lang, setLang] = useState<Lang>(
     () => (localStorage.getItem("ymca_lang") as Lang) ?? "en",
+  );
+  // Live transaction monitor in the sidebar — on by default, toggled in settings.
+  const [txMonitor, setTxMonitor] = useState(
+    () => localStorage.getItem("ymca_txmonitor") !== "off",
   );
   const isDark = theme === "dark";
 
@@ -4919,6 +5072,10 @@ export function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("ymca_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("ymca_txmonitor", txMonitor ? "on" : "off");
+  }, [txMonitor]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-fontsize", fontSize);
@@ -5041,6 +5198,7 @@ export function App() {
   const sendAnalyticsEvent = useCallback(
     (payload: AnalyticsEventPayload) => {
       if (!user) return;
+      recordCapturedAction();
       analyticsQueueRef.current.push(payload);
       if (analyticsQueueRef.current.length >= 10) {
         void flushAnalyticsQueue();
@@ -6231,9 +6389,11 @@ export function App() {
               isDark={isDark}
               csrf={csrf}
               lang={lang}
+              txMonitor={txMonitor}
               onThemeChange={setTheme}
               onFontChange={setFontSize}
               onLangChange={handleLangChange}
+              onTxMonitorChange={setTxMonitor}
               onLogout={handleLogout}
             />
 
@@ -6358,6 +6518,14 @@ export function App() {
                 </div>
               );
             })()}
+
+            {/* Live transaction monitor — its own separated block above the
+                Console / Trash controls. Toggled in personal settings. */}
+            {txMonitor && (
+              <div className='border-t pb-1' style={{ borderColor: "var(--border-color)" }}>
+                <TransactionMonitor />
+              </div>
+            )}
 
             {/* Bottom */}
             <div
