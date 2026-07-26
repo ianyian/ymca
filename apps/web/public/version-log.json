@@ -1,5 +1,60 @@
 [
   {
+    "id": "2026-07-25-search-content-and-freshness",
+    "title": "Full content search with snippets",
+    "summary": "The left-menu search (Ctrl+K) now searches inside page content, not just titles — with highlighted snippets, an open-page link, and a last-updated indicator on each result.",
+    "bullets": [
+      "Type-ahead matching on partial and multi-word queries, searching both titles and page body text.",
+      "Matched keywords are highlighted in yellow, with a short snippet from the page content.",
+      "Each result shows when the page was last updated so you can judge freshness before opening it."
+    ],
+    "publishedAt": "2026-07-25T12:00:00.000Z"
+  },
+  {
+    "id": "2026-07-25-page-stars",
+    "title": "Star your favourite pages",
+    "summary": "Gmail-style stars — click the star on any page to mark it a favourite; starred pages get their own section in the sidebar.",
+    "bullets": [
+      "Star from the Document Hub list or the editor top bar; the star fills gold when active.",
+      "A new Starred section in the left menu lists your favourites for one-click access.",
+      "Stars are personal — starring a shared page doesn't affect other members."
+    ],
+    "publishedAt": "2026-07-25T11:00:00.000Z"
+  },
+  {
+    "id": "2026-07-25-admin-analysis",
+    "title": "Console: Analysis dashboard",
+    "summary": "A new Analysis tab in the admin Console visualises how the workspace is used — for spotting load peaks and understanding user behaviour.",
+    "bullets": [
+      "Daily usage trend, top-5 users composite chart, and per-hour / per-weekday activity.",
+      "Top focus areas show which pages and features get the most use.",
+      "7d / 30d / 90d windows to help with capacity and resource planning."
+    ],
+    "publishedAt": "2026-07-25T10:00:00.000Z"
+  },
+  {
+    "id": "2026-07-25-heatmap-upgrade",
+    "title": "Contribution heatmap upgrade",
+    "summary": "The landing heatmap is now a rolling 12-month view you can page through year by year, and it fits every screen size.",
+    "bullets": [
+      "Round back/forward buttons move the window a year at a time (July-to-July).",
+      "Responsive grid fits a full year without a horizontal scrollbar, on desktop and mobile.",
+      "Friendlier, theme-aware colours for empty days in light, dark, and muji themes."
+    ],
+    "publishedAt": "2026-07-25T09:00:00.000Z"
+  },
+  {
+    "id": "2026-07-25-i18n-and-email",
+    "title": "Wider translations + live password-reset email",
+    "summary": "More of the interface now follows your selected language, and password-reset emails can be delivered for real once SMTP is configured.",
+    "bullets": [
+      "Document Hub, landing card, and Profile analytics labels are now translated in all 7 languages.",
+      "The sidebar To-do item is tidier — icon and label, without the highlighted background.",
+      "Password reset now sends a real email through your SMTP provider (with TLS)."
+    ],
+    "publishedAt": "2026-07-25T08:00:00.000Z"
+  },
+  {
     "id": "2026-07-17-rate-limit-and-top-paging",
     "title": "Login rate-limit tuning + top pager",
     "summary": "Reworked auth rate limiting so normal use no longer trips the limit, with a clear localized retry message, and moved the Console user-management pager to the top of the grid.",
