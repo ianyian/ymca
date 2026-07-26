@@ -686,7 +686,7 @@ const Ico = {
 // instead of inlining base64 (which bloats page content + every revision).
 // ────────────────────────────────────────────────────────────
 
-const MAX_INLINE_IMAGE_BYTES = 1024 * 1024 * 1024; // 1 GB
+const MAX_INLINE_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB (stored in the DB)
 
 async function uploadImageFile(
   file: File,
@@ -1668,6 +1668,7 @@ function formatDuration(ms: number): string {
 function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadAttachments = useCallback(async () => {
@@ -1690,6 +1691,12 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError(`"${file.name}" is ${formatBytes(file.size)} — the limit is 25 MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -1714,7 +1721,8 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
         csrf,
       );
       await loadAttachments();
-    } catch {
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1753,7 +1761,7 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
       </h3>
       <p className='text-[12px] mb-3' style={{ color: "var(--text-muted)" }}>
         Attach files to this page — PDF, Word, PowerPoint, Excel, images, text or
-        markdown, up to 1&nbsp;GB each.
+        markdown, up to 25&nbsp;MB each.
       </p>
 
       {/* Prominent upload drop-zone so it's easy to notice */}
@@ -1775,9 +1783,17 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
           {uploading ? "Uploading…" : "Click to upload a file"}
         </span>
         <span className='text-[11px]'>
-          PDF · Word · PPT · Excel · images — up to 1&nbsp;GB
+          PDF · Word · PPT · Excel · images — up to 25&nbsp;MB
         </span>
       </button>
+      {uploadError && (
+        <p
+          className='text-[12px] mt-2 rounded-[6px] px-3 py-2'
+          style={{ background: "rgba(200,48,48,0.08)", color: "#c03030" }}
+        >
+          {uploadError}
+        </p>
+      )}
       <input
         ref={fileInputRef}
         type='file'
@@ -5925,9 +5941,12 @@ export function App() {
       >
         <div className='w-full max-w-[380px]'>
           <div className='text-center mb-7'>
+            {/* Fixed brand-blue badge with white text — readable on every theme
+                (the old var(--text-primary) background went white-on-white in the
+                dark/vscode themes). */}
             <div
               className='inline-flex items-center justify-center w-12 h-12 rounded-xl text-white text-xl font-bold mb-4'
-              style={{ background: "var(--text-primary)" }}
+              style={{ background: "#2383e2", boxShadow: "0 2px 8px rgba(35,131,226,0.35)" }}
             >
               Y
             </div>

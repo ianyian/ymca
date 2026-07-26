@@ -1,16 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { createWriteStream, createReadStream, existsSync, mkdirSync } from 'node:fs';
+// createReadStream/existsSync/unlink are only for serving/removing legacy
+// disk-stored attachments; new uploads live in the DB.
+import { createReadStream, existsSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { resolvePageAccess } from '../lib/page-access.js';
 import { canEdit, canView } from '../domain/permissions.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = join(__dirname, '..', '..', 'uploads');
 
 // Allowlist of accepted upload MIME types + a hard per-file size cap.
 const ALLOWED_MIME = new Set([
@@ -20,15 +17,13 @@ const ALLOWED_MIME = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'application/zip',
 ]);
-const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024; // 1 GB
-
-function ensurePageDir(pageId: string): string {
-  const dir = join(UPLOADS_DIR, pageId);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  return dir;
-}
+// Attachments are stored in the database (bytea), so keep a sane per-file cap:
+// the base64 upload is held in memory and the bytes live in a DB row.
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export async function registerAttachmentRoutes(app: FastifyInstance) {
   // POST /pages/:id/attachments — upload a file as base64 JSON
@@ -73,22 +68,15 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         return reply.status(400).send({ code: 'UNSUPPORTED_TYPE', message: 'File type not allowed', traceId: request.id });
       }
 
-      // Decode base64 and write to disk
+      // Decode base64 and store the bytes in the DB (survives redeploys, unlike
+      // the ephemeral filesystem on hosts like Render).
       const buffer = Buffer.from(content, 'base64');
       if (buffer.length > MAX_ATTACHMENT_BYTES) {
-        return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'File exceeds the 1 GB limit', traceId: request.id });
+        return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'File exceeds the 25 MB limit', traceId: request.id });
       }
       const attachId = randomUUID();
       const ext = filename.includes('.') ? '.' + filename.split('.').pop() : '';
       const storedName = `${attachId}${ext}`;
-      const pageDir = ensurePageDir(pageId);
-      const filePath = join(pageDir, storedName);
-
-      await new Promise<void>((resolve, reject) => {
-        const ws = createWriteStream(filePath);
-        ws.on('error', reject);
-        ws.end(buffer, resolve);
-      });
 
       const attachment = await prisma.pageAttachment.create({
         data: {
@@ -98,8 +86,11 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
           originalName: filename,
           mimetype,
           size: buffer.length,
-          filePath,
+          filePath: '',
+          data: buffer,
         },
+        // Never return the bytes in the JSON response.
+        select: { id: true, pageId: true, filename: true, originalName: true, mimetype: true, size: true, createdAt: true },
       });
 
       // `url` is the capability URL callers embed as an inline image/file src.
@@ -168,7 +159,8 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
       if (!attachment) {
         return reply.status(404).send({ code: 'NOT_FOUND', message: 'Attachment not found', traceId: request.id });
       }
-      if (!existsSync(attachment.filePath)) {
+      const hasDbBytes = attachment.data != null;
+      if (!hasDbBytes && !existsSync(attachment.filePath)) {
         return reply.status(404).send({ code: 'FILE_MISSING', message: 'File not found on disk', traceId: request.id });
       }
 
@@ -185,7 +177,10 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         )
         .header('content-length', attachment.size);
 
-      return reply.send(createReadStream(attachment.filePath));
+      // Prefer DB-stored bytes; fall back to the legacy on-disk file.
+      return reply.send(
+        hasDbBytes ? Buffer.from(attachment.data!) : createReadStream(attachment.filePath),
+      );
     },
   );
 
@@ -223,7 +218,8 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         return reply.status(404).send({ code: 'NOT_FOUND', message: 'Attachment not found', traceId: request.id });
       }
 
-      if (!existsSync(attachment.filePath)) {
+      const hasDbBytes = attachment.data != null;
+      if (!hasDbBytes && !existsSync(attachment.filePath)) {
         return reply.status(404).send({ code: 'FILE_MISSING', message: 'File not found on disk', traceId: request.id });
       }
 
@@ -233,8 +229,9 @@ export async function registerAttachmentRoutes(app: FastifyInstance) {
         .header('content-disposition', `attachment; filename="${encodeURIComponent(attachment.originalName)}"`)
         .header('content-length', attachment.size);
 
-      const stream = createReadStream(attachment.filePath);
-      return reply.send(stream);
+      return reply.send(
+        hasDbBytes ? Buffer.from(attachment.data!) : createReadStream(attachment.filePath),
+      );
     },
   );
 

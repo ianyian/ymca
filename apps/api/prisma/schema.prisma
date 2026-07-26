@@ -262,7 +262,10 @@ model PageAttachment {
   originalName String
   mimetype     String
   size         Int
+  // Legacy disk path (kept so old rows still serve); new uploads store bytes in
+  // `data` so attachments survive redeploys on ephemeral hosts like Render.
   filePath     String   @default("")
+  data         Bytes?
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   page         Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
