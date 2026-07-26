@@ -1741,6 +1741,7 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadAttachments = useCallback(async () => {
@@ -1760,9 +1761,8 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
     void loadAttachments();
   }, [loadAttachments]);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Shared by the click-to-pick input and drag-and-drop.
+  async function uploadFile(file: File) {
     setUploadError(null);
     if (file.size > 25 * 1024 * 1024) {
       setUploadError(`"${file.name}" is ${formatBytes(file.size)} — the limit is 25 MB.`);
@@ -1801,6 +1801,11 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
     }
   }
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) void uploadFile(file);
+  }
+
   async function handleDelete(attachId: string) {
     try {
       await api(
@@ -1836,19 +1841,34 @@ function AttachmentSection({ pageId, csrf }: { pageId: string; csrf: string }) {
         markdown, up to 25&nbsp;MB each.
       </p>
 
-      {/* Prominent upload drop-zone so it's easy to notice */}
+      {/* Prominent upload drop-zone so it's easy to notice. Click opens the file
+          picker; drag-and-drop also works (a fallback when the picker misbehaves). */}
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!dragging) setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) void uploadFile(file);
+        }}
         className='w-full flex flex-col items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed py-6 transition-colors'
         style={{
-          borderColor: "var(--border-color)",
+          borderColor: dragging ? "var(--accent-color)" : "var(--border-color)",
+          background: dragging ? "rgba(35,131,226,0.06)" : "transparent",
           color: "var(--text-muted)",
         }}
         onMouseEnter={(e) =>
-          (e.currentTarget.style.background = "var(--bg-hover)")
+          !dragging && (e.currentTarget.style.background = "var(--bg-hover)")
         }
-        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        onMouseLeave={(e) =>
+          !dragging && (e.currentTarget.style.background = "transparent")
+        }
       >
         <Ico.Plus />
         <span className='text-[13px] font-medium'>
