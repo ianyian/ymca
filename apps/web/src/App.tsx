@@ -4664,26 +4664,37 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
   const [errorsLog, setErrorsLog] = useState<RecentErrors | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  // Auto-refresh so the dashboard shows the latest data; adjustable in the UI.
+  const [refreshSec, setRefreshSec] = useState(5);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    Promise.all([
-      api<UsageAnalytics>(`/admin/analytics/usage?window=${window}`),
-      api<RecentErrors>(`/admin/errors?window=${window}`).catch(() => null),
-    ])
-      .then(([usage, errors]) => {
-        if (!alive) return;
+  const load = useCallback(
+    async (silent: boolean) => {
+      if (!silent) setLoading(true);
+      try {
+        const [usage, errors] = await Promise.all([
+          api<UsageAnalytics>(`/admin/analytics/usage?window=${window}`),
+          api<RecentErrors>(`/admin/errors?window=${window}`).catch(() => null),
+        ]);
         setData(usage);
         setErrorsLog(errors);
         setErr(null);
-      })
-      .catch((e) => alive && setErr(e instanceof Error ? e.message : "Error"))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [window]);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Error");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [window],
+  );
+
+  // Load on mount / window change (with the spinner), then silently on interval.
+  useEffect(() => {
+    void load(false);
+  }, [load]);
+  useEffect(() => {
+    const id = setInterval(() => void load(true), refreshSec * 1000);
+    return () => clearInterval(id);
+  }, [load, refreshSec]);
 
   const chartText = isDark ? "#e6e6e5" : "#37352f";
   const chartMuted = isDark ? "rgba(230,230,229,0.6)" : "rgba(80,80,80,0.72)";
@@ -4869,8 +4880,8 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
         </div>
       )}
 
-      {/* Window selector */}
-      <div className='flex items-center gap-1'>
+      {/* Window selector + auto-refresh */}
+      <div className='flex items-center gap-1 flex-wrap'>
         {(["7d", "30d", "90d"] as const).map((w) => (
           <button
             key={w}
@@ -4890,6 +4901,30 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
             {t.loading}
           </span>
         )}
+        <div className='ml-auto flex items-center gap-1.5'>
+          <span
+            className='inline-block w-1.5 h-1.5 rounded-full'
+            title={t.autoRefresh}
+            style={{ background: "var(--accent-color)" }}
+          />
+          <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
+            {t.autoRefresh}
+          </span>
+          <select
+            value={refreshSec}
+            onChange={(e) => setRefreshSec(Number(e.target.value))}
+            className='rounded-[6px] border px-2 py-1 text-[11px] outline-none'
+            style={{
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <option value={5}>5s</option>
+            <option value={10}>10s</option>
+            <option value={30}>30s</option>
+          </select>
+        </div>
       </div>
 
       {/* KPIs */}
