@@ -404,6 +404,82 @@ export async function getUsageAnalytics(
   });
 }
 
+// ── Recent errors (admin troubleshooting log) ───────────────────────────────
+// Every request is already logged into ActivityEvent (path/method/status/user/
+// time), so we can surface a "recent errors" view without a separate table. We
+// treat 4xx/5xx as errors, skipping the noisy-but-normal 401 (auth prompts) and
+// 429 (rate limit) statuses.
+export type RecentErrorItem = {
+  at: string;
+  statusCode: number;
+  method: string;
+  path: string;
+  user: string | null;
+};
+export type RecentErrors = {
+  window: UsageWindowKey;
+  generatedAt: string;
+  total: number;
+  byStatus: { status: number; count: number }[];
+  items: RecentErrorItem[];
+};
+
+export async function getRecentErrors(
+  window: UsageWindowKey,
+): Promise<RecentErrors> {
+  return cached(`errors:${window}`, async () => {
+    try {
+      const from = since(USAGE_WINDOW_DAYS[window] * 24);
+      const [rows, statusRows] = await Promise.all([
+        prisma.$queryRaw<
+          { createdAt: Date; statusCode: number; method: string; path: string; userId: string | null }[]
+        >`
+          SELECT "createdAt", "statusCode", "method", "path", "userId"
+          FROM "ActivityEvent"
+          WHERE "eventType" = 'http' AND "statusCode" >= 400
+            AND "statusCode" NOT IN (401, 429)
+            AND "createdAt" >= ${from}
+          ORDER BY "createdAt" DESC
+          LIMIT 100
+        `,
+        prisma.$queryRaw<{ status: number; count: bigint }[]>`
+          SELECT "statusCode" AS status, COUNT(*)::bigint AS count
+          FROM "ActivityEvent"
+          WHERE "eventType" = 'http' AND "statusCode" >= 400
+            AND "statusCode" NOT IN (401, 429)
+            AND "createdAt" >= ${from}
+          GROUP BY 1 ORDER BY 2 DESC
+        `,
+      ]);
+
+      // Resolve user ids to emails for readability.
+      const userIds = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))];
+      const users = userIds.length
+        ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, email: true } })
+        : [];
+      const emailById = new Map(users.map((u) => [u.id, u.email]));
+
+      const byStatus = statusRows.map((r) => ({ status: Number(r.status), count: Number(r.count) }));
+      return {
+        window,
+        generatedAt: new Date().toISOString(),
+        total: byStatus.reduce((sum, s) => sum + s.count, 0),
+        byStatus,
+        items: rows.map((r) => ({
+          at: r.createdAt.toISOString(),
+          statusCode: r.statusCode,
+          method: r.method,
+          path: r.path,
+          user: r.userId ? emailById.get(r.userId) ?? null : null,
+        })),
+      };
+    } catch (error) {
+      console.error("[metrics] recent errors failed", error);
+      return { window, generatedAt: new Date().toISOString(), total: 0, byStatus: [], items: [] };
+    }
+  });
+}
+
 export async function getActivityMetrics(
   window: WindowKey,
 ): Promise<ActivityMetrics> {

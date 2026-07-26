@@ -3990,6 +3990,12 @@ type UsageAnalytics = {
   weekday: number[];
   topTargets: { label: string; count: number }[];
 };
+type RecentErrors = {
+  window: UsageWindow;
+  total: number;
+  byStatus: { status: number; count: number }[];
+  items: { at: string; statusCode: number; method: string; path: string; user: string | null }[];
+};
 
 function relativeTime(iso: string | null, at: (typeof AT)[Lang]): string {
   if (!iso) return at.never;
@@ -4474,20 +4480,30 @@ function UserManagementPanel({ csrf, lang, isDark }: { csrf: string; lang: Lang;
 // Distinct series colors for the top-5-users composite chart.
 const ANALYSIS_SERIES = ["#2383e2", "#e0a13b", "#3bb273", "#c85c5c", "#8b6fc4"];
 
+// Red for 5xx (server errors), amber for 4xx (client/permission errors).
+function analysisStatusColor(status: number): string {
+  return status >= 500 ? "#c0504d" : "#d98a2b";
+}
+
 function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
   const t = AT[lang];
   const [window, setWindow] = useState<UsageWindow>("30d");
   const [data, setData] = useState<UsageAnalytics | null>(null);
+  const [errorsLog, setErrorsLog] = useState<RecentErrors | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    api<UsageAnalytics>(`/admin/analytics/usage?window=${window}`)
-      .then((r) => {
+    Promise.all([
+      api<UsageAnalytics>(`/admin/analytics/usage?window=${window}`),
+      api<RecentErrors>(`/admin/errors?window=${window}`).catch(() => null),
+    ])
+      .then(([usage, errors]) => {
         if (!alive) return;
-        setData(r);
+        setData(usage);
+        setErrorsLog(errors);
         setErr(null);
       })
       .catch((e) => alive && setErr(e instanceof Error ? e.message : "Error"))
@@ -4748,6 +4764,54 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
         <h3 className='text-[13px] font-semibold mb-2' style={{ color: "var(--text-primary)" }}>{t.focusAreas}</h3>
         <div className='h-[260px] rounded-[10px] border p-3' style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}>
           <Bar data={targetData} options={horizontalOptions} />
+        </div>
+      </section>
+
+      {/* Recent errors (troubleshooting log) */}
+      <section>
+        <div className='flex items-center gap-2 mb-2'>
+          <h3 className='text-[13px] font-semibold' style={{ color: "var(--text-primary)" }}>{t.recentErrors}</h3>
+          {errorsLog && errorsLog.byStatus.length > 0 && (
+            <div className='flex gap-1'>
+              {errorsLog.byStatus.slice(0, 5).map((s) => (
+                <span
+                  key={s.status}
+                  className='text-[10px] font-medium px-1.5 py-0.5 rounded tabular-nums'
+                  style={{ background: analysisStatusColor(s.status), color: "#fff" }}
+                >
+                  {s.status}·{s.count}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className='rounded-[10px] border overflow-hidden' style={{ borderColor: "var(--border-color)" }}>
+          {!errorsLog || errorsLog.items.length === 0 ? (
+            <p className='text-[12px] px-3 py-6 text-center' style={{ color: "var(--text-muted)" }}>
+              {loading ? t.loading : "—"}
+            </p>
+          ) : (
+            <div className='max-h-[320px] overflow-y-auto'>
+              {errorsLog.items.map((e, i) => (
+                <div
+                  key={i}
+                  className='grid items-center gap-2 px-3 py-1.5 text-[12px] border-b last:border-0'
+                  style={{ borderColor: "var(--border-color)", gridTemplateColumns: "48px 52px 1fr auto" }}
+                >
+                  <span className='font-semibold tabular-nums' style={{ color: analysisStatusColor(e.statusCode) }}>
+                    {e.statusCode}
+                  </span>
+                  <span className='font-mono text-[11px]' style={{ color: "var(--text-muted)" }}>{e.method}</span>
+                  <span className='truncate font-mono text-[11px]' style={{ color: "var(--text-primary)" }} title={e.path}>
+                    {e.path}
+                  </span>
+                  <span className='text-[10px] whitespace-nowrap text-right' style={{ color: "var(--text-muted)" }} title={e.user ?? ""}>
+                    {e.user ? e.user.split("@")[0] : "—"} · {formatSearchUpdated(e.at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -5369,10 +5433,17 @@ export function App() {
     try {
       const r = await api<{ workspaces: Workspace[] }>("/workspaces");
       setWorkspaces(r.workspaces);
-      if (r.workspaces.length > 0 && !activeWs) setActiveWs(r.workspaces[0]!);
-      // No workspace at all — nothing will ever trigger loadTree, so the
-      // skeleton would otherwise spin forever.
-      else if (r.workspaces.length === 0) setInitialLoad(false);
+      if (r.workspaces.length > 0) {
+        // Reset the active workspace when it doesn't belong to the current user
+        // — otherwise switching accounts in the same tab keeps the previous
+        // account's workspace id, and every workspace-scoped call 403s.
+        const stillValid = activeWs && r.workspaces.some((w) => w.id === activeWs.id);
+        if (!stillValid) setActiveWs(r.workspaces[0]!);
+      } else {
+        // No workspace at all — nothing will ever trigger loadTree, so the
+        // skeleton would otherwise spin forever.
+        setInitialLoad(false);
+      }
     } catch (e) {
       setToast(e instanceof Error ? e.message : "Load failed");
       setInitialLoad(false);

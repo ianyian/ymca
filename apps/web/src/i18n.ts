@@ -527,6 +527,7 @@ export type AdminStrings = {
   peakHours: string;
   byWeekday: string;
   focusAreas: string;
+  recentErrors: string;
   // Localized labels for known role keys. Unknown roles fall back to the
   // server-provided label, so future roles still render (just untranslated).
   roles: Record<string, string>;
@@ -546,7 +547,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "User", colPages: "Pages", colLastSeen: "Last seen", colRole: "Role",
     loading: "Loading…", noUsers: "No users found", prev: "Prev", next: "Next",
     never: "never", justNow: "just now",
-    analysis: "Analysis", totalEvents: "Total events", avgPerUser: "Avg / user", usageTrend: "Daily usage", topUsersUsage: "Top 5 users", peakHours: "Usage by hour (UTC)", byWeekday: "Usage by weekday", focusAreas: "Top focus areas",
+    analysis: "Analysis", totalEvents: "Total events", avgPerUser: "Avg / user", usageTrend: "Daily usage", topUsersUsage: "Top 5 users", peakHours: "Usage by hour (UTC)", byWeekday: "Usage by weekday", focusAreas: "Top focus areas", recentErrors: "Recent errors",
     roles: { admin: "Administrator", user: "Normal User" },
   },
   zh: {
@@ -562,7 +563,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "用户", colPages: "页面", colLastSeen: "最后活跃", colRole: "角色",
     loading: "加载中…", noUsers: "未找到用户", prev: "上一页", next: "下一页",
     never: "从不", justNow: "刚刚",
-    analysis: "分析", totalEvents: "总事件数", avgPerUser: "人均", usageTrend: "每日使用量", topUsersUsage: "前 5 名用户", peakHours: "按小时使用量 (UTC)", byWeekday: "按星期使用量", focusAreas: "热门关注区域",
+    analysis: "分析", totalEvents: "总事件数", avgPerUser: "人均", usageTrend: "每日使用量", topUsersUsage: "前 5 名用户", peakHours: "按小时使用量 (UTC)", byWeekday: "按星期使用量", focusAreas: "热门关注区域", recentErrors: "近期错误",
     roles: { admin: "管理员", user: "普通用户" },
   },
   ms: {
@@ -578,7 +579,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "Pengguna", colPages: "Halaman", colLastSeen: "Terakhir dilihat", colRole: "Peranan",
     loading: "Memuatkan…", noUsers: "Tiada pengguna dijumpai", prev: "Sebelum", next: "Seterusnya",
     never: "tidak pernah", justNow: "sebentar tadi",
-    analysis: "Analisis", totalEvents: "Jumlah peristiwa", avgPerUser: "Purata / pengguna", usageTrend: "Penggunaan harian", topUsersUsage: "5 pengguna teratas", peakHours: "Penggunaan mengikut jam (UTC)", byWeekday: "Penggunaan mengikut hari", focusAreas: "Kawasan tumpuan teratas",
+    analysis: "Analisis", totalEvents: "Jumlah peristiwa", avgPerUser: "Purata / pengguna", usageTrend: "Penggunaan harian", topUsersUsage: "5 pengguna teratas", peakHours: "Penggunaan mengikut jam (UTC)", byWeekday: "Penggunaan mengikut hari", focusAreas: "Kawasan tumpuan teratas", recentErrors: "Ralat terkini",
     roles: { admin: "Pentadbir", user: "Pengguna Biasa" },
   },
   ta: {
@@ -594,7 +595,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "பயனர்", colPages: "பக்கங்கள்", colLastSeen: "கடைசியாக பார்த்தது", colRole: "பங்கு",
     loading: "ஏற்றுகிறது…", noUsers: "பயனர்கள் இல்லை", prev: "முந்தைய", next: "அடுத்து",
     never: "ஒருபோதும்", justNow: "இப்போது",
-    analysis: "பகுப்பாய்வு", totalEvents: "மொத்த நிகழ்வுகள்", avgPerUser: "சராசரி / பயனர்", usageTrend: "தினசரி பயன்பாடு", topUsersUsage: "முதல் 5 பயனர்கள்", peakHours: "மணிநேரவாரி பயன்பாடு (UTC)", byWeekday: "வாரநாள்வாரி பயன்பாடு", focusAreas: "முதன்மை கவன பகுதிகள்",
+    analysis: "பகுப்பாய்வு", totalEvents: "மொத்த நிகழ்வுகள்", avgPerUser: "சராசரி / பயனர்", usageTrend: "தினசரி பயன்பாடு", topUsersUsage: "முதல் 5 பயனர்கள்", peakHours: "மணிநேரவாரி பயன்பாடு (UTC)", byWeekday: "வாரநாள்வாரி பயன்பாடு", focusAreas: "முதன்மை கவன பகுதிகள்", recentErrors: "சமீபத்திய பிழைகள்",
     roles: { admin: "நிர்வாகி", user: "சாதாரண பயனர்" },
   },
   de: {
@@ -610,7 +611,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "Benutzer", colPages: "Seiten", colLastSeen: "Zuletzt gesehen", colRole: "Rolle",
     loading: "Wird geladen…", noUsers: "Keine Benutzer gefunden", prev: "Zurück", next: "Weiter",
     never: "nie", justNow: "gerade eben",
-    analysis: "Analyse", totalEvents: "Ereignisse gesamt", avgPerUser: "Ø / Benutzer", usageTrend: "Tägliche Nutzung", topUsersUsage: "Top 5 Benutzer", peakHours: "Nutzung nach Stunde (UTC)", byWeekday: "Nutzung nach Wochentag", focusAreas: "Wichtigste Fokusbereiche",
+    analysis: "Analyse", totalEvents: "Ereignisse gesamt", avgPerUser: "Ø / Benutzer", usageTrend: "Tägliche Nutzung", topUsersUsage: "Top 5 Benutzer", peakHours: "Nutzung nach Stunde (UTC)", byWeekday: "Nutzung nach Wochentag", focusAreas: "Wichtigste Fokusbereiche", recentErrors: "Letzte Fehler",
     roles: { admin: "Administrator", user: "Normaler Benutzer" },
   },
   hu: {
@@ -626,7 +627,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "Felhasználó", colPages: "Oldalak", colLastSeen: "Utoljára látva", colRole: "Szerep",
     loading: "Betöltés…", noUsers: "Nincs felhasználó", prev: "Előző", next: "Következő",
     never: "soha", justNow: "épp most",
-    analysis: "Elemzés", totalEvents: "Összes esemény", avgPerUser: "Átlag / felhasználó", usageTrend: "Napi használat", topUsersUsage: "Top 5 felhasználó", peakHours: "Használat óránként (UTC)", byWeekday: "Használat hét napjai szerint", focusAreas: "Fő fókuszterületek",
+    analysis: "Elemzés", totalEvents: "Összes esemény", avgPerUser: "Átlag / felhasználó", usageTrend: "Napi használat", topUsersUsage: "Top 5 felhasználó", peakHours: "Használat óránként (UTC)", byWeekday: "Használat hét napjai szerint", focusAreas: "Fő fókuszterületek", recentErrors: "Legutóbbi hibák",
     roles: { admin: "Rendszergazda", user: "Normál felhasználó" },
   },
   es: {
@@ -642,7 +643,7 @@ export const AT: Record<Lang, AdminStrings> = {
     colUser: "Usuario", colPages: "Páginas", colLastSeen: "Última vez", colRole: "Rol",
     loading: "Cargando…", noUsers: "No se encontraron usuarios", prev: "Anterior", next: "Siguiente",
     never: "nunca", justNow: "ahora mismo",
-    analysis: "Análisis", totalEvents: "Eventos totales", avgPerUser: "Prom. / usuario", usageTrend: "Uso diario", topUsersUsage: "Top 5 usuarios", peakHours: "Uso por hora (UTC)", byWeekday: "Uso por día de la semana", focusAreas: "Áreas de enfoque principales",
+    analysis: "Análisis", totalEvents: "Eventos totales", avgPerUser: "Prom. / usuario", usageTrend: "Uso diario", topUsersUsage: "Top 5 usuarios", peakHours: "Uso por hora (UTC)", byWeekday: "Uso por día de la semana", focusAreas: "Áreas de enfoque principales", recentErrors: "Errores recientes",
     roles: { admin: "Administrador", user: "Usuario normal" },
   },
 };

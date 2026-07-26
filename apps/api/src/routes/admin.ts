@@ -6,6 +6,7 @@ import {
   getActivityMetrics,
   getAllUsersHeatmap,
   getOverviewMetrics,
+  getRecentErrors,
   getUsageAnalytics,
   parseUsageWindow,
   parseWindow,
@@ -212,6 +213,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (!requireAdmin(request, reply)) return;
     const window = parseUsageWindow((request.query as { window?: string }).window);
     return reply.send(await getUsageAnalytics(window));
+  });
+
+  // Recent errors (admin troubleshooting log), derived from the request log.
+  app.get("/admin/errors", async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const window = parseUsageWindow((request.query as { window?: string }).window);
+    return reply.send(await getRecentErrors(window));
   });
 
   app.get("/admin/users/:id/activity", async (request, reply) => {
