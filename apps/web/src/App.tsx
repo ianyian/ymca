@@ -240,9 +240,10 @@ async function api<T = unknown>(
     if (res.status === 413) throw new Error(T[_currentLang].err413);
     if (res.status === 401) {
       // Wrong email/password on a login attempt is a normal 401 — don't treat it
-      // as an expired session. Any other 401 means the session/token is invalid,
-      // so clear it and drop to the login screen.
-      if (b?.code !== "INVALID_CREDENTIALS") {
+      // as an expired session. Fire-and-forget background calls (analytics) also
+      // shouldn't force a logout on a transient hiccup. Any other 401 means the
+      // session/token is invalid, so clear it and drop to the login screen.
+      if (b?.code !== "INVALID_CREDENTIALS" && !path.startsWith("/analytics/")) {
         setAuthToken(null);
         _onUnauthorized?.();
       }
@@ -259,7 +260,9 @@ async function api<T = unknown>(
     if (res.status >= 500) throw new Error(T[_currentLang].err500);
     throw new Error(b?.message ?? `Error ${res.status}`);
   }
-  // Pulse the transaction-monitor light bulb on each successful API call.
+  // Count every successful API call as a transaction (drives the chart) and
+  // pulse the transaction-monitor light bulb.
+  recordCapturedAction();
   emitApiSuccess();
   if (res.status === 204) return null as T;
   return res.json() as Promise<T>;
@@ -5198,7 +5201,6 @@ export function App() {
   const sendAnalyticsEvent = useCallback(
     (payload: AnalyticsEventPayload) => {
       if (!user) return;
-      recordCapturedAction();
       analyticsQueueRef.current.push(payload);
       if (analyticsQueueRef.current.length >= 10) {
         void flushAnalyticsQueue();
@@ -5502,6 +5504,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // No token means we're not signed in (login always stores one), so skip the
+    // /me check entirely — otherwise a fresh/incognito visitor logs a 401 for
+    // /me on the login screen for no reason.
+    if (!localStorage.getItem(TOKEN_KEY)) return;
     api<{ user: SessionUser; csrfToken: string }>("/me")
       .then((r) => {
         setUser(r.user);
