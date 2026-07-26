@@ -170,6 +170,15 @@ export function setAuthToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+// Called when an authenticated request comes back 401 (session/token no longer
+// valid). The App registers a handler that drops to the login screen, so an
+// expired session can't leave the user in a broken "looks logged-in" state where
+// actions like uploads silently fail.
+let _onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  _onUnauthorized = fn;
+}
+
 async function api<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -205,12 +214,20 @@ async function api<T = unknown>(
       );
     }
     if (res.status === 413) throw new Error(T[_currentLang].err413);
-    if (res.status === 401)
+    if (res.status === 401) {
+      // Wrong email/password on a login attempt is a normal 401 — don't treat it
+      // as an expired session. Any other 401 means the session/token is invalid,
+      // so clear it and drop to the login screen.
+      if (b?.code !== "INVALID_CREDENTIALS") {
+        setAuthToken(null);
+        _onUnauthorized?.();
+      }
       throw new Error(
         b?.code === "INVALID_CREDENTIALS"
           ? T[_currentLang].errInvalidCredentials
           : T[_currentLang].err401,
       );
+    }
     if (res.status === 403)
       throw new Error(b?.message ?? T[_currentLang].err403);
     if (res.status === 404)
@@ -5307,6 +5324,24 @@ export function App() {
       /* non-critical — already saved to localStorage */
     }
   }
+
+  // Drop to the login screen if a request 401s mid-session (expired/invalidated
+  // token) — but only when we were actually logged in, so the initial /me check
+  // for a not-signed-in visitor doesn't flash a "session expired" message.
+  const loggedInRef = useRef(false);
+  useEffect(() => {
+    loggedInRef.current = !!user;
+  }, [user]);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (!loggedInRef.current) return;
+      setUser(null);
+      setActiveWs(null);
+      setCsrf("");
+      setToast(T[_currentLang].err401);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   useEffect(() => {
     api<{ user: SessionUser; csrfToken: string }>("/me")
