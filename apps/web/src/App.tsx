@@ -1366,6 +1366,7 @@ function ProfileDropdown({
   lang,
   txMonitor,
   animals,
+  animalSpeed,
   typingSparkle,
   typingCombo,
   onThemeChange,
@@ -1373,6 +1374,7 @@ function ProfileDropdown({
   onLangChange,
   onTxMonitorChange,
   onAnimalsChange,
+  onAnimalSpeedChange,
   onTypingSparkleChange,
   onTypingComboChange,
   onLogout,
@@ -1386,6 +1388,7 @@ function ProfileDropdown({
   lang: Lang;
   txMonitor: boolean;
   animals: AnimalKey[];
+  animalSpeed: 1 | 2 | 3;
   typingSparkle: boolean;
   typingCombo: boolean;
   onThemeChange: (t: Theme) => void;
@@ -1393,6 +1396,7 @@ function ProfileDropdown({
   onLangChange: (l: Lang) => void;
   onTxMonitorChange: (v: boolean) => void;
   onAnimalsChange: (v: AnimalKey[]) => void;
+  onAnimalSpeedChange: (v: 1 | 2 | 3) => void;
   onTypingSparkleChange: (v: boolean) => void;
   onTypingComboChange: (v: boolean) => void;
   onLogout: () => void;
@@ -1662,6 +1666,34 @@ function ProfileDropdown({
                         <span className='scale-[0.7] flex'>
                           <AnimalSprite kind={a} />
                         </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
+                  {t.funSpeed}
+                </span>
+                <div className='flex items-center gap-1'>
+                  {([1, 2, 3] as const).map((lv) => {
+                    const on = animalSpeed === lv;
+                    return (
+                      <button
+                        key={lv}
+                        type='button'
+                        aria-pressed={on}
+                        onClick={() => onAnimalSpeedChange(lv)}
+                        className='w-6 h-6 rounded-[6px] border text-[11px] font-semibold transition-colors'
+                        style={{
+                          borderColor: on ? "var(--accent-color)" : "var(--border-color)",
+                          background: on ? "rgba(35,131,226,0.08)" : "transparent",
+                          color: on ? "var(--accent-color)" : "var(--text-muted)",
+                        }}
+                        title={lv === 1 ? "Slow" : lv === 3 ? "Fast" : "Medium"}
+                      >
+                        {lv}
                       </button>
                     );
                   })}
@@ -5089,20 +5121,20 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
 // actions were captured (for stats upload) in each of the last 15 seconds, plus
 // a light bulb that pulses green on every successful API transaction.
 // ── Fun: orange "lego"-style critters that waddle across the top bar ─────────
-const ANIMAL_KEYS = ["penguin", "elephant", "crab"] as const;
+const ANIMAL_KEYS = ["swordfish", "elephant", "crab"] as const;
 type AnimalKey = (typeof ANIMAL_KEYS)[number];
 
 function AnimalSprite({ kind }: { kind: AnimalKey }) {
-  if (kind === "penguin") {
+  if (kind === "swordfish") {
     return (
-      <svg viewBox='0 0 22 22' width='24' height='24'>
-        <rect x='6' y='18' width='4' height='3' rx='1' fill='#ff9e3d' />
-        <rect x='12' y='18' width='4' height='3' rx='1' fill='#ff9e3d' />
-        <rect x='4' y='3' width='14' height='16' rx='7' fill='#d9691a' />
-        <rect x='7' y='7' width='9' height='11' rx='4.5' fill='#ffc79a' />
-        <rect x='3' y='7' width='4' height='9' rx='2' fill='#b95d17' />
-        <path d='M17 9 l4 2 -4 2 z' fill='#ff9e3d' />
-        <circle cx='14.5' cy='8.5' r='1.3' fill='#3a1c06' />
+      <svg viewBox='0 0 26 16' width='26' height='18'>
+        <path d='M18 6.5 L26 8 L18 9.5 z' fill='#ff9e3d' />
+        <path d='M4 8 L0 3.5 L1.6 8 L0 12.5 z' fill='#d9691a' />
+        <ellipse cx='11' cy='8' rx='8' ry='4.2' fill='#ec7a24' />
+        <ellipse cx='11' cy='9.4' rx='5.5' ry='2' fill='#ffc79a' />
+        <path d='M9 4 L12 1.2 L14.5 4 z' fill='#d9691a' />
+        <path d='M11 11 L9 15 L13.5 11.5 z' fill='#c25c14' />
+        <circle cx='15' cy='7' r='1.2' fill='#3a1c06' />
       </svg>
     );
   }
@@ -5135,20 +5167,24 @@ function AnimalSprite({ kind }: { kind: AnimalKey }) {
 }
 
 const CRITTER_CFG: Record<AnimalKey, { dur: number; delay: number }> = {
-  penguin: { dur: 11, delay: 0 },
+  swordfish: { dur: 11, delay: 0 },
   elephant: { dur: 15, delay: -4 },
   crab: { dur: 8, delay: -2 },
 };
 
-function TopBarCritters({ animals }: { animals: AnimalKey[] }) {
+// Larger multiplier = slower walk. Level 1 (default) is the calmest.
+const SPEED_MULT: Record<1 | 2 | 3, number> = { 1: 2.6, 2: 1.6, 3: 1 };
+
+function TopBarCritters({ animals, speed }: { animals: AnimalKey[]; speed: 1 | 2 | 3 }) {
   if (animals.length === 0) return null;
+  const mult = SPEED_MULT[speed];
   return (
     <div className='relative flex-1 h-full min-w-0 hidden sm:block' aria-hidden='true'>
       {animals.map((a) => (
         <div
           key={a}
           className='critter'
-          style={{ ["--dur" as string]: `${CRITTER_CFG[a].dur}s`, ["--delay" as string]: `${CRITTER_CFG[a].delay}s` } as React.CSSProperties}
+          style={{ ["--dur" as string]: `${(CRITTER_CFG[a].dur * mult).toFixed(1)}s`, ["--delay" as string]: `${(CRITTER_CFG[a].delay * mult).toFixed(1)}s` } as React.CSSProperties}
         >
           <div className='critter-face'>
             <div className='critter-bob'>
@@ -5229,6 +5265,13 @@ function TypingFx({ sparkle, combo }: { sparkle: boolean; combo: boolean }) {
         comboRef.current += 1;
         setComboCount(comboRef.current);
         if (comboRef.current >= 10) setComboVisible(true);
+        // Every 100 hits: a brief celebratory screen shake.
+        if (comboRef.current % 100 === 0) {
+          document.body.classList.remove("screen-shake");
+          void document.body.offsetWidth; // reflow so the animation restarts
+          document.body.classList.add("screen-shake");
+          setTimeout(() => document.body.classList.remove("screen-shake"), 520);
+        }
         if (resetTimer.current) clearTimeout(resetTimer.current);
         resetTimer.current = setTimeout(() => {
           comboRef.current = 0;
@@ -5256,20 +5299,31 @@ function TypingFx({ sparkle, combo }: { sparkle: boolean; combo: boolean }) {
           } as React.CSSProperties}
         />
       ))}
-      {comboVisible && (
-        <div
-          key={comboCount}
-          className='fixed bottom-5 right-6 z-[70] pointer-events-none select-none text-right'
-          style={{ animation: "combo-pop 0.14s ease-out" }}
-        >
-          <div style={{ color: "#f5721e", fontWeight: 800, fontSize: "13px", letterSpacing: "0.14em", textShadow: "0 1px 6px rgba(245,114,30,0.35)" }}>
-            COMBO
-          </div>
-          <div style={{ color: "#f5721e", fontWeight: 900, fontSize: "40px", lineHeight: 1, textShadow: "0 2px 12px rgba(245,114,30,0.45)" }}>
-            ×{comboCount}
-          </div>
-        </div>
-      )}
+      {comboVisible &&
+        (() => {
+          // Grows bigger and darkens every 100 hits, maxing out at 2000.
+          const level = Math.min(20, Math.floor(comboCount / 100)); // 0..20
+          const lerp = level / 20;
+          const comboSize = 40 + level * 2.8; // 40px → 96px
+          const cr = Math.round(245 + (122 - 245) * lerp);
+          const cg = Math.round(114 + (46 - 114) * lerp);
+          const cb = Math.round(30 + (0 - 30) * lerp);
+          const comboColor = `rgb(${cr}, ${cg}, ${cb})`;
+          return (
+            <div
+              key={comboCount}
+              className='fixed bottom-5 right-6 z-[70] pointer-events-none select-none text-right'
+              style={{ animation: "combo-pop 0.14s ease-out" }}
+            >
+              <div style={{ color: comboColor, fontWeight: 800, fontSize: "13px", letterSpacing: "0.14em", textShadow: "0 1px 6px rgba(245,114,30,0.35)" }}>
+                COMBO
+              </div>
+              <div style={{ color: comboColor, fontWeight: 900, fontSize: `${comboSize}px`, lineHeight: 1, textShadow: "0 2px 14px rgba(245,114,30,0.45)" }}>
+                ×{comboCount}
+              </div>
+            </div>
+          );
+        })()}
     </>
   );
 }
@@ -5400,8 +5454,12 @@ export function App() {
   // Fun: animated top-bar critters (penguin by default) + typing effects.
   const [animals, setAnimals] = useState<AnimalKey[]>(() => {
     const raw = localStorage.getItem("ymca_animals");
-    if (raw == null) return ["penguin"];
-    return raw.split(",").filter((a): a is AnimalKey => (ANIMAL_KEYS as readonly string[]).includes(a));
+    if (raw == null) return ["swordfish"];
+    // Map the old "penguin" key onto the swordfish that replaced it.
+    return raw
+      .split(",")
+      .map((a) => (a === "penguin" ? "swordfish" : a))
+      .filter((a): a is AnimalKey => (ANIMAL_KEYS as readonly string[]).includes(a));
   });
   const [typingSparkle, setTypingSparkle] = useState(
     () => localStorage.getItem("ymca_sparkle") !== "off",
@@ -5409,6 +5467,11 @@ export function App() {
   const [typingCombo, setTypingCombo] = useState(
     () => localStorage.getItem("ymca_combo") !== "off",
   );
+  // Critter walk speed: 1 (slow, default) · 2 · 3 (fast).
+  const [animalSpeed, setAnimalSpeed] = useState<1 | 2 | 3>(() => {
+    const v = Number(localStorage.getItem("ymca_animalspeed"));
+    return v === 2 || v === 3 ? v : 1;
+  });
   const isDark = theme === "dark";
 
   // Check for reset-password token in URL — show reset page before any other render
@@ -5437,6 +5500,9 @@ export function App() {
   useEffect(() => {
     localStorage.setItem("ymca_combo", typingCombo ? "on" : "off");
   }, [typingCombo]);
+  useEffect(() => {
+    localStorage.setItem("ymca_animalspeed", String(animalSpeed));
+  }, [animalSpeed]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-fontsize", fontSize);
@@ -6755,6 +6821,7 @@ export function App() {
               lang={lang}
               txMonitor={txMonitor}
               animals={animals}
+              animalSpeed={animalSpeed}
               typingSparkle={typingSparkle}
               typingCombo={typingCombo}
               onThemeChange={setTheme}
@@ -6762,6 +6829,7 @@ export function App() {
               onLangChange={handleLangChange}
               onTxMonitorChange={setTxMonitor}
               onAnimalsChange={setAnimals}
+              onAnimalSpeedChange={setAnimalSpeed}
               onTypingSparkleChange={setTypingSparkle}
               onTypingComboChange={setTypingCombo}
               onLogout={handleLogout}
@@ -7069,7 +7137,7 @@ export function App() {
             </div>
 
             {/* Fun: animated critters waddling across the middle of the top bar */}
-            <TopBarCritters animals={animals} />
+            <TopBarCritters animals={animals} speed={animalSpeed} />
 
             {/* Right actions */}
             <div className='flex items-center gap-1'>
