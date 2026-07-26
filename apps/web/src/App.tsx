@@ -252,6 +252,21 @@ function formatVersionLogTimestamp(iso: string) {
   })}`;
 }
 
+// Compact, language-neutral "last updated" for search results: now / 5m / 3h /
+// 6d for recent edits, then a short absolute date. Lets the user gauge freshness
+// before opening a result.
+function formatSearchUpdated(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d`;
+  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+}
+
 function isAnalyticsInteractiveTarget(node: Element | null): boolean {
   return !!node && !!node.closest("button, a, [role='button'], [data-analytics-zone]");
 }
@@ -2766,7 +2781,7 @@ function SearchModal({
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<
-    { id: string; title: string; tags?: string[]; snippet?: string | null }[]
+    { id: string; title: string; tags?: string[]; snippet?: string | null; updatedAt?: string }[]
   >([]);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
@@ -2783,7 +2798,7 @@ function SearchModal({
       setBusy(true);
       try {
         const r = await api<{
-          results: { id: string; title: string; tags?: string[]; snippet?: string | null }[];
+          results: { id: string; title: string; tags?: string[]; snippet?: string | null; updatedAt?: string }[];
         }>(
           // content=1 → also search page body text and return snippets
           `/search?q=${encodeURIComponent(q)}&workspaceId=${workspaceId}&content=1`,
@@ -2888,10 +2903,19 @@ function SearchModal({
                 <span className='flex-1 truncate text-sm'>
                   <Highlighted text={r.title || "Untitled"} query={q} />
                 </span>
-                <div className='flex gap-1 items-center shrink-0'>
+                <div className='flex gap-1.5 items-center shrink-0'>
                   {r.tags?.slice(0, 2).map((tag) => (
                     <TagBadge key={tag} tag={tag} isDark={isDark} />
                   ))}
+                  {r.updatedAt && (
+                    <span
+                      className='text-[11px] tabular-nums whitespace-nowrap'
+                      style={{ color: "var(--accent-color)", opacity: 0.75 }}
+                      title={`Last updated ${formatVersionLogTimestamp(r.updatedAt)}`}
+                    >
+                      {formatSearchUpdated(r.updatedAt)}
+                    </span>
+                  )}
                   <span style={{ color: "var(--text-muted)" }} title='Open page'>
                     <Ico.ExternalLink />
                   </span>

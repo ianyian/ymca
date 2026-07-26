@@ -79,6 +79,7 @@ export async function registerSearchRoutes(app: FastifyInstance) {
           icon: true,
           workspaceId: true,
           deletedAt: true,
+          updatedAt: true,
           ...(searchBody ? { contentText: true } : {}),
         },
         orderBy: { updatedAt: "desc" },
