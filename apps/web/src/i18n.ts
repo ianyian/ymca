@@ -75,6 +75,10 @@ type Strings = {
   topInteractions: string; recentActivities: string; graphical: string; listView: string;
   transactionMonitor: string;
   funAnimals: string; funSparkles: string; funCombo: string; funSpeed: string;
+  funTitle: string; funFish: string; funCrab: string; funSquid: string;
+  funCrowd: string; funSingle: string; funFew: string; funMany: string;
+  funSingleHint: string; funFewHint: string; funManyHint: string;
+  funSlow: string; funMedium: string; funFast: string; funTypingEffects: string;
 };
 
 export const T: Record<Lang, Strings> = {
@@ -135,6 +139,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "Profile analytics", timeRange: "Time range", daysView: "14d view", todayIncluded: "today included",
     activityByDay: "Activity by day", daysLabel14: "14 days", today: "today",
     topInteractions: "Top interactions", recentActivities: "Recent activities", graphical: "Graphical", listView: "List", transactionMonitor: "Transaction monitor", funAnimals: "Animals", funSparkles: "Typing sparkles", funCombo: "Typing combo", funSpeed: "Animal speed",
+    funTitle: "Fun & animation", funFish: "Fish", funCrab: "Crab", funSquid: "Squid", funCrowd: "Crowd size", funSingle: "Single", funFew: "Few", funMany: "Many", funSingleHint: "one big roamer", funFewHint: "a small shoal", funManyHint: "a whole migration", funSlow: "Slow", funMedium: "Medium", funFast: "Fast", funTypingEffects: "Typing effects",
   },
   zh: {
     welcomeBack: "欢迎回来", createAccount: "创建账户",
@@ -191,6 +196,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "个人分析", timeRange: "时间范围", daysView: "14天视图", todayIncluded: "包含今天",
     activityByDay: "每日活动", daysLabel14: "14 天", today: "今天",
     topInteractions: "热门互动", recentActivities: "近期活动", graphical: "图表", listView: "列表", transactionMonitor: "交易监视器", funAnimals: "动物", funSparkles: "打字火花", funCombo: "打字连击", funSpeed: "动物速度",
+    funTitle: "趣味动画", funFish: "鱼", funCrab: "螃蟹", funSquid: "鱿鱼", funCrowd: "数量", funSingle: "单个", funFew: "少量", funMany: "许多", funSingleHint: "一只大的", funFewHint: "小群", funManyHint: "整群迁徙", funSlow: "慢", funMedium: "中", funFast: "快", funTypingEffects: "打字特效",
   },
   ms: {
     welcomeBack: "Selamat kembali", createAccount: "Buat akaun",
@@ -249,6 +255,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "Analitik profil", timeRange: "Julat masa", daysView: "Paparan 14h", todayIncluded: "termasuk hari ini",
     activityByDay: "Aktiviti mengikut hari", daysLabel14: "14 hari", today: "hari ini",
     topInteractions: "Interaksi teratas", recentActivities: "Aktiviti terkini", graphical: "Grafik", listView: "Senarai", transactionMonitor: "Pemantau transaksi", funAnimals: "Haiwan", funSparkles: "Percikan menaip", funCombo: "Kombo menaip", funSpeed: "Kelajuan haiwan",
+    funTitle: "Keseronokan & animasi", funFish: "Ikan", funCrab: "Ketam", funSquid: "Sotong", funCrowd: "Bilangan", funSingle: "Satu", funFew: "Sedikit", funMany: "Banyak", funSingleHint: "seekor besar", funFewHint: "kumpulan kecil", funManyHint: "sekawan besar", funSlow: "Perlahan", funMedium: "Sederhana", funFast: "Laju", funTypingEffects: "Kesan menaip",
   },
   ta: {
     welcomeBack: "மீண்டும் வரவேற்கிறோம்", createAccount: "கணக்கு உருவாக்கு",
@@ -307,6 +314,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "சுயவிவர பகுப்பாய்வு", timeRange: "கால வரம்பு", daysView: "14நா காட்சி", todayIncluded: "இன்று உட்பட",
     activityByDay: "நாள்வாரி செயல்பாடு", daysLabel14: "14 நாட்கள்", today: "இன்று",
     topInteractions: "முதன்மை தொடர்புகள்", recentActivities: "சமீபத்திய செயல்பாடுகள்", graphical: "வரைபடம்", listView: "பட்டியல்", transactionMonitor: "பரிவர்த்தனை கண்காணிப்பு", funAnimals: "விலங்குகள்", funSparkles: "தட்டச்சு மின்னல்", funCombo: "தட்டச்சு காம்போ", funSpeed: "விலங்கு வேகம்",
+    funTitle: "வேடிக்கை & அனிமேஷன்", funFish: "மீன்", funCrab: "நண்டு", funSquid: "கணவாய்", funCrowd: "எண்ணிக்கை", funSingle: "ஒன்று", funFew: "சில", funMany: "பல", funSingleHint: "ஒரு பெரியது", funFewHint: "சிறு கூட்டம்", funManyHint: "பெரும் கூட்டம்", funSlow: "மெதுவாக", funMedium: "நடுத்தரம்", funFast: "வேகம்", funTypingEffects: "தட்டச்சு விளைவுகள்",
   },
   de: {
     welcomeBack: "Willkommen zurück", createAccount: "Konto erstellen",
@@ -365,6 +373,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "Profil-Analyse", timeRange: "Zeitraum", daysView: "14-Tage-Ansicht", todayIncluded: "heute inklusive",
     activityByDay: "Aktivität pro Tag", daysLabel14: "14 Tage", today: "heute",
     topInteractions: "Top-Interaktionen", recentActivities: "Letzte Aktivitäten", graphical: "Grafisch", listView: "Liste", transactionMonitor: "Transaktionsmonitor", funAnimals: "Tiere", funSparkles: "Tipp-Funken", funCombo: "Tipp-Combo", funSpeed: "Tier-Tempo",
+    funTitle: "Spaß & Animation", funFish: "Fisch", funCrab: "Krabbe", funSquid: "Tintenfisch", funCrowd: "Anzahl", funSingle: "Einzeln", funFew: "Wenige", funMany: "Viele", funSingleHint: "ein großer Schwimmer", funFewHint: "ein kleiner Schwarm", funManyHint: "eine ganze Wanderung", funSlow: "Langsam", funMedium: "Mittel", funFast: "Schnell", funTypingEffects: "Tipp-Effekte",
   },
   hu: {
     welcomeBack: "Üdvözöljük újra", createAccount: "Fiók létrehozása",
@@ -423,6 +432,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "Profil-elemzés", timeRange: "Időtartomány", daysView: "14 napos nézet", todayIncluded: "mával együtt",
     activityByDay: "Napi tevékenység", daysLabel14: "14 nap", today: "ma",
     topInteractions: "Legfontosabb interakciók", recentActivities: "Legutóbbi tevékenységek", graphical: "Grafikus", listView: "Lista", transactionMonitor: "Tranzakciófigyelő", funAnimals: "Állatok", funSparkles: "Gépelési szikrák", funCombo: "Gépelési kombó", funSpeed: "Állat sebessége",
+    funTitle: "Móka és animáció", funFish: "Hal", funCrab: "Rák", funSquid: "Tintahal", funCrowd: "Mennyiség", funSingle: "Egy", funFew: "Néhány", funMany: "Sok", funSingleHint: "egy nagy úszó", funFewHint: "kis raj", funManyHint: "egész vonulás", funSlow: "Lassú", funMedium: "Közepes", funFast: "Gyors", funTypingEffects: "Gépelési effektek",
   },
   es: {
     welcomeBack: "Bienvenido de nuevo", createAccount: "Crear cuenta",
@@ -481,6 +491,7 @@ export const T: Record<Lang, Strings> = {
     profileAnalytics: "Analíticas de perfil", timeRange: "Intervalo de tiempo", daysView: "Vista de 14 d", todayIncluded: "hoy incluido",
     activityByDay: "Actividad por día", daysLabel14: "14 días", today: "hoy",
     topInteractions: "Interacciones principales", recentActivities: "Actividades recientes", graphical: "Gráfico", listView: "Lista", transactionMonitor: "Monitor de transacciones", funAnimals: "Animales", funSparkles: "Chispas al escribir", funCombo: "Combo al escribir", funSpeed: "Velocidad animal",
+    funTitle: "Diversión y animación", funFish: "Pez", funCrab: "Cangrejo", funSquid: "Calamar", funCrowd: "Cantidad", funSingle: "Uno", funFew: "Pocos", funMany: "Muchos", funSingleHint: "uno grande", funFewHint: "un pequeño banco", funManyHint: "toda una migración", funSlow: "Lento", funMedium: "Medio", funFast: "Rápido", funTypingEffects: "Efectos de escritura",
   },
 };
 

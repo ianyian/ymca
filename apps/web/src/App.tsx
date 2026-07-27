@@ -1365,18 +1365,11 @@ function ProfileDropdown({
   csrf,
   lang,
   txMonitor,
-  animals,
-  animalSpeed,
-  typingSparkle,
-  typingCombo,
   onThemeChange,
   onFontChange,
   onLangChange,
   onTxMonitorChange,
-  onAnimalsChange,
-  onAnimalSpeedChange,
-  onTypingSparkleChange,
-  onTypingComboChange,
+  onOpenFunSettings,
   onLogout,
 }: {
   user: { id: string; email: string; displayName: string | null };
@@ -1387,18 +1380,11 @@ function ProfileDropdown({
   csrf: string;
   lang: Lang;
   txMonitor: boolean;
-  animals: AnimalKey[];
-  animalSpeed: 1 | 2 | 3;
-  typingSparkle: boolean;
-  typingCombo: boolean;
   onThemeChange: (t: Theme) => void;
   onFontChange: (f: FontSize) => void;
   onLangChange: (l: Lang) => void;
   onTxMonitorChange: (v: boolean) => void;
-  onAnimalsChange: (v: AnimalKey[]) => void;
-  onAnimalSpeedChange: (v: 1 | 2 | 3) => void;
-  onTypingSparkleChange: (v: boolean) => void;
-  onTypingComboChange: (v: boolean) => void;
+  onOpenFunSettings: () => void;
   onLogout: () => void;
 }) {
   const t = useT();
@@ -1639,98 +1625,22 @@ function ProfileDropdown({
                 </button>
               </label>
 
-              {/* Fun: critters + typing effects */}
-              <div className='flex items-center justify-between gap-2'>
-                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
-                  {t.funAnimals}
+              {/* Fun & animation opens its own roomy settings panel. */}
+              <button
+                type='button'
+                onClick={onOpenFunSettings}
+                className='flex items-center justify-between gap-2 w-full rounded-[6px] px-2 py-1.5 -mx-1 transition-colors hover:bg-[var(--bg-hover)]'
+              >
+                <span className='flex items-center gap-2 text-[12px] font-medium' style={{ color: "var(--text-primary)" }}>
+                  <span className='flex scale-[0.62] -my-1 -ml-1'>
+                    <AnimalSprite type='fish' px={CRITTER_BASE} />
+                  </span>
+                  {t.funTitle}
                 </span>
-                <div className='flex items-center gap-1'>
-                  {ANIMAL_KEYS.map((a) => {
-                    const on = animals.includes(a);
-                    return (
-                      <button
-                        key={a}
-                        type='button'
-                        aria-pressed={on}
-                        onClick={() =>
-                          onAnimalsChange(on ? animals.filter((x) => x !== a) : [...animals, a])
-                        }
-                        className='w-7 h-7 rounded-[6px] border flex items-center justify-center transition-all'
-                        style={{
-                          borderColor: on ? "var(--accent-color)" : "var(--border-color)",
-                          background: on ? "rgba(35,131,226,0.08)" : "transparent",
-                          opacity: on ? 1 : 0.45,
-                        }}
-                        title={a}
-                      >
-                        <span className='scale-[0.7] flex'>
-                          <AnimalSprite kind={a} />
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className='flex items-center justify-between gap-2'>
-                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
-                  {t.funSpeed}
+                <span className='text-[13px]' style={{ color: "var(--text-muted)" }}>
+                  ›
                 </span>
-                <div className='flex items-center gap-1'>
-                  {([1, 2, 3] as const).map((lv) => {
-                    const on = animalSpeed === lv;
-                    return (
-                      <button
-                        key={lv}
-                        type='button'
-                        aria-pressed={on}
-                        onClick={() => onAnimalSpeedChange(lv)}
-                        className='w-6 h-6 rounded-[6px] border text-[11px] font-semibold transition-colors'
-                        style={{
-                          borderColor: on ? "var(--accent-color)" : "var(--border-color)",
-                          background: on ? "rgba(35,131,226,0.08)" : "transparent",
-                          color: on ? "var(--accent-color)" : "var(--text-muted)",
-                        }}
-                        title={lv === 1 ? "Slow" : lv === 3 ? "Fast" : "Medium"}
-                      >
-                        {lv}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <label className='flex items-center justify-between gap-2 cursor-pointer'>
-                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
-                  {t.funSparkles}
-                </span>
-                <button
-                  type='button'
-                  role='switch'
-                  aria-checked={typingSparkle}
-                  onClick={() => onTypingSparkleChange(!typingSparkle)}
-                  className='relative w-9 h-5 rounded-full transition-colors shrink-0'
-                  style={{ background: typingSparkle ? "var(--accent-color)" : "var(--bg-active)" }}
-                >
-                  <span className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all' style={{ left: typingSparkle ? "18px" : "2px" }} />
-                </button>
-              </label>
-
-              <label className='flex items-center justify-between gap-2 cursor-pointer'>
-                <span className='text-[11px] font-semibold shrink-0' style={{ color: "var(--text-muted)" }}>
-                  {t.funCombo}
-                </span>
-                <button
-                  type='button'
-                  role='switch'
-                  aria-checked={typingCombo}
-                  onClick={() => onTypingComboChange(!typingCombo)}
-                  className='relative w-9 h-5 rounded-full transition-colors shrink-0'
-                  style={{ background: typingCombo ? "var(--accent-color)" : "var(--bg-active)" }}
-                >
-                  <span className='absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all' style={{ left: typingCombo ? "18px" : "2px" }} />
-                </button>
-              </label>
+              </button>
             </div>
           </div>
 
@@ -5121,39 +5031,47 @@ function ConfigurationManager({ csrf, lang, isDark }: { csrf: string; lang: Lang
 // actions were captured (for stats upload) in each of the last 15 seconds, plus
 // a light bulb that pulses green on every successful API transaction.
 // ── Fun: orange "lego"-style critters that waddle across the top bar ─────────
-const ANIMAL_KEYS = ["swordfish", "elephant", "crab"] as const;
+// The critters that can swim across the top of the app. Each sprite faces
+// RIGHT by default; the engine flips it with scaleX(-1) when swimming left.
+const ANIMAL_KEYS = ["fish", "crab", "squid"] as const;
 type AnimalKey = (typeof ANIMAL_KEYS)[number];
+type Quantity = "single" | "few" | "many";
 
-function AnimalSprite({ kind }: { kind: AnimalKey }) {
-  if (kind === "swordfish") {
+// A blue swordfish, an orange crab, a pink squid — all drawn at `px` wide.
+function AnimalSprite({ type, px }: { type: AnimalKey; px: number }) {
+  if (type === "fish") {
     return (
-      <svg viewBox='0 0 26 16' width='26' height='18'>
-        <path d='M18 6.5 L26 8 L18 9.5 z' fill='#ff9e3d' />
-        <path d='M4 8 L0 3.5 L1.6 8 L0 12.5 z' fill='#d9691a' />
-        <ellipse cx='11' cy='8' rx='8' ry='4.2' fill='#ec7a24' />
-        <ellipse cx='11' cy='9.4' rx='5.5' ry='2' fill='#ffc79a' />
-        <path d='M9 4 L12 1.2 L14.5 4 z' fill='#d9691a' />
-        <path d='M11 11 L9 15 L13.5 11.5 z' fill='#c25c14' />
-        <circle cx='15' cy='7' r='1.2' fill='#3a1c06' />
+      <svg viewBox='0 0 28 16' width={px} height={(px * 16) / 28}>
+        <path d='M8 8 L1 4 L3 8 L1 12 z' fill='#1f6fb0' />
+        <ellipse cx='15' cy='8' rx='10' ry='5' fill='#2b8fe0' />
+        <ellipse cx='15' cy='9.7' rx='7' ry='2.3' fill='#bfe0ff' />
+        <path d='M13 3.2 L17 0.6 L19.6 3.6 z' fill='#1f6fb0' />
+        <path d='M15 11 L13 15 L18 12 z' fill='#1a5f98' />
+        <path d='M20 8 L27 6 L26 8 L27 10 z' fill='#7cc0f5' />
+        <circle cx='21' cy='7' r='1.5' fill='#fff' />
+        <circle cx='21.5' cy='7' r='0.85' fill='#08283f' />
       </svg>
     );
   }
-  if (kind === "elephant") {
+  if (type === "squid") {
     return (
-      <svg viewBox='0 0 24 22' width='26' height='24'>
-        <rect x='5' y='14' width='3' height='6' rx='1' fill='#b95d17' />
-        <rect x='9' y='14' width='3' height='6' rx='1' fill='#b95d17' />
-        <rect x='13' y='14' width='3' height='6' rx='1' fill='#b95d17' />
-        <rect x='3' y='5' width='15' height='11' rx='5' fill='#e0721c' />
-        <circle cx='17' cy='9' r='6' fill='#ec7a24' />
-        <circle cx='14.5' cy='8' r='3' fill='#c25c14' />
-        <path d='M22 8 q4 1 3 6 q-1 3 -3 1' stroke='#ec7a24' strokeWidth='3' fill='none' strokeLinecap='round' />
-        <circle cx='19' cy='8' r='1.2' fill='#3a1c06' />
+      <svg viewBox='0 0 26 18' width={px} height={(px * 18) / 26}>
+        <path
+          d='M9 9 q-5 0 -8 3 M9 10.5 q-5 2 -8 3 M9 7.5 q-5 -1 -8 -2 M9 11.5 q-4 3 -6 5 M9 6.5 q-4 -2 -6 -5'
+          stroke='#c23b7a'
+          strokeWidth='1.5'
+          fill='none'
+          strokeLinecap='round'
+        />
+        <path d='M8 9 Q13 2.4 22 6 Q26 9 22 12 Q13 15.6 8 9 Z' fill='#ec5a9e' />
+        <ellipse cx='16' cy='7.6' rx='5' ry='1.9' fill='#ff9ecb' />
+        <circle cx='12' cy='8.6' r='1.9' fill='#fff' />
+        <circle cx='12.5' cy='8.6' r='1' fill='#3a1030' />
       </svg>
     );
   }
   return (
-    <svg viewBox='0 0 24 18' width='26' height='20'>
+    <svg viewBox='0 0 24 18' width={px} height={(px * 18) / 24}>
       <path d='M6 11 l-4 3 M8 13 l-3 4 M16 13 l3 4 M18 11 l4 3' stroke='#c25c14' strokeWidth='1.8' strokeLinecap='round' fill='none' />
       <circle cx='4' cy='7' r='3.2' fill='#e0721c' />
       <circle cx='20' cy='7' r='3.2' fill='#e0721c' />
@@ -5166,33 +5084,442 @@ function AnimalSprite({ kind }: { kind: AnimalKey }) {
   );
 }
 
-const CRITTER_CFG: Record<AnimalKey, { dur: number; delay: number }> = {
-  swordfish: { dur: 11, delay: 0 },
-  elephant: { dur: 15, delay: -4 },
-  crab: { dur: 8, delay: -2 },
-};
+// ── Critter roster: how many units, of what size, for each quantity mode ─────
+// single = 1 big one; few = 5 (one 3×, four 2×); many = a 14-strong shoal
+// (two 3×, two 2×, ten 1×). Types are round-robined across the enabled ones.
+function buildRoster(types: AnimalKey[], quantity: Quantity): { type: AnimalKey; size: number }[] {
+  const enabled = types.length ? types : (["fish"] as AnimalKey[]);
+  const sizes =
+    quantity === "single"
+      ? [3]
+      : quantity === "few"
+        ? [3, 2, 2, 2, 2]
+        : [3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  return sizes.map((size, i) => ({ type: enabled[i % enabled.length]!, size }));
+}
 
-// Larger multiplier = slower walk. Level 1 (default) is the calmest.
-const SPEED_MULT: Record<1 | 2 | 3, number> = { 1: 2.6, 2: 1.6, 3: 1 };
+// Base sprite width (px) for a 1× unit; multiplied by the size (1/2/3).
+const CRITTER_BASE = 22;
+// Overall pace: level 1 is a calm drift, level 3 zippy. Default is 1.
+const SPEED_FACTOR: Record<1 | 2 | 3, number> = { 1: 0.55, 2: 1, 3: 1.7 };
 
-function TopBarCritters({ animals, speed }: { animals: AnimalKey[]; speed: 1 | 2 | 3 }) {
-  if (animals.length === 0) return null;
-  const mult = SPEED_MULT[speed];
+interface Critter {
+  type: AnimalKey;
+  size: number;
+  w: number;
+  h: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  face: number; // 1 = right, -1 = left
+  speed: number; // per-animal base px/s
+  rest: number; // crab rest countdown (ms)
+  burst: number; // squid jet velocity remaining
+  roll: number; // fish barrel-roll degrees (0 when idle)
+  rolling: boolean;
+  nextAct: number; // timestamp of next random special action
+}
+
+function critterDims(type: AnimalKey, size: number): { w: number; h: number } {
+  const w = size * (type === "crab" ? CRITTER_BASE * 0.95 : CRITTER_BASE * 1.1);
+  const ratio = type === "crab" ? 18 / 24 : type === "squid" ? 18 / 26 : 16 / 28;
+  return { w, h: w * ratio };
+}
+
+// A short-lived ink cloud puffed out behind a squid's special action.
+function spawnInk(field: HTMLDivElement, c: Critter) {
+  const ink = document.createElement("div");
+  ink.className = "squid-ink";
+  ink.style.left = `${(c.face === 1 ? c.x : c.x + c.w) - 4}px`;
+  ink.style.top = `${c.y + c.h / 2 - 4}px`;
+  field.appendChild(ink);
+  window.setTimeout(() => ink.remove(), 1200);
+}
+
+// The animation field: a JS/rAF engine so each critter can have its own speed,
+// vertical drift, resting, jetting and random flourishes. It overlays the top
+// bar and spills a little below it, giving the animals "double" the room.
+function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity: Quantity; speed: 1 | 2 | 3 }) {
+  const roster = useMemo(() => buildRoster(types, quantity), [types, quantity]);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const nodesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const sameDir = quantity === "many";
+
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (!field) return;
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let W = field.clientWidth || 400;
+    let H = field.clientHeight || 88;
+    const spdF = SPEED_FACTOR[speed];
+    const groupDir = { v: 1 };
+
+    const crs: Critter[] = roster.map((r) => {
+      const { w, h } = critterDims(r.type, r.size);
+      const face = sameDir ? 1 : Math.random() < 0.5 ? 1 : -1;
+      const base =
+        r.type === "fish"
+          ? 32 + Math.random() * 62 // some fast, some slow
+          : r.type === "crab"
+            ? 20 + Math.random() * 32
+            : 24 + Math.random() * 26; // squid resting drift
+      const now = performance.now();
+      return {
+        type: r.type,
+        size: r.size,
+        w,
+        h,
+        x: Math.random() * Math.max(1, W - w),
+        y: r.type === "crab" ? H - h - 2 : Math.random() * Math.max(1, H - h),
+        vx: face * base,
+        vy: 0,
+        face,
+        speed: base,
+        rest: 0,
+        burst: 0,
+        roll: 0,
+        rolling: false,
+        nextAct: now + 1800 + Math.random() * 4500,
+      };
+    });
+
+    let last = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      W = field.clientWidth || W;
+      H = field.clientHeight || H;
+
+      for (let i = 0; i < crs.length; i++) {
+        const c = crs[i]!;
+        const maxX = Math.max(1, W - c.w);
+        const maxY = Math.max(1, H - c.h);
+
+        // ── random special flourishes ──
+        if (now >= c.nextAct) {
+          c.nextAct = now + 2600 + Math.random() * 5200;
+          if (c.type === "fish" && !c.rolling) {
+            c.rolling = true;
+            c.roll = 0;
+          } else if (c.type === "crab") {
+            c.rest = 700 + Math.random() * 1800;
+          } else {
+            c.burst = 80 + Math.random() * 70;
+            spawnInk(field, c);
+          }
+        }
+
+        // ── per-type movement ──
+        if (c.type === "fish") {
+          const dir = sameDir ? groupDir.v : c.face;
+          c.vx = dir * c.speed * spdF;
+          if (Math.random() < 0.018) c.vy = (Math.random() - 0.5) * 34 * spdF;
+          c.vy *= 0.98;
+          if (c.rolling) {
+            c.roll += dt * 640;
+            if (c.roll >= 360) {
+              c.roll = 0;
+              c.rolling = false;
+            }
+          }
+        } else if (c.type === "crab") {
+          if (c.rest > 0) {
+            c.rest -= dt * 1000;
+            c.vx = 0;
+          } else {
+            const dir = sameDir ? groupDir.v : c.face;
+            c.vx = dir * c.speed * spdF;
+          }
+          c.vy = 0;
+          c.y = H - c.h - 2;
+        } else {
+          // squid: jet in pulses, then coast — never a constant speed
+          if (c.burst > 0) {
+            const dir = sameDir ? groupDir.v : c.face;
+            c.vx = dir * (c.speed + c.burst) * spdF;
+            c.vy += (Math.random() - 0.5) * 26;
+            c.burst *= 0.92;
+            if (c.burst < 3) c.burst = 0;
+          } else {
+            c.vx *= 0.95;
+            c.vy *= 0.95;
+          }
+          c.vy = Math.max(-70, Math.min(70, c.vy));
+        }
+
+        // ── integrate + bounce off the field edges ──
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        if (c.type !== "crab") {
+          if (c.y < 0) {
+            c.y = 0;
+            c.vy = Math.abs(c.vy);
+          } else if (c.y > maxY) {
+            c.y = maxY;
+            c.vy = -Math.abs(c.vy);
+          }
+        }
+        if (c.x < 0) {
+          c.x = 0;
+          if (!sameDir) c.face = 1;
+          c.vx = Math.abs(c.vx);
+        } else if (c.x > maxX) {
+          c.x = maxX;
+          if (!sameDir) c.face = -1;
+          c.vx = -Math.abs(c.vx);
+        }
+
+        const node = nodesRef.current[i];
+        if (node) {
+          const dir = sameDir ? groupDir.v : c.face;
+          node.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px) scaleX(${dir})${c.rolling ? ` rotate(${c.roll.toFixed(0)}deg)` : ""}`;
+        }
+      }
+
+      // ── group turns as one in "many" mode ──
+      if (sameDir && crs.length) {
+        let minX = Infinity;
+        let maxRight = -Infinity;
+        for (const c of crs) {
+          if (c.x < minX) minX = c.x;
+          if (c.x + c.w > maxRight) maxRight = c.x + c.w;
+        }
+        if (groupDir.v === 1 && maxRight >= W - 1) groupDir.v = -1;
+        else if (groupDir.v === -1 && minX <= 1) groupDir.v = 1;
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [roster, speed, sameDir]);
+
+  if (roster.length === 0) return null;
   return (
-    <div className='relative flex-1 h-full min-w-0 hidden sm:block' aria-hidden='true'>
-      {animals.map((a) => (
+    <div ref={fieldRef} className='critter-field' aria-hidden='true'>
+      {roster.map((r, i) => (
         <div
-          key={a}
-          className='critter'
-          style={{ ["--dur" as string]: `${(CRITTER_CFG[a].dur * mult).toFixed(1)}s`, ["--delay" as string]: `${(CRITTER_CFG[a].delay * mult).toFixed(1)}s` } as React.CSSProperties}
+          key={i}
+          ref={(el) => {
+            nodesRef.current[i] = el;
+          }}
+          className='critter-unit'
         >
-          <div className='critter-face'>
-            <div className='critter-bob'>
-              <AnimalSprite kind={a} />
-            </div>
-          </div>
+          <AnimalSprite type={r.type} px={critterDims(r.type, r.size).w} />
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// ── Fun & animation settings: a roomy panel for the critters + typing FX ─────
+function FunToggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <label className='flex items-center justify-between gap-3 cursor-pointer py-1.5'>
+      <span className='text-[13px]' style={{ color: "var(--text-primary)" }}>
+        {label}
+      </span>
+      <button
+        type='button'
+        role='switch'
+        aria-checked={on}
+        onClick={onClick}
+        className='relative w-10 h-5.5 rounded-full transition-colors shrink-0'
+        style={{ width: 40, height: 22, background: on ? "var(--accent-color)" : "var(--bg-active)" }}
+      >
+        <span
+          className='absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white transition-all'
+          style={{ left: on ? "20px" : "2px" }}
+        />
+      </button>
+    </label>
+  );
+}
+
+function FunSettingsModal({
+  open,
+  onClose,
+  animals,
+  quantity,
+  speed,
+  sparkle,
+  combo,
+  onAnimals,
+  onQuantity,
+  onSpeed,
+  onSparkle,
+  onCombo,
+}: {
+  open: boolean;
+  onClose: () => void;
+  animals: AnimalKey[];
+  quantity: Quantity;
+  speed: 1 | 2 | 3;
+  sparkle: boolean;
+  combo: boolean;
+  onAnimals: (v: AnimalKey[]) => void;
+  onQuantity: (v: Quantity) => void;
+  onSpeed: (v: 1 | 2 | 3) => void;
+  onSparkle: (v: boolean) => void;
+  onCombo: (v: boolean) => void;
+}) {
+  const t = useT();
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+
+  const typeMeta: { key: AnimalKey; label: string }[] = [
+    { key: "fish", label: t.funFish },
+    { key: "crab", label: t.funCrab },
+    { key: "squid", label: t.funSquid },
+  ];
+  const qtyMeta: { key: Quantity; label: string; count: string; hint: string }[] = [
+    { key: "single", label: t.funSingle, count: "1", hint: t.funSingleHint },
+    { key: "few", label: t.funFew, count: "5", hint: t.funFewHint },
+    { key: "many", label: t.funMany, count: "14", hint: t.funManyHint },
+  ];
+  const cardStyle = (on: boolean): React.CSSProperties => ({
+    borderColor: on ? "var(--accent-color)" : "var(--border-color)",
+    background: on ? "rgba(35,131,226,0.08)" : "transparent",
+  });
+
+  return (
+    <div
+      className='fixed inset-0 z-[80] flex items-center justify-center p-4'
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className='w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden'
+        style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
+      >
+        {/* Header */}
+        <div
+          className='flex items-center justify-between px-5 py-3.5 border-b'
+          style={{ borderColor: "var(--border-color)" }}
+        >
+          <h2 className='text-[15px] font-semibold' style={{ color: "var(--text-primary)" }}>
+            {t.funTitle}
+          </h2>
+          <button
+            type='button'
+            onClick={onClose}
+            className='w-7 h-7 rounded-[6px] flex items-center justify-center transition-colors hover:bg-[var(--bg-hover)]'
+            style={{ color: "var(--text-muted)" }}
+            aria-label='Close'
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className='px-5 py-4 space-y-5 max-h-[75vh] overflow-y-auto'>
+          {/* Which critters */}
+          <div>
+            <div className='text-[11px] font-semibold uppercase tracking-wide mb-2' style={{ color: "var(--text-muted)" }}>
+              {t.funAnimals}
+            </div>
+            <div className='grid grid-cols-3 gap-2'>
+              {typeMeta.map(({ key, label }) => {
+                const on = animals.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type='button'
+                    aria-pressed={on}
+                    onClick={() => onAnimals(on ? animals.filter((x) => x !== key) : [...animals, key])}
+                    className='flex flex-col items-center gap-1.5 rounded-[10px] border py-3 transition-all'
+                    style={{ ...cardStyle(on), opacity: on ? 1 : 0.5 }}
+                  >
+                    <span className='flex h-8 items-center'>
+                      <AnimalSprite type={key} px={CRITTER_BASE * 1.5} />
+                    </span>
+                    <span className='text-[12px] font-medium' style={{ color: on ? "var(--accent-color)" : "var(--text-muted)" }}>
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* How many */}
+          <div>
+            <div className='text-[11px] font-semibold uppercase tracking-wide mb-2' style={{ color: "var(--text-muted)" }}>
+              {t.funCrowd}
+            </div>
+            <div className='grid grid-cols-3 gap-2'>
+              {qtyMeta.map(({ key, label, count, hint }) => {
+                const on = quantity === key;
+                return (
+                  <button
+                    key={key}
+                    type='button'
+                    aria-pressed={on}
+                    onClick={() => onQuantity(key)}
+                    className='flex flex-col items-center gap-0.5 rounded-[10px] border py-2.5 px-1 transition-all'
+                    style={cardStyle(on)}
+                  >
+                    <span className='text-[18px] font-bold leading-none' style={{ color: on ? "var(--accent-color)" : "var(--text-primary)" }}>
+                      {count}
+                    </span>
+                    <span className='text-[12px] font-medium' style={{ color: on ? "var(--accent-color)" : "var(--text-muted)" }}>
+                      {label}
+                    </span>
+                    <span className='text-[10px] text-center leading-tight mt-0.5' style={{ color: "var(--text-muted)" }}>
+                      {hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Speed */}
+          <div>
+            <div className='text-[11px] font-semibold uppercase tracking-wide mb-2' style={{ color: "var(--text-muted)" }}>
+              {t.funSpeed}
+            </div>
+            <div className='grid grid-cols-3 gap-2'>
+              {([1, 2, 3] as const).map((lv) => {
+                const on = speed === lv;
+                const label = lv === 1 ? t.funSlow : lv === 3 ? t.funFast : t.funMedium;
+                return (
+                  <button
+                    key={lv}
+                    type='button'
+                    aria-pressed={on}
+                    onClick={() => onSpeed(lv)}
+                    className='rounded-[10px] border py-2 text-[12px] font-medium transition-all'
+                    style={{ ...cardStyle(on), color: on ? "var(--accent-color)" : "var(--text-muted)" }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Typing effects */}
+          <div className='pt-1 border-t' style={{ borderColor: "var(--border-color)" }}>
+            <div className='text-[11px] font-semibold uppercase tracking-wide mt-3 mb-1' style={{ color: "var(--text-muted)" }}>
+              {t.funTypingEffects}
+            </div>
+            <FunToggle on={sparkle} onClick={() => onSparkle(!sparkle)} label={t.funSparkles} />
+            <FunToggle on={combo} onClick={() => onCombo(!combo)} label={t.funCombo} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -5454,13 +5781,21 @@ export function App() {
   // Fun: animated top-bar critters (penguin by default) + typing effects.
   const [animals, setAnimals] = useState<AnimalKey[]>(() => {
     const raw = localStorage.getItem("ymca_animals");
-    if (raw == null) return ["swordfish"];
-    // Map the old "penguin" key onto the swordfish that replaced it.
+    // Default: a lively mix of all three critters.
+    if (raw == null) return ["fish", "crab", "squid"];
+    // Migrate the old keys onto the current fish/crab/squid trio.
+    const remap: Record<string, string> = { penguin: "fish", swordfish: "fish", elephant: "squid" };
     return raw
       .split(",")
-      .map((a) => (a === "penguin" ? "swordfish" : a))
+      .map((a) => remap[a] ?? a)
       .filter((a): a is AnimalKey => (ANIMAL_KEYS as readonly string[]).includes(a));
   });
+  // How big a crowd: single · few (default) · many.
+  const [quantity, setQuantity] = useState<Quantity>(() => {
+    const q = localStorage.getItem("ymca_quantity");
+    return q === "single" || q === "many" ? q : "few";
+  });
+  const [funOpen, setFunOpen] = useState(false);
   const [typingSparkle, setTypingSparkle] = useState(
     () => localStorage.getItem("ymca_sparkle") !== "off",
   );
@@ -5494,6 +5829,9 @@ export function App() {
   useEffect(() => {
     localStorage.setItem("ymca_animals", animals.join(","));
   }, [animals]);
+  useEffect(() => {
+    localStorage.setItem("ymca_quantity", quantity);
+  }, [quantity]);
   useEffect(() => {
     localStorage.setItem("ymca_sparkle", typingSparkle ? "on" : "off");
   }, [typingSparkle]);
@@ -6820,18 +7158,11 @@ export function App() {
               csrf={csrf}
               lang={lang}
               txMonitor={txMonitor}
-              animals={animals}
-              animalSpeed={animalSpeed}
-              typingSparkle={typingSparkle}
-              typingCombo={typingCombo}
               onThemeChange={setTheme}
               onFontChange={setFontSize}
               onLangChange={handleLangChange}
               onTxMonitorChange={setTxMonitor}
-              onAnimalsChange={setAnimals}
-              onAnimalSpeedChange={setAnimalSpeed}
-              onTypingSparkleChange={setTypingSparkle}
-              onTypingComboChange={setTypingCombo}
+              onOpenFunSettings={() => setFunOpen(true)}
               onLogout={handleLogout}
             />
 
@@ -7091,7 +7422,9 @@ export function App() {
         )}
 
         {/* ════════════════ MAIN ════════════════ */}
-        <div className='flex-1 flex flex-col overflow-hidden'>
+        <div className='flex-1 flex flex-col overflow-hidden relative'>
+          {/* Fun: critters that swim across (and just below) the top bar */}
+          <CritterField types={animals} quantity={quantity} speed={animalSpeed} />
           {/* Top bar */}
           <div
             className='flex items-center justify-between px-4 py-1.5 border-b shrink-0'
@@ -7135,9 +7468,6 @@ export function App() {
                 </div>
               )}
             </div>
-
-            {/* Fun: animated critters waddling across the middle of the top bar */}
-            <TopBarCritters animals={animals} speed={animalSpeed} />
 
             {/* Right actions */}
             <div className='flex items-center gap-1'>
@@ -7588,6 +7918,21 @@ export function App() {
 
         {/* Fun: typing sparkles + combo counter */}
         <TypingFx sparkle={typingSparkle} combo={typingCombo} />
+
+        <FunSettingsModal
+          open={funOpen}
+          onClose={() => setFunOpen(false)}
+          animals={animals}
+          quantity={quantity}
+          speed={animalSpeed}
+          sparkle={typingSparkle}
+          combo={typingCombo}
+          onAnimals={setAnimals}
+          onQuantity={setQuantity}
+          onSpeed={setAnimalSpeed}
+          onSparkle={setTypingSparkle}
+          onCombo={setTypingCombo}
+        />
       </div>
     </LangContext.Provider>
   );
