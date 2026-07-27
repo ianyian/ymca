@@ -29,6 +29,8 @@
      off the card background so an empty grid still reads as a heatmap. */
   --heatmap-empty: rgba(55,53,47,0.06);
   --tx-line: #15a349; --tx-fill: rgba(21,163,73,0.18); --tx-grid: rgba(21,163,73,0.13);
+  /* Squid ink cloud — dark on light surfaces. */
+  --ink-rgb: 45, 10, 40;
 }
 
 [data-theme="dark"] {
@@ -49,6 +51,8 @@
      invisible, so nudge it up a touch). */
   --heatmap-empty: rgba(255,255,255,0.05);
   --tx-line: #39d353; --tx-fill: rgba(57,211,83,0.22); --tx-grid: rgba(57,211,83,0.14);
+  /* On the near-black surface, ink shows as a pale muji cloud. */
+  --ink-rgb: 235, 230, 220;
 }
 
 [data-theme="muji"] {
@@ -69,6 +73,8 @@
   /* Warm earth tint to match muji's cream palette. */
   --heatmap-empty: rgba(61,53,48,0.07);
   --tx-line: #3f9142; --tx-fill: rgba(63,145,66,0.20); --tx-grid: rgba(63,145,66,0.14);
+  /* Warm brown ink on the cream muji surface. */
+  --ink-rgb: 70, 45, 20;
 }
 
 [data-theme="vscode"] {
@@ -88,6 +94,8 @@
   --font-family:   "Consolas", "Courier New", monospace;
   --heatmap-empty: rgba(255,255,255,0.045);
   --tx-line: #4ec94e; --tx-fill: rgba(78,201,78,0.20); --tx-grid: rgba(78,201,78,0.14);
+  /* Pale cloud on the dark editor surface. */
+  --ink-rgb: 220, 224, 230;
 }
 
 /* Font sizes */
@@ -479,7 +487,7 @@ body {
   height: 9px;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(45, 10, 40, 0.55), rgba(45, 10, 40, 0));
+  background: radial-gradient(circle, rgba(var(--ink-rgb, 45, 10, 40), 0.55), rgba(var(--ink-rgb, 45, 10, 40), 0));
   animation: squid-ink 1.2s ease-out forwards;
 }
 @keyframes squid-ink {

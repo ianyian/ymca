@@ -5040,16 +5040,18 @@ type Quantity = "single" | "few" | "many";
 // A blue swordfish, an orange crab, a pink squid — all drawn at `px` wide.
 function AnimalSprite({ type, px }: { type: AnimalKey; px: number }) {
   if (type === "fish") {
+    // Blue swordfish — the earlier, nicer silhouette (bill to the right,
+    // tail to the left), recoloured in ocean blues.
     return (
-      <svg viewBox='0 0 28 16' width={px} height={(px * 16) / 28}>
-        <path d='M8 8 L1 4 L3 8 L1 12 z' fill='#1f6fb0' />
-        <ellipse cx='15' cy='8' rx='10' ry='5' fill='#2b8fe0' />
-        <ellipse cx='15' cy='9.7' rx='7' ry='2.3' fill='#bfe0ff' />
-        <path d='M13 3.2 L17 0.6 L19.6 3.6 z' fill='#1f6fb0' />
-        <path d='M15 11 L13 15 L18 12 z' fill='#1a5f98' />
-        <path d='M20 8 L27 6 L26 8 L27 10 z' fill='#7cc0f5' />
-        <circle cx='21' cy='7' r='1.5' fill='#fff' />
-        <circle cx='21.5' cy='7' r='0.85' fill='#08283f' />
+      <svg viewBox='0 0 26 16' width={px} height={(px * 16) / 26}>
+        <path d='M18 6.5 L26 8 L18 9.5 z' fill='#7cc0f5' />
+        <path d='M4 8 L0 3.5 L1.6 8 L0 12.5 z' fill='#1f6fb0' />
+        <ellipse cx='11' cy='8' rx='8' ry='4.2' fill='#2b8fe0' />
+        <ellipse cx='11' cy='9.4' rx='5.5' ry='2' fill='#bfe0ff' />
+        <path d='M9 4 L12 1.2 L14.5 4 z' fill='#1f6fb0' />
+        <path d='M11 11 L9 15 L13.5 11.5 z' fill='#1a5f98' />
+        <circle cx='15' cy='7' r='1.4' fill='#fff' />
+        <circle cx='15.2' cy='7' r='0.85' fill='#08283f' />
       </svg>
     );
   }
@@ -5108,6 +5110,8 @@ interface Critter {
   size: number;
   w: number;
   h: number;
+  mountW: number; // sprite px at mount (for runtime scaling when a crab grows)
+  mountH: number; // sprite px height at mount
   x: number;
   y: number;
   vx: number;
@@ -5116,14 +5120,17 @@ interface Critter {
   speed: number; // per-animal base px/s
   rest: number; // crab rest countdown (ms)
   burst: number; // squid jet velocity remaining
-  roll: number; // fish barrel-roll degrees (0 when idle)
-  rolling: boolean;
   nextAct: number; // timestamp of next random special action
+  anchorY: number; // preferred vertical band (keeps a school tight)
+  dead: boolean; // squid eaten by a crab
+  inkUntil: number; // squid ink-defence active until (ms)
+  inkCd: number; // squid can ink again after (ms)
+  flipUntil: number; // crab tumbled upside-down until (ms)
 }
 
 function critterDims(type: AnimalKey, size: number): { w: number; h: number } {
   const w = size * (type === "crab" ? CRITTER_BASE * 0.95 : CRITTER_BASE * 1.1);
-  const ratio = type === "crab" ? 18 / 24 : type === "squid" ? 18 / 26 : 16 / 28;
+  const ratio = type === "crab" ? 18 / 24 : type === "squid" ? 18 / 26 : 16 / 26;
   return { w, h: w * ratio };
 }
 
@@ -5144,7 +5151,9 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
   const roster = useMemo(() => buildRoster(types, quantity), [types, quantity]);
   const fieldRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<(HTMLDivElement | null)[]>([]);
-  const sameDir = quantity === "many";
+  // "many" = tight, same-type schools that swim as one. Other modes let every
+  // animal roam the whole width independently.
+  const schooling = quantity === "many";
 
   useEffect(() => {
     const field = fieldRef.current;
@@ -5154,34 +5163,67 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
     let W = field.clientWidth || 400;
     let H = field.clientHeight || 88;
     const spdF = SPEED_FACTOR[speed];
-    const groupDir = { v: 1 };
+    const now0 = performance.now();
+    // A node may still be hidden from an eaten squid in a previous run; revive it.
+    for (const n of nodesRef.current) if (n) n.style.display = "";
+
+    // One school per enabled type (only used in "many" mode): a shared heading,
+    // a shared cruising speed and a home column/row the members cluster around.
+    type School = { dir: number; speed: number; anchorX: number; anchorY: number };
+    const schools = new Map<AnimalKey, School>();
+    if (schooling) {
+      for (const r of roster) {
+        if (schools.has(r.type)) continue;
+        schools.set(r.type, {
+          dir: Math.random() < 0.5 ? 1 : -1,
+          speed: 34 + Math.random() * 30,
+          anchorX: W * (0.2 + Math.random() * 0.6),
+          anchorY: r.type === "crab" ? H : H * (0.15 + Math.random() * 0.5),
+        });
+      }
+    }
 
     const crs: Critter[] = roster.map((r) => {
       const { w, h } = critterDims(r.type, r.size);
-      const face = sameDir ? 1 : Math.random() < 0.5 ? 1 : -1;
+      const school = schools.get(r.type);
+      const face = school ? school.dir : Math.random() < 0.5 ? 1 : -1;
+      // Fish come in fast/normal/slow; crabs vary; squid drift slowly and jet.
       const base =
         r.type === "fish"
-          ? 32 + Math.random() * 62 // some fast, some slow
+          ? 46 + Math.random() * 78
           : r.type === "crab"
-            ? 20 + Math.random() * 32
-            : 24 + Math.random() * 26; // squid resting drift
-      const now = performance.now();
+            ? 28 + Math.random() * 40
+            : 26 + Math.random() * 26;
+      const anchorY =
+        r.type === "crab"
+          ? H - h - 2
+          : school
+            ? Math.max(0, Math.min(H - h, school.anchorY + (Math.random() - 0.5) * 22))
+            : Math.random() * Math.max(1, H - h);
+      const x = school
+        ? Math.max(0, Math.min(W - w, school.anchorX + (Math.random() - 0.5) * 46))
+        : Math.random() * Math.max(1, W - w);
       return {
         type: r.type,
         size: r.size,
         w,
         h,
-        x: Math.random() * Math.max(1, W - w),
-        y: r.type === "crab" ? H - h - 2 : Math.random() * Math.max(1, H - h),
+        mountW: w,
+        mountH: h,
+        x,
+        y: anchorY,
         vx: face * base,
         vy: 0,
         face,
-        speed: base,
+        speed: school ? school.speed : base,
         rest: 0,
         burst: 0,
-        roll: 0,
-        rolling: false,
-        nextAct: now + 1800 + Math.random() * 4500,
+        nextAct: now0 + 1800 + Math.random() * 4500,
+        anchorY,
+        dead: false,
+        inkUntil: 0,
+        inkCd: 0,
+        flipUntil: 0,
       };
     });
 
@@ -5193,52 +5235,74 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
       W = field.clientWidth || W;
       H = field.clientHeight || H;
 
+      // ── each school turns as one when its leading edge reaches a wall ──
+      if (schooling) {
+        for (const [type, s] of schools) {
+          let minX = Infinity;
+          let maxRight = -Infinity;
+          for (const c of crs) {
+            if (c.dead || c.type !== type) continue;
+            if (c.x < minX) minX = c.x;
+            if (c.x + c.w > maxRight) maxRight = c.x + c.w;
+          }
+          if (maxRight === -Infinity) continue;
+          if (s.dir === 1 && maxRight >= W - 1) s.dir = -1;
+          else if (s.dir === -1 && minX <= 1) s.dir = 1;
+        }
+      }
+
       for (let i = 0; i < crs.length; i++) {
         const c = crs[i]!;
+        if (c.dead) continue;
+        const school = schooling ? schools.get(c.type) : undefined;
         const maxX = Math.max(1, W - c.w);
         const maxY = Math.max(1, H - c.h);
 
         // ── random special flourishes ──
         if (now >= c.nextAct) {
           c.nextAct = now + 2600 + Math.random() * 5200;
-          if (c.type === "fish" && !c.rolling) {
-            c.rolling = true;
-            c.roll = 0;
+          if (c.type === "fish") {
+            c.burst = 40 + Math.random() * 60; // a quick dart forward
           } else if (c.type === "crab") {
-            c.rest = 700 + Math.random() * 1800;
-          } else {
+            if (c.flipUntil <= now) c.rest = 700 + Math.random() * 1800;
+          } else if (now >= c.inkCd) {
             c.burst = 80 + Math.random() * 70;
             spawnInk(field, c);
+            c.inkUntil = now + 1100;
+            c.inkCd = now + 2600;
           }
         }
 
         // ── per-type movement ──
         if (c.type === "fish") {
-          const dir = sameDir ? groupDir.v : c.face;
-          c.vx = dir * c.speed * spdF;
-          if (Math.random() < 0.018) c.vy = (Math.random() - 0.5) * 34 * spdF;
-          c.vy *= 0.98;
-          if (c.rolling) {
-            c.roll += dt * 640;
-            if (c.roll >= 360) {
-              c.roll = 0;
-              c.rolling = false;
-            }
+          const dir = school ? school.dir : c.face;
+          c.vx = dir * (c.speed + c.burst) * spdF;
+          c.burst *= 0.9;
+          if (c.burst < 2) c.burst = 0;
+          if (school) {
+            // hug the school's row so same-type fish stay clustered
+            c.vy = (c.anchorY - c.y) * 3;
+          } else {
+            if (Math.random() < 0.02) c.vy = (Math.random() - 0.5) * 40 * spdF;
+            c.vy *= 0.98;
           }
         } else if (c.type === "crab") {
-          if (c.rest > 0) {
+          if (c.flipUntil > now) {
+            c.vx = 0; // tumbled upside-down, playing dead
+          } else if (c.rest > 0) {
             c.rest -= dt * 1000;
             c.vx = 0;
           } else {
-            const dir = sameDir ? groupDir.v : c.face;
+            const dir = school ? school.dir : c.face;
             c.vx = dir * c.speed * spdF;
           }
           c.vy = 0;
-          c.y = H - c.h - 2;
+          // keep the (centre-scaled) sprite's feet on the floor as it grows
+          c.y = H - 2 - c.mountH / 2 - c.h / 2;
         } else {
           // squid: jet in pulses, then coast — never a constant speed
           if (c.burst > 0) {
-            const dir = sameDir ? groupDir.v : c.face;
+            const dir = school ? school.dir : c.face;
             c.vx = dir * (c.speed + c.burst) * spdF;
             c.vy += (Math.random() - 0.5) * 26;
             c.burst *= 0.92;
@@ -5247,6 +5311,7 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
             c.vx *= 0.95;
             c.vy *= 0.95;
           }
+          if (school) c.vy += (c.anchorY - c.y) * 1.4 * dt;
           c.vy = Math.max(-70, Math.min(70, c.vy));
         }
 
@@ -5264,38 +5329,70 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
         }
         if (c.x < 0) {
           c.x = 0;
-          if (!sameDir) c.face = 1;
+          if (!school) c.face = 1;
           c.vx = Math.abs(c.vx);
         } else if (c.x > maxX) {
           c.x = maxX;
-          if (!sameDir) c.face = -1;
+          if (!school) c.face = -1;
           c.vx = -Math.abs(c.vx);
-        }
-
-        const node = nodesRef.current[i];
-        if (node) {
-          const dir = sameDir ? groupDir.v : c.face;
-          node.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px) scaleX(${dir})${c.rolling ? ` rotate(${c.roll.toFixed(0)}deg)` : ""}`;
         }
       }
 
-      // ── group turns as one in "many" mode ──
-      if (sameDir && crs.length) {
-        let minX = Infinity;
-        let maxRight = -Infinity;
-        for (const c of crs) {
-          if (c.x < minX) minX = c.x;
-          if (c.x + c.w > maxRight) maxRight = c.x + c.w;
+      // ── crab ⇄ squid encounters ──
+      for (const crab of crs) {
+        if (crab.dead || crab.type !== "crab") continue;
+        // the crab scales around its centre, so derive its live box from that
+        const crabCx = crab.x + crab.mountW / 2;
+        const crabCy = crab.y + crab.mountH / 2;
+        const crabL = crabCx - crab.w / 2;
+        const crabR = crabCx + crab.w / 2;
+        const crabT = crabCy - crab.h / 2;
+        const crabB = crabCy + crab.h / 2;
+        for (const squid of crs) {
+          if (squid.dead || squid.type !== "squid") continue;
+          const overlap =
+            crabL < squid.x + squid.w &&
+            crabR > squid.x &&
+            crabT < squid.y + squid.h &&
+            crabB > squid.y;
+          if (!overlap) continue;
+          if (squid.inkUntil > now) {
+            // ink defence: the crab tumbles upside-down for 2s, the squid flees
+            if (crab.flipUntil <= now) {
+              crab.flipUntil = now + 2000;
+              crab.rest = 0;
+            }
+            squid.burst = Math.max(squid.burst, 120);
+            squid.face = squid.x < crab.x ? -1 : 1;
+          } else {
+            // no ink ready → the crab eats the squid and grows one level
+            squid.dead = true;
+            const node = nodesRef.current[crs.indexOf(squid)];
+            if (node) node.style.display = "none";
+            crab.size = Math.min(4, crab.size + 1);
+            const dims = critterDims("crab", crab.size);
+            crab.w = dims.w;
+            crab.h = dims.h;
+          }
         }
-        if (groupDir.v === 1 && maxRight >= W - 1) groupDir.v = -1;
-        else if (groupDir.v === -1 && minX <= 1) groupDir.v = 1;
+      }
+
+      // ── write transforms ──
+      for (let i = 0; i < crs.length; i++) {
+        const c = crs[i]!;
+        const node = nodesRef.current[i];
+        if (!node || c.dead) continue;
+        const dir = schooling ? schools.get(c.type)?.dir ?? c.face : c.face;
+        const scale = c.w / c.mountW;
+        const flip = c.type === "crab" && c.flipUntil > now ? " rotate(180deg)" : "";
+        node.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px) scaleX(${dir}) scale(${scale.toFixed(3)})${flip}`;
       }
 
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [roster, speed, sameDir]);
+  }, [roster, speed, schooling]);
 
   if (roster.length === 0) return null;
   return (
