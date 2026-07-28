@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-pixel-crab-redesign",
+    "title": "Crab redesign: blocky pixel look",
+    "summary": "The crab critter got a fresh pixel-art design — a blocky terracotta body with notch eyes, stubby paired legs, and a proper pincer claw on each side.",
+    "bullets": [
+      "Retro pixel-art silhouette: rectangular body, stepped side bumps, and two pairs of stubby legs.",
+      "Each side now carries a blocky C-shaped pincer claw.",
+      "Same behaviours as before — walking, resting, and the squid encounters all still work."
+    ],
+    "publishedAt": "2026-07-28T18:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-fish-shoal-and-bubbles",
     "title": "Fish upgrade: bait-ball shoal + air bubbles",
     "summary": "The fish animation got livelier — in 'many' mode the fish now form their own dense mixed-size shoal that swims as one, and in single/few modes fish blow streams of air bubbles that rise and shrink toward the surface.",
