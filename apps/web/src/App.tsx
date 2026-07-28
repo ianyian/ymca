@@ -3188,7 +3188,9 @@ function SearchModal({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && onClose()}
-            className='flex-1 text-sm bg-transparent outline-none'
+            // 16px on mobile — anything smaller makes iOS Safari zoom the page
+            // in when the field is focused, leaving the layout messy on close.
+            className='flex-1 text-base sm:text-sm bg-transparent outline-none min-w-0'
             style={{ color: "var(--text-primary)" }}
             placeholder='Search titles & content...'
           />
@@ -8311,6 +8313,35 @@ export function App() {
             onSelect={(id) => void handleSelectPage(id)}
             onClose={() => setShowSearch(false)}
           />
+        )}
+
+        {/* Mobile-only floating back button — second-level surfaces (an open
+            page, To-do, the Console) are hard to leave on a phone, so a round
+            bottom-right button returns to the landing page. */}
+        {(activePage || showTodo || showComa) && (
+          <button
+            onClick={() => {
+              setActivePage(null);
+              setShowTodo(false);
+              setShowComa(false);
+            }}
+            className='md:hidden fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform'
+            style={{ background: "var(--accent-color)", color: "#fff" }}
+            aria-label='Back to home'
+          >
+            <svg
+              width='20'
+              height='20'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2.5'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              viewBox='0 0 24 24'
+            >
+              <path d='M19 12H5M12 19l-7-7 7-7' />
+            </svg>
+          </button>
         )}
 
         {/* Toast */}

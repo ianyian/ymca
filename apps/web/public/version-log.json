@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-mobile-back-and-search-fix",
+    "title": "Mobile: floating back button + search zoom fix",
+    "summary": "Getting around on a phone is easier — second-level pages have a floating back button, and opening search no longer auto-zooms and messes up the layout.",
+    "bullets": [
+      "A round back button floats at the bottom-right on mobile whenever you are inside a page, the To-do view, or the Console — one tap returns to the landing page.",
+      "Search is now stable on mobile: focusing the search box no longer makes iOS Safari zoom the page in.",
+      "Pinch-to-zoom still works as before."
+    ],
+    "publishedAt": "2026-07-28T14:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-todo-calendar-and-polish",
     "title": "To-do calendar + dashboard polish",
     "summary": "To-do tasks can now be scheduled onto a calendar shown in the left menu, long tasks wrap properly, and several defaults were tuned — including a fix so the landing contribution chart always shows fresh data.",
