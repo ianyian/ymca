@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-in-page-star-row",
+    "title": "Star a page from under its title",
+    "summary": "A second star toggle now sits right below the page title, above the Category row — no more reaching for the small star in the top-right corner.",
+    "bullets": [
+      "New Starred row in the page header: click the star to favourite or unfavourite the page.",
+      "Stays in sync with the top-right star and the Starred section in the sidebar.",
+      "Fills gold when the page is starred, matching the rest of the app."
+    ],
+    "publishedAt": "2026-07-28T20:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-crab-blink-and-catch",
     "title": "Crab animations: blinking + claw snaps",
     "summary": "The pixel crab is livelier — it now blinks its eyes at random, and occasionally one claw grows and snaps as if trying to catch something before settling back to normal size.",
