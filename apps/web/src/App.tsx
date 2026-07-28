@@ -5316,24 +5316,30 @@ function AnimalSprite({ type, px }: { type: AnimalKey; px: number }) {
       <rect x='9.4' y='13' width='1.8' height='4.2' fill='#b9603c' />
       <rect x='12.8' y='13' width='1.8' height='4.2' fill='#b9603c' />
       <rect x='15.4' y='13' width='1.8' height='4.2' fill='#b9603c' />
-      {/* claw arms */}
-      <rect x='2' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
-      <rect x='18.6' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
-      {/* left pincer — a blocky C opening outward */}
-      <rect x='0.2' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
-      <rect x='0.2' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
-      <rect x='1.5' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
-      {/* right pincer */}
-      <rect x='21.4' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
-      <rect x='21.4' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
-      <rect x='21.2' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
+      {/* left claw (arm + blocky C pincer) — grouped so the engine can animate
+          a one-handed "catch" snap on it */}
+      <g className='crab-claw-l'>
+        <rect x='2' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
+        <rect x='0.2' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
+        <rect x='0.2' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
+        <rect x='1.5' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
+      </g>
+      {/* right claw */}
+      <g className='crab-claw-r'>
+        <rect x='18.6' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
+        <rect x='21.4' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
+        <rect x='21.4' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
+        <rect x='21.2' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
+      </g>
       {/* wider middle band → the stepped side bumps of the silhouette */}
       <rect x='3.4' y='6.8' width='17.2' height='4.4' fill='#cf7a55' />
       {/* main body block */}
       <rect x='5' y='2.6' width='14' height='10.4' fill='#cf7a55' />
-      {/* notch eyes cut into the top of the body */}
-      <rect x='8.2' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
-      <rect x='14.1' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
+      {/* notch eyes cut into the top of the body — grouped for random blinks */}
+      <g className='crab-eyes'>
+        <rect x='8.2' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
+        <rect x='14.1' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
+      </g>
     </svg>
   );
 }
@@ -5392,6 +5398,8 @@ interface Critter {
   inkCd: number; // squid can ink again after (ms)
   flipUntil: number; // crab tumbled upside-down until (ms)
   nextBubble: number; // fish: timestamp of the next air-bubble release
+  nextBlink: number; // crab: timestamp of the next eye blink
+  nextCatch: number; // crab: timestamp of the next one-clawed catch snap
 }
 
 function critterDims(type: AnimalKey, size: number): { w: number; h: number } {
@@ -5531,6 +5539,8 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
         inkCd: 0,
         flipUntil: 0,
         nextBubble: now0 + 600 + Math.random() * 2400,
+        nextBlink: now0 + 1000 + Math.random() * 3500,
+        nextCatch: now0 + 2000 + Math.random() * 5000,
       };
     });
 
@@ -5599,6 +5609,29 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
             }
           }
         } else if (c.type === "crab") {
+          // ── random face/claw flourishes (skipped while playing dead) ──
+          const crabNode = nodesRef.current[i];
+          if (crabNode && c.flipUntil <= now) {
+            if (now >= c.nextBlink) {
+              c.nextBlink = now + 1600 + Math.random() * 4200;
+              const eyes = crabNode.querySelector(".crab-eyes");
+              if (eyes) {
+                eyes.classList.add("crab-blink");
+                window.setTimeout(() => eyes.classList.remove("crab-blink"), 240);
+              }
+            }
+            if (now >= c.nextCatch) {
+              c.nextCatch = now + 2600 + Math.random() * 6000;
+              // only one hand snaps at a time, picked at random
+              const claw = crabNode.querySelector(
+                Math.random() < 0.5 ? ".crab-claw-l" : ".crab-claw-r",
+              );
+              if (claw) {
+                claw.classList.add("crab-catching");
+                window.setTimeout(() => claw.classList.remove("crab-catching"), 750);
+              }
+            }
+          }
           if (c.flipUntil > now) {
             c.vx = 0; // tumbled upside-down, playing dead
           } else if (c.rest > 0) {

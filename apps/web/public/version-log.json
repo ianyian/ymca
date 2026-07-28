@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-crab-blink-and-catch",
+    "title": "Crab animations: blinking + claw snaps",
+    "summary": "The pixel crab is livelier — it now blinks its eyes at random, and occasionally one claw grows and snaps as if trying to catch something before settling back to normal size.",
+    "bullets": [
+      "Random eye blinks every few seconds, with each crab on its own rhythm.",
+      "Random catch snaps: one claw at a time (picked at random) enlarges and wiggles like it's grabbing at something, then returns to normal size.",
+      "Flourishes pause while a crab is inked and playing dead."
+    ],
+    "publishedAt": "2026-07-28T19:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-pixel-crab-redesign",
     "title": "Crab redesign: blocky pixel look",
     "summary": "The crab critter got a fresh pixel-art design — a blocky terracotta body with notch eyes, stubby paired legs, and a proper pincer claw on each side.",

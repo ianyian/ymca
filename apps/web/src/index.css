@@ -494,6 +494,32 @@ body {
   0%   { transform: scale(0.4); opacity: 0.65; }
   100% { transform: scale(6);   opacity: 0; }
 }
+/* Crab flourishes: the engine occasionally toggles these classes at random.
+   transform-box: fill-box lets the SVG groups scale around their own centre. */
+.crab-eyes,
+.crab-claw-l,
+.crab-claw-r {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.crab-blink {
+  animation: crab-blink 0.22s ease-in-out;
+}
+@keyframes crab-blink {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.12); }
+}
+/* One claw grows and wiggles as if snapping at something, then settles back. */
+.crab-catching {
+  animation: crab-catch 0.7s ease-in-out;
+}
+@keyframes crab-catch {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30%      { transform: scale(1.4) rotate(-14deg); }
+  55%      { transform: scale(1.32) rotate(12deg); }
+  75%      { transform: scale(1.18) rotate(-6deg); }
+}
+
 /* Air bubbles a fish releases: they float toward the surface and shrink as
    they rise, fading out near the top of the field. */
 .fish-bubble {
