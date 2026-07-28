@@ -378,6 +378,20 @@ const Ico = {
       <path d='M12 5v14M5 12h14' />
     </svg>
   ),
+  Calendar: () => (
+    <svg
+      width='13'
+      height='13'
+      fill='none'
+      stroke='currentColor'
+      strokeWidth='2'
+      strokeLinecap='round'
+      viewBox='0 0 24 24'
+    >
+      <rect x='3' y='5' width='18' height='16' rx='2' />
+      <path d='M16 3v4M8 3v4M3 11h18' />
+    </svg>
+  ),
   // Star: filled gold when starred, otherwise an outline "frame" (no fill),
   // matching the Gmail-style star toggle.
   Star: ({ filled }: { filled?: boolean }) => (
@@ -2298,7 +2312,47 @@ type TodoItemT = {
   text: string;
   done: boolean;
   createdAt?: string;
+  // Optional calendar date (YYYY-MM-DD, local) the task is scheduled for.
+  dueDate?: string | null;
 };
+
+// A textarea that wraps long tasks and grows to fit its content (the previous
+// single-line <input> clipped anything longer than the row).
+function AutoGrowText({
+  value,
+  onChange,
+  onKeyDown,
+  placeholder,
+  className,
+  style,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      className={`resize-none overflow-hidden ${className ?? ""}`}
+      style={style}
+    />
+  );
+}
 
 function formatTodoTimestamp(iso?: string): string {
   if (!iso) return "";
@@ -2312,39 +2366,18 @@ function formatTodoTimestamp(iso?: string): string {
   });
 }
 
-function TodoView({ csrf }: { csrf: string }) {
-  const [items, setItems] = useState<TodoItemT[]>([]);
-  const [loading, setLoading] = useState(true);
+// The list itself lives in App (so the sidebar calendar can highlight the days
+// with scheduled tasks); this view renders and edits it.
+function TodoView({
+  items,
+  loading,
+  update,
+}: {
+  items: TodoItemT[];
+  loading: boolean;
+  update: (next: TodoItemT[]) => void;
+}) {
   const [input, setInput] = useState("");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api<{ items: TodoItemT[] }>("/me/todo", {}, csrf)
-      .then((r) => {
-        if (alive) setItems(Array.isArray(r.items) ? r.items : []);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [csrf]);
-
-  // Debounced autosave — the client owns the list, PUT replaces it wholesale.
-  const update = (next: TodoItemT[]) => {
-    setItems(next);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void api(
-        "/me/todo",
-        { method: "PUT", body: JSON.stringify({ items: next }) },
-        csrf,
-      ).catch(() => {});
-    }, 600);
-  };
 
   const addItem = () => {
     const text = input.trim();
@@ -2381,14 +2414,17 @@ function TodoView({ csrf }: { csrf: string }) {
       </div>
 
       <div className='flex gap-2 mb-4'>
-        <input
+        <AutoGrowText
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={setInput}
           onKeyDown={(e) => {
-            if (e.key === "Enter") addItem();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              addItem();
+            }
           }}
           placeholder='Add a task and press Enter…'
-          className='flex-1 text-sm px-3 py-2 rounded-[8px] border outline-none'
+          className='flex-1 text-sm px-3 py-2 rounded-[8px] border outline-none min-w-0'
           style={{
             borderColor: "var(--border-color)",
             background: "var(--bg-secondary)",
@@ -2420,7 +2456,7 @@ function TodoView({ csrf }: { csrf: string }) {
           {items.map((it) => (
             <div
               key={it.id}
-              className='group flex items-center gap-3 px-3 py-2 rounded-[8px]'
+              className='group flex items-start gap-3 px-3 py-2 rounded-[8px]'
               style={{
                 border: "1px solid var(--border-color)",
                 background: "var(--bg-secondary)",
@@ -2446,21 +2482,46 @@ function TodoView({ csrf }: { csrf: string }) {
               >
                 {it.done && <Ico.Check />}
               </button>
-              <input
-                value={it.text}
-                onChange={(e) =>
-                  update(
-                    items.map((x) =>
-                      x.id === it.id ? { ...x, text: e.target.value } : x,
-                    ),
-                  )
-                }
-                className='flex-1 bg-transparent outline-none text-sm min-w-0'
-                style={{
-                  color: it.done ? "var(--text-muted)" : "var(--text-primary)",
-                  textDecoration: it.done ? "line-through" : "none",
-                }}
-              />
+              <div className='flex-1 min-w-0'>
+                <AutoGrowText
+                  value={it.text}
+                  onChange={(v) =>
+                    update(
+                      items.map((x) =>
+                        x.id === it.id ? { ...x, text: v } : x,
+                      ),
+                    )
+                  }
+                  className='w-full bg-transparent outline-none text-sm border-0 p-0'
+                  style={{
+                    color: it.done ? "var(--text-muted)" : "var(--text-primary)",
+                    textDecoration: it.done ? "line-through" : "none",
+                  }}
+                />
+                {it.dueDate && (
+                  <span
+                    className='inline-flex items-center gap-1 mt-1 text-[11px] px-1.5 py-0.5 rounded-full font-medium'
+                    style={{ background: "rgba(245,197,24,0.22)", color: "#8a6d00" }}
+                    title='Scheduled'
+                  >
+                    <Ico.Calendar />
+                    {it.dueDate}
+                    <button
+                      onClick={() =>
+                        update(
+                          items.map((x) =>
+                            x.id === it.id ? { ...x, dueDate: null } : x,
+                          ),
+                        )
+                      }
+                      className='ml-0.5 leading-none'
+                      title='Remove from calendar'
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+              </div>
               {it.createdAt && (
                 <span
                   className='shrink-0 text-[11px] text-right hidden sm:block'
@@ -2470,6 +2531,30 @@ function TodoView({ csrf }: { csrf: string }) {
                   {formatTodoTimestamp(it.createdAt)}
                 </span>
               )}
+              {/* Calendar button: an invisible native date input sits on top of
+                  the icon so clicking it opens the browser's date picker. */}
+              <div
+                className='relative shrink-0 p-1 rounded'
+                style={{ color: it.dueDate ? "#e0a800" : "var(--text-muted)" }}
+                title={it.dueDate ? `Scheduled for ${it.dueDate}` : "Add to calendar"}
+              >
+                <Ico.Calendar />
+                <input
+                  type='date'
+                  value={it.dueDate ?? ""}
+                  onChange={(e) =>
+                    update(
+                      items.map((x) =>
+                        x.id === it.id
+                          ? { ...x, dueDate: e.target.value || null }
+                          : x,
+                      ),
+                    )
+                  }
+                  className='absolute inset-0 w-full h-full opacity-0 cursor-pointer'
+                  aria-label='Schedule this task on a date'
+                />
+              </div>
               <button
                 onClick={() => update(items.filter((x) => x.id !== it.id))}
                 className='shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity'
@@ -2482,6 +2567,138 @@ function TodoView({ csrf }: { csrf: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Todo calendar — a compact month view for the sidebar. Days that have a
+// scheduled to-do get a yellow round highlight; hovering one shows a tooltip
+// listing the tasks booked for that day.
+// ────────────────────────────────────────────────────────────
+
+const TODO_CAL_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function TodoCalendar({ items }: { items: TodoItemT[] }) {
+  const [offset, setOffset] = useState(0); // months relative to the current one
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+
+  const today = new Date();
+  const view = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay(); // 0 = Sunday
+
+  // Group scheduled tasks by their YYYY-MM-DD due date.
+  const byDate = useMemo(() => {
+    const m = new Map<string, TodoItemT[]>();
+    for (const it of items) {
+      if (!it.dueDate) continue;
+      const list = m.get(it.dueDate) ?? [];
+      list.push(it);
+      m.set(it.dueDate, list);
+    }
+    return m;
+  }, [items]);
+
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const keyFor = (day: number) => `${year}-${pad2(month + 1)}-${pad2(day)}`;
+  const todayKey = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstDow }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  return (
+    <div className='px-3 py-2'>
+      <div className='flex items-center justify-between mb-1.5'>
+        <span
+          className='text-[11px] font-semibold uppercase tracking-wide'
+          style={{ color: "var(--text-muted)" }}
+        >
+          {TODO_CAL_MONTHS[month]} {year}
+        </span>
+        <span className='flex items-center gap-0.5'>
+          <button
+            onClick={() => setOffset((o) => o - 1)}
+            className='w-5 h-5 rounded flex items-center justify-center hover:bg-[var(--bg-hover)]'
+            style={{ color: "var(--text-muted)" }}
+            aria-label='Previous month'
+          >
+            ‹
+          </button>
+          <button
+            onClick={() => setOffset((o) => o + 1)}
+            className='w-5 h-5 rounded flex items-center justify-center hover:bg-[var(--bg-hover)]'
+            style={{ color: "var(--text-muted)" }}
+            aria-label='Next month'
+          >
+            ›
+          </button>
+        </span>
+      </div>
+      <div className='grid grid-cols-7 gap-y-0.5 text-center'>
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <span key={i} className='text-[9px] font-medium' style={{ color: "var(--text-muted)", opacity: 0.7 }}>
+            {d}
+          </span>
+        ))}
+        {cells.map((day, i) => {
+          if (day == null) return <span key={`pad-${i}`} />;
+          const key = keyFor(day);
+          const booked = byDate.get(key);
+          const isToday = key === todayKey;
+          return (
+            <span key={key} className='relative flex justify-center'>
+              <span
+                onMouseEnter={() => booked && setHoverKey(key)}
+                onMouseLeave={() => setHoverKey(null)}
+                className='w-[22px] h-[22px] rounded-full flex items-center justify-center text-[10px] tabular-nums'
+                style={
+                  booked
+                    ? { background: "#f5c518", color: "#3a2f00", fontWeight: 700, cursor: "default" }
+                    : isToday
+                      ? { border: "1px solid var(--accent-color)", color: "var(--accent-color)", fontWeight: 600 }
+                      : { color: "var(--text-primary)" }
+                }
+              >
+                {day}
+              </span>
+              {booked && hoverKey === key && (
+                <div
+                  className='absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-[170px] rounded-[8px] border shadow-xl px-2.5 py-2 z-50 pointer-events-none text-left'
+                  style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
+                >
+                  <div className='text-[10px] font-semibold mb-1' style={{ color: "var(--text-muted)" }}>
+                    {key}
+                  </div>
+                  {booked.map((it) => (
+                    <div
+                      key={it.id}
+                      className='text-[11px] leading-snug truncate flex items-center gap-1'
+                      style={{
+                        color: it.done ? "var(--text-muted)" : "var(--text-primary)",
+                        textDecoration: it.done ? "line-through" : "none",
+                      }}
+                    >
+                      <span
+                        className='inline-block w-1 h-1 rounded-full shrink-0'
+                        style={{ background: "#f5c518" }}
+                      />
+                      {it.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -4601,13 +4818,16 @@ function analysisStatusColor(status: number): string {
 
 function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
   const t = AT[lang];
-  const [window, setWindow] = useState<UsageWindow>("30d");
+  const [window, setWindow] = useState<UsageWindow>("7d");
   const [data, setData] = useState<UsageAnalytics | null>(null);
   const [errorsLog, setErrorsLog] = useState<RecentErrors | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   // Auto-refresh so the dashboard shows the latest data; adjustable in the UI.
   const [refreshSec, setRefreshSec] = useState(5);
+  // Flash the blue bulb once per auto-refresh so it's visible data is being pulled.
+  const [refreshFlash, setRefreshFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(
     async (silent: boolean) => {
@@ -4634,8 +4854,16 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
     void load(false);
   }, [load]);
   useEffect(() => {
-    const id = setInterval(() => void load(true), refreshSec * 1000);
-    return () => clearInterval(id);
+    const id = setInterval(() => {
+      setRefreshFlash(true);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setRefreshFlash(false), 450);
+      void load(true);
+    }, refreshSec * 1000);
+    return () => {
+      clearInterval(id);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
   }, [load, refreshSec]);
 
   const chartText = isDark ? "#e6e6e5" : "#37352f";
@@ -4845,9 +5073,14 @@ function AnalysisPanel({ lang, isDark }: { lang: Lang; isDark: boolean }) {
         )}
         <div className='ml-auto flex items-center gap-1.5'>
           <span
-            className='inline-block w-1.5 h-1.5 rounded-full'
+            className='inline-block w-1.5 h-1.5 rounded-full transition-all duration-150'
             title={t.autoRefresh}
-            style={{ background: "var(--accent-color)" }}
+            style={{
+              background: "var(--accent-color)",
+              opacity: refreshFlash ? 1 : 0.55,
+              boxShadow: refreshFlash ? "0 0 8px 3px rgba(35,131,226,0.85)" : "none",
+              transform: refreshFlash ? "scale(1.6)" : "scale(1)",
+            }}
           />
           <span className='text-[11px]' style={{ color: "var(--text-muted)" }}>
             {t.autoRefresh}
@@ -5148,12 +5381,22 @@ function spawnInk(field: HTMLDivElement, c: Critter) {
 // vertical drift, resting, jetting and random flourishes. It overlays the top
 // bar and spills a little below it, giving the animals "double" the room.
 function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity: Quantity; speed: 1 | 2 | 3 }) {
-  const roster = useMemo(() => buildRoster(types, quantity), [types, quantity]);
+  // On mobile viewports the animation is capped at a single animal regardless of
+  // the crowd setting — the rAF engine is too heavy for small devices otherwise.
+  const [mobile, setMobile] = useState(isMobileViewport);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const effQuantity: Quantity = mobile ? "single" : quantity;
+  const roster = useMemo(() => buildRoster(types, effQuantity), [types, effQuantity]);
   const fieldRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<(HTMLDivElement | null)[]>([]);
   // "many" = tight, same-type schools that swim as one. Other modes let every
   // animal roam the whole width independently.
-  const schooling = quantity === "many";
+  const schooling = effQuantity === "many";
 
   useEffect(() => {
     const field = fieldRef.current;
@@ -5875,11 +6118,11 @@ export function App() {
   const [txMonitor, setTxMonitor] = useState(
     () => localStorage.getItem("ymca_txmonitor") !== "off",
   );
-  // Fun: animated top-bar critters (penguin by default) + typing effects.
+  // Fun: animated top-bar critters (squid by default) + typing effects.
   const [animals, setAnimals] = useState<AnimalKey[]>(() => {
     const raw = localStorage.getItem("ymca_animals");
-    // Default: a lively mix of all three critters.
-    if (raw == null) return ["fish", "crab", "squid"];
+    // Default: a squid (with the "few" crowd of 5 below).
+    if (raw == null) return ["squid"];
     // Migrate the old keys onto the current fish/crab/squid trio.
     const remap: Record<string, string> = { penguin: "fish", swordfish: "fish", elephant: "squid" };
     return raw
@@ -6003,6 +6246,17 @@ export function App() {
   const [homeActivitySummary, setHomeActivitySummary] = useState<UserActivitySummary | null>(null);
   const [homeActivityLoading, setHomeActivityLoading] = useState(false);
   const [homeActivityError, setHomeActivityError] = useState<string | null>(null);
+  // Mirror of the summary so the refresh effect can decide "first load vs
+  // silent refresh" without depending on the summary itself (would loop).
+  const homeActivitySummaryRef = useRef<UserActivitySummary | null>(null);
+  useEffect(() => {
+    homeActivitySummaryRef.current = homeActivitySummary;
+  }, [homeActivitySummary]);
+  // To-do list — lifted here (rather than living inside TodoView) so the
+  // sidebar calendar can highlight the days that have scheduled tasks.
+  const [todoItems, setTodoItems] = useState<TodoItemT[]>([]);
+  const [todoLoading, setTodoLoading] = useState(true);
+  const todoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleAreaRef = useRef<HTMLTextAreaElement>(null);
   const activeSurface = showComa
@@ -6379,6 +6633,44 @@ export function App() {
       });
   }, []);
 
+  // Load the user's to-do list once signed in; the debounced update below
+  // autosaves it (the client owns the list, PUT replaces it wholesale).
+  useEffect(() => {
+    if (!user) {
+      setTodoItems([]);
+      setTodoLoading(false);
+      return;
+    }
+    let alive = true;
+    setTodoLoading(true);
+    api<{ items: TodoItemT[] }>("/me/todo", {}, csrfRef.current)
+      .then((r) => {
+        if (alive) setTodoItems(Array.isArray(r.items) ? r.items : []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setTodoLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  const updateTodoItems = useCallback((next: TodoItemT[]) => {
+    setTodoItems(next);
+    if (todoSaveTimer.current) clearTimeout(todoSaveTimer.current);
+    todoSaveTimer.current = setTimeout(() => {
+      void api(
+        "/me/todo",
+        { method: "PUT", body: JSON.stringify({ items: next }) },
+        csrfRef.current,
+      ).catch(() => {});
+    }, 600);
+  }, []);
+
+  // Whether the landing page (document hub) is the visible surface right now.
+  const onHome = !activePage && !showComa && !showTodo;
+
   useEffect(() => {
     if (!user) {
       setHomeActivitySummary(null);
@@ -6386,9 +6678,14 @@ export function App() {
       setHomeActivityLoading(false);
       return;
     }
+    // Re-fetch every time the user lands back on the home view so the
+    // contribution chart reflects edits made while they were inside a page.
+    if (!onHome) return;
 
     let alive = true;
-    setHomeActivityLoading(true);
+    // Only show the loading state on the very first fetch; later returns to the
+    // landing page refresh silently so the chart doesn't flicker.
+    setHomeActivityLoading((prev) => prev || homeActivitySummaryRef.current == null);
     // Pull 5 years so the landing heatmap's year filter can switch instantly
     // (client-side buckets by calendar year). Sparse zero-days gzip away.
     api<UserActivitySummary>("/me/activity?window=1825d")
@@ -6410,7 +6707,7 @@ export function App() {
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, onHome]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7385,6 +7682,12 @@ export function App() {
               );
             })()}
 
+            {/* To-do calendar — days with a scheduled task get a yellow round
+                highlight; hover shows the tasks booked for that day. */}
+            <div className='border-t pb-1' style={{ borderColor: "var(--border-color)" }}>
+              <TodoCalendar items={todoItems} />
+            </div>
+
             {/* Live transaction monitor — its own separated block above the
                 Console / Trash controls. Toggled in personal settings. */}
             {txMonitor && (
@@ -7823,7 +8126,7 @@ export function App() {
 
               {/* ─── To-do (personal scratchpad) ─── */}
               {showTodo && !activePage && !showComa && (
-                <TodoView csrf={csrf} />
+                <TodoView items={todoItems} loading={todoLoading} update={updateTodoItems} />
               )}
 
               {/* ─── Home / Document Hub ─── */}
