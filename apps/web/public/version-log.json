@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-07-28-todo-calendar-and-polish",
+    "title": "To-do calendar + dashboard polish",
+    "summary": "To-do tasks can now be scheduled onto a calendar shown in the left menu, long tasks wrap properly, and several defaults were tuned — including a fix so the landing contribution chart always shows fresh data.",
+    "bullets": [
+      "Each to-do item has a calendar button to book it on a date; a sidebar month view highlights booked days in yellow, with a hover tooltip listing that day's tasks.",
+      "To-do inputs now word-wrap and grow with long text instead of clipping it.",
+      "Console Analysis defaults to a 7-day window, and its blue auto-refresh light flashes each time data refreshes.",
+      "The animation default is now a squid with a crowd of 5; on mobile only one animal swims, to keep things smooth.",
+      "The landing page contribution chart refreshes every time you return to it, so recent edits are always reflected."
+    ],
+    "publishedAt": "2026-07-28T10:00:00.000Z"
+  },
+  {
     "id": "2026-07-25-search-content-and-freshness",
     "title": "Full content search with snippets",
     "summary": "The left-menu search (Ctrl+K) now searches inside page content, not just titles — with highlighted snippets, an open-page link, and a last-updated indicator on each result.",
