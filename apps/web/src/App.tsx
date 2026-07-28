@@ -5307,16 +5307,33 @@ function AnimalSprite({ type, px }: { type: AnimalKey; px: number }) {
       </svg>
     );
   }
+  // Blocky pixel-art crab: rectangular terracotta body with notch eyes, a
+  // wider middle band, four stubby legs — and a C-shaped pincer on each side.
   return (
-    <svg viewBox='0 0 24 18' width={px} height={(px * 18) / 24}>
-      <path d='M6 11 l-4 3 M8 13 l-3 4 M16 13 l3 4 M18 11 l4 3' stroke='#c25c14' strokeWidth='1.8' strokeLinecap='round' fill='none' />
-      <circle cx='4' cy='7' r='3.2' fill='#e0721c' />
-      <circle cx='20' cy='7' r='3.2' fill='#e0721c' />
-      <rect x='6' y='6' width='12' height='8' rx='4' fill='#ec7a24' />
-      <rect x='9' y='2.5' width='1.6' height='4' fill='#c25c14' />
-      <rect x='13' y='2.5' width='1.6' height='4' fill='#c25c14' />
-      <circle cx='9.8' cy='2.5' r='1.4' fill='#3a1c06' />
-      <circle cx='13.8' cy='2.5' r='1.4' fill='#3a1c06' />
+    <svg viewBox='0 0 24 18' width={px} height={(px * 18) / 24} shapeRendering='crispEdges'>
+      {/* legs (two pairs, like the reference) */}
+      <rect x='6.8' y='13' width='1.8' height='4.2' fill='#b9603c' />
+      <rect x='9.4' y='13' width='1.8' height='4.2' fill='#b9603c' />
+      <rect x='12.8' y='13' width='1.8' height='4.2' fill='#b9603c' />
+      <rect x='15.4' y='13' width='1.8' height='4.2' fill='#b9603c' />
+      {/* claw arms */}
+      <rect x='2' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
+      <rect x='18.6' y='7.4' width='3.4' height='2.2' fill='#b9603c' />
+      {/* left pincer — a blocky C opening outward */}
+      <rect x='0.2' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
+      <rect x='0.2' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
+      <rect x='1.5' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
+      {/* right pincer */}
+      <rect x='21.4' y='4.8' width='2.4' height='1.9' fill='#cf7a55' />
+      <rect x='21.4' y='10.3' width='2.4' height='1.9' fill='#cf7a55' />
+      <rect x='21.2' y='4.8' width='1.3' height='7.4' fill='#cf7a55' />
+      {/* wider middle band → the stepped side bumps of the silhouette */}
+      <rect x='3.4' y='6.8' width='17.2' height='4.4' fill='#cf7a55' />
+      {/* main body block */}
+      <rect x='5' y='2.6' width='14' height='10.4' fill='#cf7a55' />
+      {/* notch eyes cut into the top of the body */}
+      <rect x='8.2' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
+      <rect x='14.1' y='4.4' width='1.7' height='3.2' fill='#1c0d06' />
     </svg>
   );
 }
