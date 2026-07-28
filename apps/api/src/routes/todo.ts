@@ -19,6 +19,8 @@ const putTodoSchema = {
           text: { type: "string", maxLength: 2000 },
           done: { type: "boolean" },
           createdAt: { type: ["string", "null"], maxLength: 40 },
+          // Optional calendar date (YYYY-MM-DD) the task is scheduled for.
+          dueDate: { type: ["string", "null"], maxLength: 40 },
         },
         required: ["id", "text", "done"],
         additionalProperties: false,
@@ -34,6 +36,7 @@ type TodoItem = {
   text: string;
   done: boolean;
   createdAt?: string | null;
+  dueDate?: string | null;
 };
 
 export async function registerTodoRoutes(app: FastifyInstance) {
