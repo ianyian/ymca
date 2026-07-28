@@ -494,6 +494,22 @@ body {
   0%   { transform: scale(0.4); opacity: 0.65; }
   100% { transform: scale(6);   opacity: 0; }
 }
+/* Air bubbles a fish releases: they float toward the surface and shrink as
+   they rise, fading out near the top of the field. */
+.fish-bubble {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1px solid rgba(120, 175, 235, 0.75);
+  background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.85), rgba(150, 200, 245, 0.12));
+  animation: fish-bubble 1.6s ease-in both;
+}
+@keyframes fish-bubble {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  12%  { opacity: 0.9; }
+  75%  { opacity: 0.65; }
+  100% { transform: translateY(-64px) scale(0.2); opacity: 0; }
+}
 
 @keyframes sparkle-pop {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; }

@@ -5324,14 +5324,27 @@ function AnimalSprite({ type, px }: { type: AnimalKey; px: number }) {
 // ── Critter roster: how many units, of what size, for each quantity mode ─────
 // single = 1 big one; few = 5 (one 3×, four 2×); many = a 14-strong shoal
 // (two 3×, two 2×, ten 1×). Types are round-robined across the enabled ones.
+// Exception in "many" mode: fish don't count toward the 14 — they arrive as
+// their own dense bait-ball shoal of mixed sizes that swims as one, while the
+// other enabled types split the regular roster between them.
+const FISH_SHOAL_SIZES = [
+  2, 1.75, 1.75, 1.5, 1.5, 1.5, 1.5, 1.25, 1.25, 1.25, 1.25, 1.25,
+  1, 1, 1, 1, 1, 1, 1, 1, 0.75, 0.75, 0.75, 0.75,
+];
 function buildRoster(types: AnimalKey[], quantity: Quantity): { type: AnimalKey; size: number }[] {
   const enabled = types.length ? types : (["fish"] as AnimalKey[]);
-  const sizes =
-    quantity === "single"
-      ? [3]
-      : quantity === "few"
-        ? [3, 2, 2, 2, 2]
-        : [3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  if (quantity === "many") {
+    const others = enabled.filter((t) => t !== "fish");
+    const sizes = [3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const roster: { type: AnimalKey; size: number }[] = others.length
+      ? sizes.map((size, i) => ({ type: others[i % others.length]!, size }))
+      : [];
+    if (enabled.includes("fish")) {
+      for (const size of FISH_SHOAL_SIZES) roster.push({ type: "fish", size });
+    }
+    return roster;
+  }
+  const sizes = quantity === "single" ? [3] : [3, 2, 2, 2, 2];
   return sizes.map((size, i) => ({ type: enabled[i % enabled.length]!, size }));
 }
 
@@ -5361,12 +5374,33 @@ interface Critter {
   inkUntil: number; // squid ink-defence active until (ms)
   inkCd: number; // squid can ink again after (ms)
   flipUntil: number; // crab tumbled upside-down until (ms)
+  nextBubble: number; // fish: timestamp of the next air-bubble release
 }
 
 function critterDims(type: AnimalKey, size: number): { w: number; h: number } {
   const w = size * (type === "crab" ? CRITTER_BASE * 0.95 : CRITTER_BASE * 1.1);
   const ratio = type === "crab" ? 18 / 24 : type === "squid" ? 18 / 26 : 16 / 26;
   return { w, h: w * ratio };
+}
+
+// A little burst of air bubbles from a fish's mouth. Each bubble floats up and
+// shrinks as it rises (single/few modes only — a whole shoal would be noisy).
+function spawnBubbles(field: HTMLDivElement, c: Critter) {
+  const n = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement("div");
+    b.className = "fish-bubble";
+    const px = 3 + Math.random() * 4;
+    b.style.width = `${px}px`;
+    b.style.height = `${px}px`;
+    const mouthX = c.face === 1 ? c.x + c.w - 2 : c.x + 2;
+    b.style.left = `${mouthX + (Math.random() - 0.5) * 6}px`;
+    b.style.top = `${c.y + c.h * 0.35 + (Math.random() - 0.5) * 6}px`;
+    b.style.animationDelay = `${i * 130}ms`;
+    b.style.animationDuration = `${1.3 + Math.random() * 0.9}s`;
+    field.appendChild(b);
+    window.setTimeout(() => b.remove(), 2800);
+  }
 }
 
 // A short-lived ink cloud puffed out behind a squid's special action.
@@ -5439,14 +5473,18 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
           : r.type === "crab"
             ? 28 + Math.random() * 40
             : 26 + Math.random() * 26;
+      // The fish bait-ball is bigger than other schools, so give it a wider
+      // cluster to spawn into — it reads as one dense ball, not a line.
+      const spreadX = r.type === "fish" ? 120 : 46;
+      const spreadY = r.type === "fish" ? 40 : 22;
       const anchorY =
         r.type === "crab"
           ? H - h - 2
           : school
-            ? Math.max(0, Math.min(H - h, school.anchorY + (Math.random() - 0.5) * 22))
+            ? Math.max(0, Math.min(H - h, school.anchorY + (Math.random() - 0.5) * spreadY))
             : Math.random() * Math.max(1, H - h);
       const x = school
-        ? Math.max(0, Math.min(W - w, school.anchorX + (Math.random() - 0.5) * 46))
+        ? Math.max(0, Math.min(W - w, school.anchorX + (Math.random() - 0.5) * spreadX))
         : Math.random() * Math.max(1, W - w);
       return {
         type: r.type,
@@ -5460,7 +5498,13 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
         vx: face * base,
         vy: 0,
         face,
-        speed: school ? school.speed : base,
+        // Shoaling fish keep the shared heading but vary their pace a little,
+        // so the ball shimmers instead of moving like one rigid block.
+        speed: school
+          ? r.type === "fish"
+            ? school.speed * (0.85 + Math.random() * 0.3)
+            : school.speed
+          : base,
         rest: 0,
         burst: 0,
         nextAct: now0 + 1800 + Math.random() * 4500,
@@ -5469,6 +5513,7 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
         inkUntil: 0,
         inkCd: 0,
         flipUntil: 0,
+        nextBubble: now0 + 600 + Math.random() * 2400,
       };
     });
 
@@ -5530,6 +5575,11 @@ function CritterField({ types, quantity, speed }: { types: AnimalKey[]; quantity
           } else {
             if (Math.random() < 0.02) c.vy = (Math.random() - 0.5) * 40 * spdF;
             c.vy *= 0.98;
+            // single/few: release the occasional stream of air bubbles
+            if (now >= c.nextBubble) {
+              c.nextBubble = now + 1200 + Math.random() * 3200;
+              spawnBubbles(field, c);
+            }
           }
         } else if (c.type === "crab") {
           if (c.flipUntil > now) {
@@ -5728,7 +5778,7 @@ function FunSettingsModal({
   const qtyMeta: { key: Quantity; label: string; count: string; hint: string }[] = [
     { key: "single", label: t.funSingle, count: "1", hint: t.funSingleHint },
     { key: "few", label: t.funFew, count: "5", hint: t.funFewHint },
-    { key: "many", label: t.funMany, count: "14", hint: t.funManyHint },
+    { key: "many", label: t.funMany, count: "14+", hint: t.funManyHint },
   ];
   const cardStyle = (on: boolean): React.CSSProperties => ({
     borderColor: on ? "var(--accent-color)" : "var(--border-color)",
