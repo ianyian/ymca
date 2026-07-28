@@ -2,9 +2,9 @@
   {
     "id": "2026-07-28-in-page-star-row",
     "title": "Star a page from under its title",
-    "summary": "A second star toggle now sits right below the page title, above the Category row — no more reaching for the small star in the top-right corner.",
+    "summary": "A second star toggle now sits right below the page title, at the start of the Category row — no more reaching for the small star in the top-right corner.",
     "bullets": [
-      "New Starred row in the page header: click the star to favourite or unfavourite the page.",
+      "One clickable star in front of the Category label: click to favourite or unfavourite the page.",
       "Stays in sync with the top-right star and the Starred section in the sidebar.",
       "Fills gold when the page is starred, matching the rest of the app."
     ],

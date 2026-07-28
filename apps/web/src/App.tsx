@@ -8310,23 +8310,15 @@ export function App() {
                     placeholder={T[lang].untitled}
                   />
 
-                  {/* Star row — the same toggle as the top-right star, placed
-                      under the title so it's easier to reach */}
-                  {(() => {
-                    const starred = !!flattenTree(tree).find((n) => n.id === activePage.id)?.isStarred;
-                    return (
-                      <div className='flex items-center gap-2 mt-3'>
-                        <span
-                          className='text-[11px] font-medium w-[80px] shrink-0'
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          <span className='flex items-center gap-1.5'>
-                            <Ico.Star /> {T[lang].starred}
-                          </span>
-                        </span>
+                  {/* Tags row — with a quick star toggle in front of the
+                      Category label (same action as the top-right star) */}
+                  <div className='flex items-center gap-2 mt-3 mb-5'>
+                    {(() => {
+                      const starred = !!flattenTree(tree).find((n) => n.id === activePage.id)?.isStarred;
+                      return (
                         <button
                           onClick={() => void toggleStar(activePage.id, !starred)}
-                          className='p-1 -ml-1 rounded-[4px] transition-colors hover:bg-[var(--bg-hover)]'
+                          className='p-1 -ml-1 rounded-[4px] shrink-0 transition-colors hover:bg-[var(--bg-hover)]'
                           style={{ color: starred ? "#e6a700" : "var(--text-muted)" }}
                           title={starred ? T[lang].unstar : T[lang].star}
                           aria-label={starred ? T[lang].unstar : T[lang].star}
@@ -8334,12 +8326,8 @@ export function App() {
                         >
                           <Ico.Star filled={starred} />
                         </button>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Tags row */}
-                  <div className='flex items-center gap-2 mt-1.5 mb-5'>
+                      );
+                    })()}
                     <span
                       className='text-[11px] font-medium w-[80px] shrink-0'
                       style={{ color: "var(--text-muted)" }}
