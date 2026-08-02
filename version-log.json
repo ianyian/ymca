@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-faster-login",
+    "title": "Much faster sign-in",
+    "summary": "Login has been sped up on three fronts: cheaper password verification, a warm-up ping that wakes the API while you type, and one combined request for the first screen instead of three back-to-back ones.",
+    "bullets": [
+      "Password hashing cost reduced to the recommended baseline, and existing accounts are automatically rehashed in the background on their next sign-in.",
+      "The login page pings the API the moment it opens, so a sleeping server is already waking up before you press Sign in.",
+      "After sign-in the app fetches your workspaces and page list in a single round trip (new /me/bootstrap endpoint), with its database queries running in parallel."
+    ],
+    "publishedAt": "2026-07-28T21:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-in-page-star-row",
     "title": "Star a page from under its title",
     "summary": "A second star toggle now sits right below the page title, at the start of the Category row — no more reaching for the small star in the top-right corner.",
