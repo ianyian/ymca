@@ -14,7 +14,9 @@ const envSchema = z.object({
     .positive()
     .default(Number(process.env.PORT ?? 4000)),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  // 10 rounds (OWASP minimum) instead of 12: bcryptjs is pure JS, and on a
+  // small API instance each extra round doubles the login-time CPU cost.
+  BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(10),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),

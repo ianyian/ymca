@@ -167,6 +167,25 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         });
       }
 
+      // Opportunistic rehash: verification cost is dictated by the *stored*
+      // hash's rounds, so accounts hashed at a higher cost stay slow to log in
+      // until rehashed. Do it in the background — never delay the response.
+      try {
+        if (bcrypt.getRounds(user.passwordHash) > env.BCRYPT_ROUNDS) {
+          void bcrypt
+            .hash(payload.password, env.BCRYPT_ROUNDS)
+            .then((passwordHash) =>
+              prisma.user.update({
+                where: { id: user.id },
+                data: { passwordHash },
+              }),
+            )
+            .catch(() => {});
+        }
+      } catch {
+        /* unparsable hash — leave it alone */
+      }
+
       const session = await createSessionForUser({
         userId: user.id,
         env,

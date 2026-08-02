@@ -6718,6 +6718,14 @@ export function App() {
     return () => setUnauthorizedHandler(null);
   }, []);
 
+  // Warm-up ping: fire a cheap /health request as soon as the app mounts. On
+  // hosts that spin idle instances down (e.g. Render's free tier) the API can
+  // take a long time to cold-start — this wakes it while the user is still
+  // typing their email/password instead of after they press Sign in.
+  useEffect(() => {
+    void fetch(`${API}/health`).catch(() => {});
+  }, []);
+
   useEffect(() => {
     // No token means we're not signed in (login always stores one), so skip the
     // /me check entirely — otherwise a fresh/incognito visitor logs a 401 for
@@ -6885,31 +6893,59 @@ export function App() {
 
   // ── Workspaces ──
 
-  const loadWorkspaces = useCallback(async () => {
+  // Tracks a workspace whose tree arrived via /me/bootstrap so the loadTree
+  // effect doesn't immediately re-fetch the exact same data.
+  const bootstrappedTreeWsRef = useRef<string | null>(null);
+  // Mirror of activeWs so the bootstrap effect (deps: [user]) can check the
+  // current workspace without re-running on every workspace change.
+  const activeWsRef = useRef<Workspace | null>(null);
+  useEffect(() => {
+    activeWsRef.current = activeWs;
+  }, [activeWs]);
+
+  // One combined round trip after sign-in: workspaces + the first workspace's
+  // page tree together, instead of the old login → /workspaces → /pages/tree
+  // waterfall that kept the loading skeleton up for three network hops.
+  useEffect(() => {
     if (!user) return;
-    try {
-      const r = await api<{ workspaces: Workspace[] }>("/workspaces");
-      setWorkspaces(r.workspaces);
-      if (r.workspaces.length > 0) {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await api<{
+          workspaces: Workspace[];
+          activeWorkspaceId: string | null;
+          tree: PageNode[];
+        }>("/me/bootstrap");
+        if (!alive) return;
+        setWorkspaces(r.workspaces);
+        if (!r.activeWorkspaceId || r.workspaces.length === 0) {
+          // No workspace at all — nothing will ever trigger loadTree, so the
+          // skeleton would otherwise spin forever.
+          setInitialLoad(false);
+          return;
+        }
+        const first = r.workspaces.find((w) => w.id === r.activeWorkspaceId) ?? r.workspaces[0]!;
         // Reset the active workspace when it doesn't belong to the current user
         // — otherwise switching accounts in the same tab keeps the previous
         // account's workspace id, and every workspace-scoped call 403s.
-        const stillValid = activeWs && r.workspaces.some((w) => w.id === activeWs.id);
-        if (!stillValid) setActiveWs(r.workspaces[0]!);
-      } else {
-        // No workspace at all — nothing will ever trigger loadTree, so the
-        // skeleton would otherwise spin forever.
+        const current = activeWsRef.current;
+        const stillValid = current && r.workspaces.some((w) => w.id === current.id);
+        if (!stillValid) {
+          bootstrappedTreeWsRef.current = first.id;
+          setTree(r.tree);
+          setActiveWs(first);
+        }
+        setInitialLoad(false);
+      } catch (e) {
+        if (!alive) return;
+        setToast(e instanceof Error ? e.message : "Load failed");
         setInitialLoad(false);
       }
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : "Load failed");
-      setInitialLoad(false);
-    }
-  }, [user, activeWs]);
-
-  useEffect(() => {
-    void loadWorkspaces();
-  }, [loadWorkspaces]);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   const loadTree = useCallback(async () => {
     if (!activeWs) return;
@@ -6928,8 +6964,14 @@ export function App() {
   }, [activeWs, csrf]);
 
   useEffect(() => {
+    // Skip the fetch when this workspace's tree was just seeded by
+    // /me/bootstrap — it would be an identical query a moment later.
+    if (activeWs && bootstrappedTreeWsRef.current === activeWs.id) {
+      bootstrappedTreeWsRef.current = null;
+      return;
+    }
     void loadTree();
-  }, [loadTree]);
+  }, [loadTree, activeWs]);
 
   // Gmail-style page star. Optimistically flips isStarred on the matching tree
   // node, then persists; on failure we reload the tree to fall back to truth.
