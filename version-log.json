@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-07-28-published-page-fish",
+    "title": "Fish shoal on published pages",
+    "summary": "Publicly shared pages now carry the same swimming fish animation as the app — the 14+ mixed-size bait-ball glides across the top of every published document.",
+    "bullets": [
+      "The 24-strong shoal of different-size fish swims as one group across the page header, turning together at the edges.",
+      "Mobile viewers get a single fish to keep the page smooth, and the animation is skipped entirely for visitors who prefer reduced motion.",
+      "Purely decorative — it never blocks clicks or affects the page content."
+    ],
+    "publishedAt": "2026-07-28T22:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-faster-login",
     "title": "Much faster sign-in",
     "summary": "Login has been sped up on three fronts: cheaper password verification, a warm-up ping that wakes the API while you type, and one combined request for the first screen instead of three back-to-back ones.",
