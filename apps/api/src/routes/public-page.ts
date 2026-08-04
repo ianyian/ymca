@@ -328,6 +328,18 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
     .attachment-size { font-size: 12px; color: var(--muted); flex-shrink: 0; }
     .attachment-download { font-size: 12px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
 
+    /* Fish shoal — same critters as the app's top bar, swimming over the
+       published page's header. Purely decorative: no pointer events. */
+    .fish-field {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 88px;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 101;
+    }
+    .fish-unit { position: absolute; top: 0; left: 0; will-change: transform; }
+
     /* Footer */
     .page-footer {
       max-width: 720px; margin: 60px auto 0;
@@ -369,6 +381,105 @@ function renderPublicPage(title: string, icon: string | null, tags: string[], bo
       <span>${dateStr}</span>
     </footer>
   </div>
+
+  <div class="fish-field" id="fish-field" aria-hidden="true"></div>
+
+  <script>
+  // Fish bait-ball — a standalone port of the app's "many" (14+) fish shoal:
+  // mixed sizes, one shared heading, slight per-fish pace variance, turning as
+  // a group at the walls. Mobile gets a single fish (performance), and the
+  // whole thing is skipped for viewers who prefer reduced motion.
+  (function () {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var field = document.getElementById('fish-field');
+    if (!field) return;
+
+    var SIZES = matchMedia('(max-width: 767px)').matches
+      ? [3]
+      : [2, 1.75, 1.75, 1.5, 1.5, 1.5, 1.5, 1.25, 1.25, 1.25, 1.25, 1.25,
+         1, 1, 1, 1, 1, 1, 1, 1, 0.75, 0.75, 0.75, 0.75];
+
+    function sprite(w, h) {
+      return '<svg viewBox="0 0 26 16" width="' + w + '" height="' + h + '">' +
+        '<path d="M18 6.5 L26 8 L18 9.5 z" fill="#7cc0f5"/>' +
+        '<path d="M4 8 L0 3.5 L1.6 8 L0 12.5 z" fill="#1f6fb0"/>' +
+        '<ellipse cx="11" cy="8" rx="8" ry="4.2" fill="#2b8fe0"/>' +
+        '<ellipse cx="11" cy="9.4" rx="5.5" ry="2" fill="#bfe0ff"/>' +
+        '<path d="M9 4 L12 1.2 L14.5 4 z" fill="#1f6fb0"/>' +
+        '<path d="M11 11 L9 15 L13.5 11.5 z" fill="#1a5f98"/>' +
+        '<circle cx="15" cy="7" r="1.4" fill="#fff"/>' +
+        '<circle cx="15.2" cy="7" r="0.85" fill="#08283f"/>' +
+        '</svg>';
+    }
+
+    var W = field.clientWidth || 400;
+    var H = field.clientHeight || 88;
+    var school = {
+      dir: Math.random() < 0.5 ? 1 : -1,
+      speed: 34 + Math.random() * 30,
+      ax: W * (0.2 + Math.random() * 0.6),
+      ay: H * (0.15 + Math.random() * 0.5),
+    };
+
+    var fish = SIZES.map(function (s) {
+      var w = s * 22 * 1.1;
+      var h = (w * 16) / 26;
+      var el = document.createElement('div');
+      el.className = 'fish-unit';
+      el.innerHTML = sprite(w, h);
+      field.appendChild(el);
+      var ay = Math.max(0, Math.min(H - h, school.ay + (Math.random() - 0.5) * 40));
+      return {
+        el: el, w: w, h: h,
+        x: Math.max(0, Math.min(W - w, school.ax + (Math.random() - 0.5) * 120)),
+        y: ay, ay: ay,
+        sp: school.speed * (0.85 + Math.random() * 0.3),
+        burst: 0,
+        nextAct: performance.now() + 1800 + Math.random() * 4500,
+      };
+    });
+
+    var last = performance.now();
+    function tick(now) {
+      var dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      W = field.clientWidth || W;
+      H = field.clientHeight || H;
+
+      // the school turns as one when its leading edge reaches a wall
+      var minX = Infinity, maxR = -Infinity;
+      for (var i = 0; i < fish.length; i++) {
+        var c = fish[i];
+        if (c.x < minX) minX = c.x;
+        if (c.x + c.w > maxR) maxR = c.x + c.w;
+      }
+      if (school.dir === 1 && maxR >= W - 1) school.dir = -1;
+      else if (school.dir === -1 && minX <= 1) school.dir = 1;
+
+      for (var j = 0; j < fish.length; j++) {
+        var f = fish[j];
+        if (now >= f.nextAct) {
+          f.nextAct = now + 2600 + Math.random() * 5200;
+          f.burst = 40 + Math.random() * 60; // a quick dart forward
+        }
+        f.burst *= 0.9;
+        if (f.burst < 2) f.burst = 0;
+        var vx = school.dir * (f.sp + f.burst) * 0.55;
+        var vy = (f.ay - f.y) * 3; // hug the school's row
+        f.x += vx * dt;
+        f.y += vy * dt;
+        if (f.x < 0) f.x = 0;
+        if (f.x > W - f.w) f.x = W - f.w;
+        if (f.y < 0) f.y = 0;
+        if (f.y > H - f.h) f.y = H - f.h;
+        f.el.style.transform =
+          'translate(' + f.x.toFixed(1) + 'px,' + f.y.toFixed(1) + 'px) scaleX(' + school.dir + ')';
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
+  </script>
 
 </body>
 </html>`;
