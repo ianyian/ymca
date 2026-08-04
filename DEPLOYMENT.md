@@ -50,7 +50,7 @@ Set these as **Render environment variables**:
 | `DIRECT_DATABASE_URL` | Neon **direct** URL (no `-pooler`, `?sslmode=require`)        | used only by `prisma migrate` |
 | `APP_URL`             | your web origin, e.g. `https://<user>.github.io/ymca`        | password-reset + published-page links |
 | `CORS_ORIGINS`        | your web origin, e.g. `https://<user>.github.io`             | comma-separated allowlist; if unset, all origins are reflected |
-| `BCRYPT_ROUNDS`       | `12`                                                          | |
+| `BCRYPT_ROUNDS`       | `10`                                                          | 10 = OWASP baseline; higher values slow every login noticeably on small instances |
 | `SESSION_TTL_DAYS`    | `30`                                                          | |
 | `SMTP_HOST/PORT/USER/PASS/FROM` | optional                                           | password-reset emails; without SMTP the reset link is returned in dev only |
 
