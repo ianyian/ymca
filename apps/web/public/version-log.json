@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-08-04-home-todo-button",
+    "title": "To-do shortcut on the landing page",
+    "summary": "A To-do button now sits next to New Page at the top of the Document Hub, so the task list is one click away without going through the sidebar.",
+    "bullets": [
+      "One click opens the To-do view straight from the landing page header.",
+      "Follows your selected app language, like the rest of the interface."
+    ],
+    "publishedAt": "2026-08-04T10:00:00.000Z"
+  },
+  {
     "id": "2026-08-04-todo-delete-fix",
     "title": "To-do delete fixed",
     "summary": "Deleting a to-do now works reliably — the delete button is always visible on mobile, and deletes (plus checks and scheduling) save to the server instantly instead of waiting on a timer.",

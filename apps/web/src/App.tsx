@@ -2718,6 +2718,7 @@ function DocumentHub({
   isLoading,
   onSelectPage,
   onNewPage,
+  onOpenTodo,
   onDeletePage,
   onToggleStar,
   latestUpdateAt,
@@ -2731,6 +2732,7 @@ function DocumentHub({
   isLoading: boolean;
   onSelectPage: (id: string) => void;
   onNewPage: () => void;
+  onOpenTodo: () => void;
   onDeletePage: (id: string) => void;
   onToggleStar: (id: string, starred: boolean) => void;
   latestUpdateAt: string | null;
@@ -2778,19 +2780,34 @@ function DocumentHub({
         >
           {t.documentHub}
         </h1>
-        <button
-          onClick={onNewPage}
-          className='flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-sm font-medium text-white transition-colors'
-          style={{ background: "var(--accent-color)" }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "var(--accent-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "var(--accent-color)")
-          }
-        >
-          <Ico.Plus /> {t.newPage}
-        </button>
+        <div className='flex items-center gap-2'>
+          <button
+            onClick={onOpenTodo}
+            className='flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-sm font-medium border transition-colors'
+            style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", background: "transparent" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--bg-hover)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
+          >
+            <Ico.Check /> {t.todo}
+          </button>
+          <button
+            onClick={onNewPage}
+            className='flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-sm font-medium text-white transition-colors'
+            style={{ background: "var(--accent-color)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--accent-hover)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "var(--accent-color)")
+            }
+          >
+            <Ico.Plus /> {t.newPage}
+          </button>
+        </div>
       </div>
 
       {/* Tag filter pills */}
@@ -8320,6 +8337,11 @@ export function App() {
                   isLoading={initialLoad}
                   onSelectPage={(id) => void handleSelectPage(id)}
                   onNewPage={() => void handleNewPage()}
+                  onOpenTodo={() => {
+                    setShowTodo(true);
+                    setShowComa(false);
+                    setActivePage(null);
+                  }}
                   onDeletePage={(id) => void handleDeletePage(id)}
                   onToggleStar={(id, starred) => void toggleStar(id, starred)}
                   latestUpdateAt={latestVersionLogAt}
