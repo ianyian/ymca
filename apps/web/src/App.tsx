@@ -2375,22 +2375,25 @@ function TodoView({
 }: {
   items: TodoItemT[];
   loading: boolean;
-  update: (next: TodoItemT[]) => void;
+  update: (next: TodoItemT[], opts?: { immediate?: boolean }) => void;
 }) {
   const [input, setInput] = useState("");
 
   const addItem = () => {
     const text = input.trim();
     if (!text) return;
-    update([
-      ...items,
-      {
-        id: crypto.randomUUID(),
-        text,
-        done: false,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    update(
+      [
+        ...items,
+        {
+          id: crypto.randomUUID(),
+          text,
+          done: false,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      { immediate: true },
+    );
     setInput("");
   };
 
@@ -2468,6 +2471,7 @@ function TodoView({
                     items.map((x) =>
                       x.id === it.id ? { ...x, done: !x.done } : x,
                     ),
+                    { immediate: true },
                   )
                 }
                 className='shrink-0 w-5 h-5 rounded-[5px] flex items-center justify-center border transition-colors'
@@ -2512,6 +2516,7 @@ function TodoView({
                           items.map((x) =>
                             x.id === it.id ? { ...x, dueDate: null } : x,
                           ),
+                          { immediate: true },
                         )
                       }
                       className='ml-0.5 leading-none'
@@ -2549,15 +2554,19 @@ function TodoView({
                           ? { ...x, dueDate: e.target.value || null }
                           : x,
                       ),
+                      { immediate: true },
                     )
                   }
                   className='absolute inset-0 w-full h-full opacity-0 cursor-pointer'
                   aria-label='Schedule this task on a date'
                 />
               </div>
+              {/* Always visible on touch screens (no hover there); on desktop
+                  it fades in on row hover as before. Saves immediately so a
+                  quick refresh can't resurrect the deleted item. */}
               <button
-                onClick={() => update(items.filter((x) => x.id !== it.id))}
-                className='shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity'
+                onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
+                className='shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded transition-opacity'
                 style={{ color: "var(--text-muted)" }}
                 title='Delete'
               >
@@ -6766,17 +6775,47 @@ export function App() {
     };
   }, [user]);
 
-  const updateTodoItems = useCallback((next: TodoItemT[]) => {
-    setTodoItems(next);
-    if (todoSaveTimer.current) clearTimeout(todoSaveTimer.current);
-    todoSaveTimer.current = setTimeout(() => {
-      void api(
-        "/me/todo",
-        { method: "PUT", body: JSON.stringify({ items: next }) },
-        csrfRef.current,
-      ).catch(() => {});
-    }, 600);
+  // Latest unsaved list, so a flush always writes the newest state.
+  const todoPendingRef = useRef<TodoItemT[] | null>(null);
+  const flushTodoSave = useCallback(() => {
+    if (todoSaveTimer.current) {
+      clearTimeout(todoSaveTimer.current);
+      todoSaveTimer.current = null;
+    }
+    const pending = todoPendingRef.current;
+    if (!pending) return;
+    todoPendingRef.current = null;
+    // keepalive lets the request survive a page navigation/close mid-flight.
+    void api(
+      "/me/todo",
+      { method: "PUT", body: JSON.stringify({ items: pending }), keepalive: true },
+      csrfRef.current,
+    ).catch(() => {});
   }, []);
+
+  // Typing autosaves on a debounce; discrete clicks (delete, done-toggle,
+  // scheduling) pass immediate so a quick refresh can't undo them.
+  const updateTodoItems = useCallback(
+    (next: TodoItemT[], opts?: { immediate?: boolean }) => {
+      setTodoItems(next);
+      todoPendingRef.current = next;
+      if (todoSaveTimer.current) clearTimeout(todoSaveTimer.current);
+      if (opts?.immediate) {
+        flushTodoSave();
+        return;
+      }
+      todoSaveTimer.current = setTimeout(flushTodoSave, 600);
+    },
+    [flushTodoSave],
+  );
+
+  // Last line of defence: flush any pending debounced save when the tab is
+  // being hidden/closed, so edits made moments before leaving aren't lost.
+  useEffect(() => {
+    const onHide = () => flushTodoSave();
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [flushTodoSave]);
 
   // Whether the landing page (document hub) is the visible surface right now.
   const onHome = !activePage && !showComa && !showTodo;

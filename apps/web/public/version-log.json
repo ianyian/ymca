@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-08-04-todo-delete-fix",
+    "title": "To-do delete fixed",
+    "summary": "Deleting a to-do now works reliably — the delete button is always visible on mobile, and deletes (plus checks and scheduling) save to the server instantly instead of waiting on a timer.",
+    "bullets": [
+      "The trash button was hover-only, so on phones it was invisible; it now always shows on touch screens (desktop keeps the tidy hover reveal).",
+      "Deletes, done-toggles, and calendar changes save immediately — refreshing right after a delete can no longer bring the item back.",
+      "Pending edits are also flushed when you leave the page, so last-second changes aren't lost."
+    ],
+    "publishedAt": "2026-08-04T08:00:00.000Z"
+  },
+  {
     "id": "2026-07-28-published-page-fish",
     "title": "Fish shoal on published pages",
     "summary": "Publicly shared pages now carry the same swimming fish animation as the app — the 14+ mixed-size bait-ball glides across the top of every published document.",
