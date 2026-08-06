@@ -2401,7 +2401,9 @@ function TodoView({
 
   return (
     <div
-      className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[720px] mx-auto w-full'
+      // pb-28 on mobile: clearance so the floating back button can't sit on
+      // top of the last rows' delete/calendar buttons.
+      className='flex-1 overflow-y-auto px-4 pt-6 pb-28 sm:px-8 sm:pt-10 sm:pb-10 max-w-[720px] mx-auto w-full'
       data-scroll-host='main'
       data-analytics-zone='todo'
     >
@@ -2539,7 +2541,7 @@ function TodoView({
               {/* Calendar button: an invisible native date input sits on top of
                   the icon so clicking it opens the browser's date picker. */}
               <div
-                className='relative shrink-0 p-1 rounded'
+                className='relative shrink-0 p-2 sm:p-1 rounded'
                 style={{ color: it.dueDate ? "#e0a800" : "var(--text-muted)" }}
                 title={it.dueDate ? `Scheduled for ${it.dueDate}` : "Add to calendar"}
               >
@@ -2566,7 +2568,7 @@ function TodoView({
                   quick refresh can't resurrect the deleted item. */}
               <button
                 onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
-                className='shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded transition-opacity'
+                className='shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 sm:p-1 rounded transition-opacity'
                 style={{ color: "var(--text-muted)" }}
                 title='Delete'
               >
@@ -2772,15 +2774,16 @@ function DocumentHub({
 
   return (
     <div className='flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10 max-w-[900px] mx-auto w-full' data-analytics-zone='home-dashboard'>
-      {/* Header */}
-      <div className='flex items-center justify-between mb-6'>
+      {/* Header — wraps on narrow screens so the buttons drop cleanly below
+          the title instead of getting squeezed off the row */}
+      <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-3 mb-6'>
         <h1
           className='text-2xl sm:text-3xl font-bold'
           style={{ color: "var(--text-primary)" }}
         >
           {t.documentHub}
         </h1>
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 shrink-0'>
           <button
             onClick={onOpenTodo}
             className='flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-sm font-medium border transition-colors'
