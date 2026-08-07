@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-08-04-mobile-todo-polish",
+    "title": "Mobile fixes: header layout + reachable delete",
+    "summary": "On phones the landing header now wraps cleanly instead of squeezing the To-do/New Page buttons, and the floating back button no longer covers the delete buttons at the bottom of the to-do list.",
+    "bullets": [
+      "The Document Hub title and its buttons wrap onto two rows on narrow screens.",
+      "Extra bottom space in the To-do list so every row can scroll clear of the floating back button.",
+      "Bigger tap targets for the delete and calendar buttons on touch screens."
+    ],
+    "publishedAt": "2026-08-04T12:00:00.000Z"
+  },
+  {
     "id": "2026-08-04-home-todo-button",
     "title": "To-do shortcut on the landing page",
     "summary": "A To-do button now sits next to New Page at the top of the Document Hub, so the task list is one click away without going through the sidebar.",
