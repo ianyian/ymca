@@ -2461,12 +2461,13 @@ function TodoView({
           {items.map((it) => (
             <div
               key={it.id}
-              className='group flex items-start gap-3 px-3 py-2 rounded-[8px]'
+              className='group px-3 py-2 rounded-[8px]'
               style={{
                 border: "1px solid var(--border-color)",
                 background: "var(--bg-secondary)",
               }}
             >
+              <div className='flex items-start gap-3'>
               <button
                 onClick={() =>
                   update(
@@ -2506,7 +2507,7 @@ function TodoView({
                 />
                 {it.dueDate && (
                   <span
-                    className='inline-flex items-center gap-1 mt-1 text-[11px] px-1.5 py-0.5 rounded-full font-medium'
+                    className='hidden sm:inline-flex items-center gap-1 mt-1 text-[11px] px-1.5 py-0.5 rounded-full font-medium'
                     style={{ background: "rgba(245,197,24,0.22)", color: "#8a6d00" }}
                     title='Scheduled'
                   >
@@ -2538,10 +2539,12 @@ function TodoView({
                   {formatTodoTimestamp(it.createdAt)}
                 </span>
               )}
-              {/* Calendar button: an invisible native date input sits on top of
-                  the icon so clicking it opens the browser's date picker. */}
+              {/* Desktop-only inline actions. On phones these live in the
+                  action bar below instead — iOS gives the invisible native
+                  date input an oversized touch area that swallowed taps meant
+                  for the adjacent trash icon. */}
               <div
-                className='relative shrink-0 p-2 sm:p-1 rounded'
+                className='relative shrink-0 p-1 rounded hidden sm:block'
                 style={{ color: it.dueDate ? "#e0a800" : "var(--text-muted)" }}
                 title={it.dueDate ? `Scheduled for ${it.dueDate}` : "Add to calendar"}
               >
@@ -2563,17 +2566,74 @@ function TodoView({
                   aria-label='Schedule this task on a date'
                 />
               </div>
-              {/* Always visible on touch screens (no hover there); on desktop
-                  it fades in on row hover as before. Saves immediately so a
-                  quick refresh can't resurrect the deleted item. */}
               <button
                 onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
-                className='shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 sm:p-1 rounded transition-opacity'
+                className='shrink-0 hidden sm:block sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded transition-opacity'
                 style={{ color: "var(--text-muted)" }}
                 title='Delete'
               >
                 <Ico.Trash />
               </button>
+              </div>
+
+              {/* Mobile action bar: schedule on the left, delete on the far
+                  right — separate row, wide gap, no overlapping hit areas. */}
+              <div
+                className='flex sm:hidden items-center justify-between mt-2 pt-2 border-t'
+                style={{ borderColor: "var(--border-color)" }}
+              >
+                <span className='flex items-center gap-1.5'>
+                  <span
+                    className='relative flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-[6px] border'
+                    style={{
+                      borderColor: it.dueDate ? "rgba(224,168,0,0.5)" : "var(--border-color)",
+                      color: it.dueDate ? "#b8860b" : "var(--text-muted)",
+                    }}
+                  >
+                    <Ico.Calendar /> {it.dueDate ?? "Schedule"}
+                    <input
+                      type='date'
+                      value={it.dueDate ?? ""}
+                      onChange={(e) =>
+                        update(
+                          items.map((x) =>
+                            x.id === it.id
+                              ? { ...x, dueDate: e.target.value || null }
+                              : x,
+                          ),
+                          { immediate: true },
+                        )
+                      }
+                      className='absolute inset-0 w-full h-full opacity-0'
+                      aria-label='Schedule this task on a date'
+                    />
+                  </span>
+                  {it.dueDate && (
+                    <button
+                      onClick={() =>
+                        update(
+                          items.map((x) =>
+                            x.id === it.id ? { ...x, dueDate: null } : x,
+                          ),
+                          { immediate: true },
+                        )
+                      }
+                      className='px-2 py-1.5 text-[12px]'
+                      style={{ color: "var(--text-muted)" }}
+                      title='Remove from calendar'
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
+                <button
+                  onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
+                  className='flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-[6px] border'
+                  style={{ borderColor: "rgba(200,48,48,0.4)", color: "#c03030" }}
+                >
+                  <Ico.Trash /> Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

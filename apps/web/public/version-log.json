@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-08-06-todo-mobile-action-bar",
+    "title": "To-do on mobile: separate Schedule / Delete row",
+    "summary": "On phones each task now has its own action row — a Schedule chip on the left and a clearly labelled red Delete button on the far right — so deleting no longer accidentally opens the date picker.",
+    "bullets": [
+      "iOS gives the invisible date-picker control an oversized touch area that was swallowing taps meant for the trash icon; the two actions are now on their own row, far apart.",
+      "The Schedule chip shows the booked date right on it, with an ✕ to unschedule.",
+      "Desktop keeps the compact inline icons exactly as before."
+    ],
+    "publishedAt": "2026-08-06T18:00:00.000Z"
+  },
+  {
     "id": "2026-08-04-mobile-todo-polish",
     "title": "Mobile fixes: header layout + reachable delete",
     "summary": "On phones the landing header now wraps cleanly instead of squeezing the To-do/New Page buttons, and the floating back button no longer covers the delete buttons at the bottom of the to-do list.",
