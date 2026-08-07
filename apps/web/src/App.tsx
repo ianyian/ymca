@@ -6915,6 +6915,15 @@ export function App() {
   // Auto-update: poll version.json (bypassing the HTTP cache). When a strictly
   // newer build has been deployed, reload once to pick it up — this is what
   // keeps phones from getting stuck on a stale cached bundle after a deploy.
+  // Once the fresh build has loaded, drop the ?v= cache-buster from the URL.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("v")) {
+      url.searchParams.delete("v");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
+
   useEffect(() => {
     let stopped = false;
     async function checkVersion() {
@@ -6933,7 +6942,15 @@ export function App() {
           sessionStorage.getItem("ymca_updated_to") !== id
         ) {
           sessionStorage.setItem("ymca_updated_to", id);
-          if (!stopped) window.location.reload();
+          // A plain location.reload() can re-serve the same cached index.html
+          // (mobile browsers especially), leaving the app stuck on the old
+          // bundle forever. Navigating to a ?v=<id> URL changes the cache key,
+          // which forces a fresh HTML fetch that references the new bundle.
+          if (!stopped) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("v", id);
+            window.location.replace(url.toString());
+          }
         }
       } catch {
         /* offline / transient — ignore, try again next tick */
