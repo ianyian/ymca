@@ -2378,6 +2378,17 @@ function TodoView({
   update: (next: TodoItemT[], opts?: { immediate?: boolean }) => void;
 }) {
   const [input, setInput] = useState("");
+  // Delete asks for confirmation first — one tap felt too easy to fat-finger.
+  const [confirmDelete, setConfirmDelete] = useState<TodoItemT | null>(null);
+
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmDelete(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmDelete]);
 
   const addItem = () => {
     const text = input.trim();
@@ -2567,7 +2578,7 @@ function TodoView({
                 />
               </div>
               <button
-                onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
+                onClick={() => setConfirmDelete(it)}
                 className='shrink-0 hidden sm:block sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded transition-opacity'
                 style={{ color: "var(--text-muted)" }}
                 title='Delete'
@@ -2627,7 +2638,7 @@ function TodoView({
                   )}
                 </span>
                 <button
-                  onClick={() => update(items.filter((x) => x.id !== it.id), { immediate: true })}
+                  onClick={() => setConfirmDelete(it)}
                   className='flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-[6px] border'
                   style={{ borderColor: "rgba(200,48,48,0.4)", color: "#c03030" }}
                 >
@@ -2636,6 +2647,56 @@ function TodoView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete confirmation — pause before removing a task */}
+      {confirmDelete && (
+        <div
+          className='fixed inset-0 z-[90] flex items-center justify-center p-6'
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className='w-full max-w-[340px] rounded-2xl border shadow-2xl p-5'
+            style={{ background: "var(--bg-primary)", borderColor: "var(--border-color)" }}
+          >
+            <h2 className='text-[15px] font-semibold mb-1.5' style={{ color: "var(--text-primary)" }}>
+              Delete this task?
+            </h2>
+            <p
+              className='text-[13px] mb-4 break-words'
+              style={{
+                color: "var(--text-muted)",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {confirmDelete.text || "Untitled task"}
+            </p>
+            <div className='flex gap-2 justify-end'>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className='px-4 py-2 rounded-[8px] text-sm font-medium border'
+                style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}
+              >
+                No, keep it
+              </button>
+              <button
+                onClick={() => {
+                  update(items.filter((x) => x.id !== confirmDelete.id), { immediate: true });
+                  setConfirmDelete(null);
+                }}
+                className='px-4 py-2 rounded-[8px] text-sm font-medium text-white'
+                style={{ background: "#c03030" }}
+              >
+                Yes, delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

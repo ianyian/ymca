@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-08-06-todo-delete-confirm",
+    "title": "To-do: confirm before delete",
+    "summary": "Deleting a task now asks first — a small Yes/No dialog shows the task text so you can pause and check before it's removed.",
+    "bullets": [
+      "Tapping Delete opens a confirmation showing the task you're about to remove.",
+      "Yes, delete removes it instantly; No, keep it (or tapping outside / Esc) cancels.",
+      "Applies on both desktop and mobile."
+    ],
+    "publishedAt": "2026-08-06T20:00:00.000Z"
+  },
+  {
     "id": "2026-08-06-todo-mobile-action-bar",
     "title": "To-do on mobile: separate Schedule / Delete row",
     "summary": "On phones each task now has its own action row — a Schedule chip on the left and a clearly labelled red Delete button on the far right — so deleting no longer accidentally opens the date picker.",
